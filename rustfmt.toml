@@ -1,0 +1,9 @@
+wrap_comments = true
+
+# rust-analyzer generally inserts use statements wherever so this standardizes
+# their order and granularity.
+imports_granularity = "Module"
+group_imports = "StdExternalCrate"
+
+format_code_in_doc_comments = true
+format_strings = true
