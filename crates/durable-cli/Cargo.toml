@@ -10,6 +10,7 @@ path = "src/main.rs"
 [dependencies]
 anyhow = "1.0.86"
 clap = { version = "4.5.11", features = ["env", "derive"] }
+futures-util = "0.3.30"
 serde = "1.0.204"
 serde_json = { version = "1.0.120", features = ["raw_value"] }
 sqlx = { version = "0.8.0", features = ["postgres", "runtime-tokio", "tls-rustls"] }

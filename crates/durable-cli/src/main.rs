@@ -2,9 +2,11 @@
 
 use anyhow::Context;
 use clap::Parser;
+use tokio::sync::OnceCell;
 use tracing_subscriber::prelude::*;
 
 mod launch;
+mod logs;
 
 #[derive(Debug, clap::Parser)]
 struct Args {
@@ -18,6 +20,7 @@ struct Args {
 #[derive(Debug, clap::Subcommand)]
 enum Commands {
     Launch(self::launch::Launch),
+    Logs(self::logs::Logs),
 }
 
 #[tokio::main]
@@ -31,6 +34,7 @@ async fn main() -> anyhow::Result<()> {
 
     match args.command {
         Commands::Launch(cmd) => cmd.run(&args.common).await,
+        Commands::Logs(cmd) => cmd.run(&args.common).await,
     }
 }
 
@@ -38,12 +42,20 @@ async fn main() -> anyhow::Result<()> {
 struct CommonOptions {
     #[arg(long, env = "DATABASE_URL")]
     database_url: String,
+
+    #[arg(skip)]
+    pool: OnceCell<sqlx::PgPool>,
 }
 
 impl CommonOptions {
     pub async fn pool(&self) -> anyhow::Result<sqlx::PgPool> {
-        sqlx::PgPool::connect(&self.database_url)
+        self.pool
+            .get_or_try_init(|| async {
+                sqlx::PgPool::connect(&self.database_url)
+                    .await
+                    .context("failed to connect to the database")
+            })
             .await
-            .context("failed to connect to the database")
+            .map(|pool| pool.clone())
     }
 }
