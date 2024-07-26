@@ -41,7 +41,7 @@ where
     F: for<'a> Fn(&'a TxnContext) -> T,
     T: Serialize + DeserializeOwned,
 {
-    if in_transaction() {
+    if !in_transaction() {
         transaction(label, func)
     } else {
         let ctx = TxnContext::new();

@@ -48,7 +48,7 @@ impl Launch {
         .await?
         .id;
 
-        println!("task as task id {id}");
+        println!("launched new task with id {id}");
 
         Ok(())
     }

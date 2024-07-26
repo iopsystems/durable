@@ -10,11 +10,6 @@ mod context;
 mod start;
 mod transaction;
 
-#[doc(hidden)]
-pub mod export {
-    pub use crate::start::durable_entry;
-}
-
 pub use crate::context::TxnContext;
 pub use crate::transaction::transaction;
 

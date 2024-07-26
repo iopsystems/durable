@@ -15,7 +15,7 @@ use tokio::task::JoinSet;
 use tokio::time::Instant;
 use tracing::Instrument;
 
-use crate::bindings::Core;
+use crate::bindings::{Core, CorePre};
 use crate::error::AbortError;
 use crate::event::{Event, EventSource, NotificationInserted, TaskInserted};
 use crate::flag::{ShutdownFlag, ShutdownGuard};
@@ -234,8 +234,9 @@ impl Worker {
                 .await?;
 
             // To avoid weird cases with large clusters the maximum interval is 1 day.
-            let mut interval = ((shared.config.heartbeat_timeout / 2) * (record.count as u32))
-                .min(Duration::from_secs(24 * 3600));
+            let mut interval = ((shared.config.heartbeat_timeout / 2)
+                * (record.count as u32).max(1))
+            .min(Duration::from_secs(24 * 3600));
             let jitter = rand::thread_rng().gen_range(0..(interval / 2).as_nanos());
             interval -= Duration::from_nanos(jitter as u64);
 
@@ -479,17 +480,19 @@ impl Worker {
 
         let state = WorkflowState::new(shared.clone(), task, worker_id);
         let mut linker = Linker::new(&engine);
-        Core::add_to_linker(&mut linker, |state: &mut WorkflowState| state)?;
+
+        Core::add_to_linker(&mut linker, |state| state)?;
+        // linker.define_unknown_imports_as_traps(&component)?;
+
+        let instance_pre = linker
+            .instantiate_pre(&component)
+            .context("failed to pre-instantiate the wasm component")?;
 
         let mut store = wasmtime::Store::new(&engine, state);
-        linker.define_unknown_imports_as_traps(&component)?;
-        let instance = linker.instantiate_async(&mut store, &component).await?;
+        let core = CorePre::new(instance_pre)?;
+        let instance = core.instantiate_async(&mut store).await?;
 
-        let func = instance
-            .get_typed_func::<(), ()>(&mut store, "start")
-            .context("failed to load function `start` from the wasm module")?;
-
-        func.call_async(&mut store, ()).await
+        instance.call_start(&mut store).await
     }
 }
 

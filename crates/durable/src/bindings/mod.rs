@@ -1,10 +1,9 @@
-#[cfg(not(feature = "regenerate"))]
-mod core;
-#[cfg(feature = "regenerate")]
 mod core {
+    #[cfg(feature = "regenerate")]
     include!(concat!(env!("OUT_DIR"), "/core.rs"));
-}
 
-mod core2;
+    #[cfg(not(feature = "regenerate"))]
+    include!("core.rs");
+}
 
 pub use self::core::*;

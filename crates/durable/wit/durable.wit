@@ -1,6 +1,8 @@
 package durable:core@1.0.0;
 
 world core {
+    export start: func();
+
     // Get access to the task name.
     import task-name: func() -> string;
     // Get access to the encoded json data
