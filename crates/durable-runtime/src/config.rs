@@ -20,6 +20,12 @@ pub struct Config {
     /// worker entry in the database and doesn't need to be expired via a
     /// heartbeat.
     pub heartbeat_timeout: Duration,
+
+    /// The maximum permitted timeout when a workflow makes HTTP requests.
+    ///
+    /// Timeouts longer than this maximum will be clamped and if no timeout is
+    /// provided then this is the timeout that will be used.
+    pub max_http_timeout: Duration,
 }
 
 impl Default for Config {
@@ -27,6 +33,7 @@ impl Default for Config {
         Self {
             heartbeat_interval: Duration::from_secs(30),
             heartbeat_timeout: Duration::from_secs(120),
+            max_http_timeout: Duration::from_secs(60),
         }
     }
 }

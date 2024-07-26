@@ -5,8 +5,6 @@ use std::panic::AssertUnwindSafe;
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 
-use crate::TxnContext;
-
 static IN_TRANSACTION: SyncUnsafeCell<bool> = SyncUnsafeCell::new(false);
 
 /// Create an execute a transaction.
@@ -18,7 +16,7 @@ static IN_TRANSACTION: SyncUnsafeCell<bool> = SyncUnsafeCell::new(false);
 /// This means that transactions provide at-least-once semantics.
 pub fn transaction<F, T>(label: &str, func: F) -> T
 where
-    F: for<'a> Fn(&'a TxnContext) -> T,
+    F: Fn() -> T,
     T: Serialize + DeserializeOwned,
 {
     let opts = TransactionOptions {
@@ -38,14 +36,18 @@ pub(crate) fn in_transaction() -> bool {
 /// Run `func` in a transaction unless we are already running in one.
 pub(crate) fn maybe_txn<F, T>(label: &str, func: F) -> T
 where
-    F: for<'a> Fn(&'a TxnContext) -> T,
+    F: FnOnce() -> T,
     T: Serialize + DeserializeOwned,
 {
     if !in_transaction() {
-        transaction(label, func)
+        let opts = TransactionOptions {
+            label,
+            is_txn: false,
+        };
+
+        transaction_impl(opts, func)
     } else {
-        let ctx = TxnContext::new();
-        func(&ctx)
+        func()
     }
 }
 
@@ -75,13 +77,13 @@ impl Drop for InTxnGuard {
 
 pub(crate) fn transaction_impl<F, T>(opts: TransactionOptions, func: F) -> T
 where
-    F: for<'a> Fn(&'a TxnContext) -> T,
+    F: FnOnce() -> T,
     T: Serialize + DeserializeOwned,
 {
     #[derive(Serialize, Deserialize)]
-    #[serde(tag = "type", content = "data")]
+    #[serde(tag = "type", content = "data", rename_all = "kebab-case")]
     enum TransactionResult<T, E = String> {
-        Data(T),
+        Value(T),
         Panic(E),
     }
 
@@ -96,7 +98,7 @@ where
         };
 
         match data {
-            TransactionResult::Data(data) => return data,
+            TransactionResult::Value(data) => return data,
             TransactionResult::Panic(payload) => {
                 std::panic::resume_unwind(Box::new(payload));
             }
@@ -104,10 +106,9 @@ where
     }
 
     let _guard = InTxnGuard::new();
-    let context = TxnContext::new();
     let result = std::panic::catch_unwind(AssertUnwindSafe(|| {
-        let data = func(&context);
-        let json = serde_json::to_string(&TransactionResult::<_, String>::Data(&data))
+        let data = func();
+        let json = serde_json::to_string(&TransactionResult::<_, String>::Value(&data))
             .expect("failed to serialize the transaction result to json");
 
         (data, json)

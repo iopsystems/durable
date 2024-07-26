@@ -1,1 +1,2 @@
 /target
+/crates/durable-runtime/src/bindings.rs

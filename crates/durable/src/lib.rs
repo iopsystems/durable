@@ -6,12 +6,18 @@ pub use serde_json::value::RawValue;
 extern crate serde;
 
 mod bindings;
-mod context;
 mod start;
 mod transaction;
 
-pub use crate::context::TxnContext;
 pub use crate::transaction::transaction;
+
+#[cfg(feature = "http")]
+pub mod http;
+
+#[doc(hidden)]
+pub mod export {
+    pub use crate::start::durable_start;
+}
 
 /// The name of the currently executing task.
 ///
@@ -41,9 +47,7 @@ pub fn abort(message: &str) -> ! {
 }
 
 pub fn print(message: &str) {
-    wit_bindgen::rt::maybe_link_cabi_realloc();
-
-    crate::transaction::maybe_txn("durable::print", |_| {
+    crate::transaction::maybe_txn("durable::print", || {
         crate::bindings::print(message);
         message.to_owned()
     });

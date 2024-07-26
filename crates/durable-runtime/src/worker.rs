@@ -482,7 +482,7 @@ impl Worker {
         let mut linker = Linker::new(&engine);
 
         Core::add_to_linker(&mut linker, |state| state)?;
-        // linker.define_unknown_imports_as_traps(&component)?;
+        linker.define_unknown_imports_as_traps(&component)?;
 
         let instance_pre = linker
             .instantiate_pre(&component)

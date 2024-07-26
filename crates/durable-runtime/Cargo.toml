@@ -7,6 +7,7 @@ edition = "2021"
 [features]
 default = ["cli"]
 cli = ["dep:clap", "dep:tracing-subscriber", "tokio/full"]
+regen = []
 
 [[bin]]
 name = "durable-server"
@@ -32,6 +33,7 @@ tracing-subscriber = { version = "0.3", optional = true, features = [
     "fmt",
     "env-filter",
 ] }
+http = "1.1.0"
 
 [dependencies.sqlx]
 version = "0.8.0"

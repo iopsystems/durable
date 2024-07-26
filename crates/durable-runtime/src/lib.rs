@@ -3,6 +3,7 @@
 #[macro_use]
 extern crate serde;
 
+#[path = "bindings/mod.rs"]
 mod bindings;
 mod config;
 mod error;

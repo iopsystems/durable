@@ -1,10 +1,13 @@
 use std::sync::Arc;
+use std::time::Duration;
 
 use anyhow::Context;
+use reqwest::header::{HeaderName, HeaderValue};
+use reqwest::Method;
 use serde_json::value::RawValue;
 use sqlx::types::Json;
 
-use crate::bindings::durable::CoreImports;
+use crate::bindings::durable::*;
 use crate::error::AbortError;
 use crate::worker::{SharedState, TaskData};
 
@@ -51,6 +54,14 @@ struct CurrentTxn {
 }
 
 impl WorkflowState {
+    fn assert_in_transaction(&self, op: &str) -> anyhow::Result<()> {
+        if !self.txn.is_some() {
+            anyhow::bail!("attempted to run impure function `{op}` outside of a transaction")
+        }
+
+        Ok(())
+    }
+
     async fn enter(
         &mut self,
         label: String,
@@ -155,12 +166,43 @@ impl WorkflowState {
         Ok(())
     }
 
-    fn assert_in_transaction(&self, op: &str) -> anyhow::Result<()> {
-        if !self.txn.is_some() {
-            anyhow::bail!("attempted to run impure function `{op}` outside of a transaction")
+    async fn http_impl(&mut self, request: HttpRequest) -> Result<HttpResponse, HttpError> {
+        let method = Method::from_bytes(request.method.as_bytes())?;
+        let timeout = request
+            .timeout
+            .map(Duration::from_nanos)
+            .unwrap_or(self.shared.config.max_http_timeout)
+            .min(self.shared.config.max_http_timeout);
+
+        let url = reqwest::Url::parse(&request.url) //
+            .map_err(|e| HttpError::InvalidUrl(e.to_string()))?;
+        let mut builder = self.shared.client.request(method, url).timeout(timeout);
+
+        if let Some(body) = request.body {
+            builder = builder.body(body);
         }
 
-        Ok(())
+        for header in request.headers {
+            let name = HeaderName::from_bytes(&header.name.as_bytes())?;
+            let value = HeaderValue::from_bytes(&header.value)?;
+
+            builder = builder.header(name, value);
+        }
+
+        let response = builder.send().await?;
+
+        Ok(HttpResponse {
+            status: response.status().as_u16(),
+            headers: response
+                .headers()
+                .iter()
+                .map(|(name, value)| HttpHeader {
+                    name: name.as_str().to_owned(),
+                    value: value.as_bytes().to_owned(),
+                })
+                .collect(),
+            body: response.bytes().await?.to_vec(),
+        })
     }
 }
 
@@ -202,5 +244,14 @@ impl CoreImports for WorkflowState {
 
         println!("{message}");
         Ok(())
+    }
+
+    async fn http(
+        &mut self,
+        request: HttpRequest,
+    ) -> anyhow::Result<Result<HttpResponse, HttpError>> {
+        self.assert_in_transaction("http")?;
+
+        Ok(self.http_impl(request).await)
     }
 }
