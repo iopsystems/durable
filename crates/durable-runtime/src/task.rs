@@ -4,7 +4,7 @@ use anyhow::Context;
 use serde_json::value::RawValue;
 use sqlx::types::Json;
 
-use crate::bindings::CoreImports;
+use crate::bindings::durable::CoreImports;
 use crate::error::AbortError;
 use crate::worker::{SharedState, TaskData};
 

@@ -15,7 +15,7 @@ use tokio::task::JoinSet;
 use tokio::time::Instant;
 use tracing::Instrument;
 
-use crate::bindings::{Core, CorePre};
+use crate::bindings::durable::{Core, CorePre};
 use crate::error::AbortError;
 use crate::event::{Event, EventSource, NotificationInserted, TaskInserted};
 use crate::flag::{ShutdownFlag, ShutdownGuard};
