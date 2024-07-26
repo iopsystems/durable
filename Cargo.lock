@@ -607,6 +607,8 @@ dependencies = [
  "http-serde-ext",
  "serde",
  "serde_json",
+ "serde_urlencoded",
+ "url",
  "wit-bindgen-rt",
  "xshell",
 ]
@@ -2896,6 +2898,7 @@ dependencies = [
  "form_urlencoded",
  "idna",
  "percent-encoding",
+ "serde",
 ]
 
 [[package]]

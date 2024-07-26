@@ -7,7 +7,7 @@ edition = "2021"
 default = ["http"]
 regenerate = ["dep:xshell"]
 
-http = ["dep:http", "dep:http-serde-ext"]
+http = ["dep:http", "dep:http-serde-ext", "dep:serde_urlencoded", "dep:url"]
 
 [dependencies]
 serde = { version = "1.0", features = ["derive"] }
@@ -16,6 +16,8 @@ wit-bindgen-rt = "0.28.0"
 
 http = { version = "1.0", optional = true }
 http-serde-ext = { version = "1.0.2", optional = true }
+serde_urlencoded = { version = "0.7.1", optional = true }
+url = { version = "2.5.2", optional = true, features = ["serde"] }
 
 [build-dependencies]
 xshell = { version = "0.2.6", optional = true }
