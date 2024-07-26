@@ -1,0 +1,34 @@
+package durable:core@1.0.0;
+
+world core {
+    // Get access to the task name.
+    import task-name: func() -> string;
+    // Get access to the encoded json data
+    import task-data: func() -> string;
+
+    // Immediately abort the task with an error.
+    import abort: func(message: string);
+
+    // Start a transaction. If this transaction has already executed to completion
+    // then return the data from the last time it was executed.
+    //
+    // Parameters:
+    // - `label` - A text label that gets recorded in the event. This is used to
+    //             validate that events are in fact executing in the same order
+    //             when the workflow is restarted.
+    // - `is-db` - Whether this transaction is a database transaction and should
+    //             reserve a database connection so that sql can be used within.
+    import transaction-enter: func(label: string, is-db: bool) -> option<string>;
+
+    // Complete a transaction, saving the result of this transaction for future use.
+    //
+    // Parameters:
+    // - `data` - JSON-encoded state to save.
+    import transaction-exit: func(data: string);
+
+    // Impure functions.
+    //
+    // It is only valid to call these when within a transaction. Attempting to
+    // call them otherwise will immediately abort the workflow.
+    import print: func(data: string);
+}

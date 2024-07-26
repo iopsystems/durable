@@ -1,0 +1,8 @@
+[package]
+name = "durable-protocol"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies.fp-bindgen]
+version = "3.0.0"
+features = ["generators"]
