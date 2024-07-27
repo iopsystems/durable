@@ -1,4 +1,4 @@
-// #![allow(unused_mut)]
+//! Bindings for the durable:core WIT interface.
 
 wasmtime::component::bindgen!({
     path: "../durable/wit",
