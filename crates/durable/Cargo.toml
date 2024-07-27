@@ -4,20 +4,29 @@ version = "0.1.0"
 edition = "2021"
 
 [features]
-default = ["http"]
-regenerate = ["dep:xshell"]
+default = ["sqlx"]
 
-http = ["dep:http", "dep:http-serde-ext", "dep:serde_urlencoded", "dep:url"]
+http = ["dep:durable-http"]
+sqlx = ["dep:sqlx", "dep:chrono"]
 
 [dependencies]
+durable-core = { path = "../durable-core" }
+durable-http = { path = "../durable-http", optional = true }
+
 serde = { version = "1.0", features = ["derive"] }
 serde_json = { version = "1.0", features = ["raw_value"] }
 wit-bindgen-rt = "0.28.0"
 
-http = { version = "1.0", optional = true }
-http-serde-ext = { version = "1.0.2", optional = true }
-serde_urlencoded = { version = "0.7.1", optional = true }
-url = { version = "2.5.2", optional = true, features = ["serde"] }
+chrono = { version = "0.4.38", optional = true }
 
-[build-dependencies]
-xshell = { version = "0.2.6", optional = true }
+[dependencies.sqlx]
+version = "0.8.0"
+default-features = false
+optional = true
+
+[[example]]
+name = "hello-world"
+
+[[example]]
+name = "http-request"
+required-features = ["http"]

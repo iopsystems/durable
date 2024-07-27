@@ -1,4 +1,4 @@
-use crate::bindings::Guest;
+use crate::bindings::{export, Guest};
 
 extern "Rust" {
     #[link_name = "_start"]

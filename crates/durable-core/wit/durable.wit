@@ -37,6 +37,51 @@ interface http {
     http: func(request: http-request) -> result<http-response, http-error>;
 }
 
+interface sql {
+    variant primitive {
+        null,
+        boolean(bool),
+        single(f32),
+        double(f64),
+        int8(s8),
+        int16(s16),
+        int32(s32),
+        int64(s64),
+        text(string),
+        bytea(list<u8>),
+    }
+
+    variant value {
+        primitive(primitive),
+        array(list<primitive>)
+    }
+
+    record column {
+        name: string,
+        value: value
+    }
+
+    record row {
+        columns: list<column>
+    }
+
+    record options {
+        // Instructs the runtime to not bother returning any rows since they
+        // won't be used by the workflow.
+        drop-returned-rows: bool
+    }
+
+    variant error {
+        other(string)
+    }
+
+    query: func(
+        sql: string,
+        params: list<value>,
+        options: options,
+    ) -> result<list<row>, error>;
+}
+
 world core {
     // The main function that is called to actually start the workflow.
     export start: func();
@@ -75,4 +120,5 @@ world core {
     import print: func(data: string);
 
     import http;
+    import sql;
 }

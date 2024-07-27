@@ -37,4 +37,4 @@ http = "1.1.0"
 
 [dependencies.sqlx]
 version = "0.8.0"
-features = ["postgres", "runtime-tokio", "tls-rustls"]
+features = ["postgres", "runtime-tokio", "tls-rustls", "chrono"]
