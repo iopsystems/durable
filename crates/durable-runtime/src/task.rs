@@ -2,12 +2,14 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use anyhow::Context;
+use async_trait::async_trait;
 use reqwest::header::{HeaderName, HeaderValue};
 use reqwest::Method;
 use serde_json::value::RawValue;
 use sqlx::types::Json;
 
-use crate::bindings::durable::*;
+use crate::bindings::durable::http::*;
+use crate::bindings::durable::{self, *};
 use crate::error::AbortError;
 use crate::worker::{SharedState, TaskData};
 
@@ -206,7 +208,7 @@ impl WorkflowState {
     }
 }
 
-#[async_trait::async_trait]
+#[async_trait]
 impl CoreImports for WorkflowState {
     fn task_name(&mut self) -> anyhow::Result<String> {
         Ok(self.name.clone())
@@ -245,7 +247,10 @@ impl CoreImports for WorkflowState {
         println!("{message}");
         Ok(())
     }
+}
 
+#[async_trait]
+impl durable::http::Host for WorkflowState {
     async fn http(
         &mut self,
         request: HttpRequest,

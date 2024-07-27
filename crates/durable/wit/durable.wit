@@ -1,5 +1,42 @@
 package durable:core@1.0.0;
 
+// Types and functions for making HTTP requests from within the workflow.
+interface http {
+    record http-header {
+        name: string,
+        value: list<u8>,
+    }
+
+    record http-request {
+        method: string,
+        url: string,
+        headers: list<http-header>,
+        body: option<list<u8>>,
+        timeout: option<u64>,
+    }
+
+    record http-response {
+        status: u16,
+        headers: list<http-header>,
+        body: list<u8>
+    }
+
+    variant http-error {
+        timeout,
+        invalid-method,
+        invalid-url(string),
+        invalid-header-name,
+        invalid-header-value,
+        other(string)
+    }
+
+    // Make an HTTP request.
+    //
+    // # Parameters
+    // - `request` - A description of the HTTP request to make.
+    http: func(request: http-request) -> result<http-response, http-error>;
+}
+
 world core {
     // The main function that is called to actually start the workflow.
     export start: func();
@@ -37,37 +74,5 @@ world core {
     // Print a line to stdout.
     import print: func(data: string);
 
-    record http-header {
-        name: string,
-        value: list<u8>,
-    }
-
-    record http-request {
-        method: string,
-        url: string,
-        headers: list<http-header>,
-        body: option<list<u8>>,
-        timeout: option<u64>,
-    }
-
-    record http-response {
-        status: u16,
-        headers: list<http-header>,
-        body: list<u8>
-    }
-
-    variant http-error {
-        timeout,
-        invalid-method,
-        invalid-url(string),
-        invalid-header-name,
-        invalid-header-value,
-        other(string)
-    }
-
-    // Make an HTTP request.
-    //
-    // # Parameters
-    // - `request` - A description of the HTTP request to make.
-    import http: func(request: http-request) -> result<http-response, http-error>;
+    import http;
 }

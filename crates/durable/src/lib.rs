@@ -5,9 +5,14 @@ pub use serde_json::value::RawValue;
 #[macro_use]
 extern crate serde;
 
-mod bindings;
 mod start;
 mod transaction;
+
+mod bindings {
+    include!("bindings.rs");
+
+    pub use self::durable::core::*;
+}
 
 pub use crate::transaction::transaction;
 

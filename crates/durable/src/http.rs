@@ -22,7 +22,7 @@ use serde::Serialize;
 use url::Url;
 
 fn send(request: &Request) -> Result<Response, Error> {
-    use crate::bindings::*;
+    use crate::bindings::http::*;
 
     let label = format!("durable::http::send({} {})", request.method, request.url);
     crate::transaction::maybe_txn(&label, || {
@@ -48,7 +48,7 @@ fn send(request: &Request) -> Result<Response, Error> {
             timeout,
         };
 
-        match crate::bindings::http(&request) {
+        match http(&request) {
             Ok(response) => {
                 let status = StatusCode::from_u16(response.status)
                     .map_err(|_| ErrorKind::InvalidStatus(response.status))?;
@@ -111,7 +111,7 @@ pub fn head(url: impl AsRef<str>) -> RequestBuilder {
 }
 
 /// A request which can be executed by calling [`send`].
-/// 
+///
 /// [`send`]: Request::send
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Request {
@@ -333,7 +333,7 @@ impl RequestBuilder {
     }
 
     /// Add a set of headers to the existing ones on this request.
-    /// 
+    ///
     /// The headers will be merged in to any already set.
     pub fn headers(self, headers: HeaderMap) -> Self {
         self.modify(|req| {
