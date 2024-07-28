@@ -21,6 +21,11 @@ pub mod export {
     pub use crate::start::durable_start;
 }
 
+/// The numeric id of the currently executing task.
+pub fn task_id() -> i64 {
+    crate::bindings::task_id()
+}
+
 /// The name of the currently executing task.
 ///
 /// This is the name that was provided when the task was being created.

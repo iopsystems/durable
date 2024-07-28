@@ -24,7 +24,7 @@ where
         is_txn: false,
     };
 
-    transaction_impl(opts, func)
+    transaction_with(opts, func)
 }
 
 pub fn in_transaction() -> bool {
@@ -45,15 +45,29 @@ where
             is_txn: false,
         };
 
-        transaction_impl(opts, func)
+        transaction_with(opts, func)
     } else {
         func()
     }
 }
 
-pub(crate) struct TransactionOptions<'a> {
+pub struct TransactionOptions<'a> {
     label: &'a str,
     is_txn: bool,
+}
+
+impl<'a> TransactionOptions<'a> {
+    pub fn new(label: &'a str) -> Self {
+        Self {
+            label,
+            is_txn: false,
+        }
+    }
+
+    pub fn database(mut self, is_db_txn: bool) -> Self {
+        self.is_txn = is_db_txn;
+        self
+    }
 }
 
 struct InTxnGuard(());
@@ -75,9 +89,9 @@ impl Drop for InTxnGuard {
     }
 }
 
-pub(crate) fn transaction_impl<F, T>(opts: TransactionOptions, func: F) -> T
+pub fn transaction_with<F, T>(opts: TransactionOptions, func: F) -> T
 where
-    F: FnOnce() -> T,
+    F: Fn() -> T,
     T: Serialize + DeserializeOwned,
 {
     #[derive(Serialize, Deserialize)]

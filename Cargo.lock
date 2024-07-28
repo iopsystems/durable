@@ -130,6 +130,28 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7d5a26814d8dcb93b0e5a0ff3c6d80a8843bafb21b39e8e18a6f05471870e110"
 
 [[package]]
+name = "async-stream"
+version = "0.3.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "cd56dd203fef61ac097dd65721a419ddccb106b2d2b70ba60a6b529f03961a51"
+dependencies = [
+ "async-stream-impl",
+ "futures-core",
+ "pin-project-lite",
+]
+
+[[package]]
+name = "async-stream-impl"
+version = "0.3.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "16e62a023e7c117e27523144c5d2459f4397fcc3cab0085af8e2224f643a0193"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
+]
+
+[[package]]
 name = "async-trait"
 version = "0.1.81"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -632,12 +654,11 @@ checksum = "1aaf95b3e5c8f23aa320147307562d361db0ae0d51242340f558153b4eb2439b"
 name = "durable"
 version = "0.1.0"
 dependencies = [
- "chrono",
  "durable-core",
  "durable-http",
+ "durable-sqlx",
  "serde",
  "serde_json",
- "sqlx",
  "wit-bindgen-rt",
 ]
 
@@ -683,6 +704,7 @@ name = "durable-runtime"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "async-stream",
  "async-trait",
  "clap",
  "futures-concurrency",
@@ -698,6 +720,22 @@ dependencies = [
  "tracing",
  "tracing-subscriber",
  "wasmtime",
+]
+
+[[package]]
+name = "durable-sqlx"
+version = "0.1.0"
+dependencies = [
+ "async-stream",
+ "durable",
+ "durable-core",
+ "futures-core",
+ "futures-util",
+ "log",
+ "serde",
+ "sqlx",
+ "sqlx-core",
+ "url",
 ]
 
 [[package]]

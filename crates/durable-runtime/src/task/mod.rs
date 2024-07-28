@@ -48,19 +48,46 @@ impl WorkflowState {
 
 struct CurrentTxn {
     label: String,
-    conn: Option<sqlx::Transaction<'static, sqlx::Postgres>>,
 
-    /// Whether an error occurred while attempting to run the transaction.
-    txerr: bool,
+    // SAFETY NOTE: When `Some`, this stream refers to `conn`. Make sure to clear it before reading
+    //              `conn`.
+    //
+    // This field must also come before `conn` so that it gets dropped first.
+    stream: Option<self::sql::QueryStream<'static>>,
+
+    conn: Option<Box<sqlx::Transaction<'static, sqlx::Postgres>>>,
+}
+
+impl CurrentTxn {
+    fn new(label: String) -> Self {
+        Self {
+            label,
+            stream: None,
+            conn: None,
+        }
+    }
+
+    fn conn(&mut self) -> Option<&mut sqlx::Transaction<'static, sqlx::Postgres>> {
+        // Make sure to drop stream before we access the connection.
+        self.stream = None;
+        self.conn.as_deref_mut()
+    }
+
+    fn take_conn(&mut self) -> Option<sqlx::Transaction<'static, sqlx::Postgres>> {
+        // Make sure to drop stream before we access the connection.
+        self.stream = None;
+        self.conn.take().map(|c| *c)
+    }
 }
 
 impl WorkflowState {
-    fn assert_in_transaction(&self, op: &str) -> anyhow::Result<()> {
-        if !self.txn.is_some() {
-            anyhow::bail!("attempted to run impure function `{op}` outside of a transaction")
+    fn assert_in_transaction(&mut self, op: &str) -> anyhow::Result<&mut CurrentTxn> {
+        match &mut self.txn {
+            Some(txn) => Ok(txn),
+            None => {
+                anyhow::bail!("attempted to run impure function `{op}` outside of a transaction")
+            }
         }
-
-        Ok(())
     }
 
     async fn enter(
@@ -94,13 +121,9 @@ impl WorkflowState {
         let record = match record {
             Some(record) => record,
             None => {
-                let mut txn = CurrentTxn {
-                    label,
-                    txerr: false,
-                    conn: None,
-                };
+                let mut txn = CurrentTxn::new(label);
                 if is_txn {
-                    txn.conn = Some(tx);
+                    txn.conn = Some(Box::new(tx));
                 } else {
                     tx.commit().await?;
                 }
@@ -132,8 +155,15 @@ impl WorkflowState {
             None => anyhow::bail!("attempted to exit a transaction without having entered one"),
         };
 
-        let mut tx = match txn.conn.take() {
-            Some(tx) if !txn.txerr => tx,
+        let mut tx = match txn.take_conn() {
+            Some(mut tx) => {
+                // Check if the transaction is not in an aborted state by running a query
+                if sqlx::query("SELECT 1").execute(&mut *tx).await.is_ok() {
+                    tx
+                } else {
+                    self.shared.pool.begin().await?
+                }
+            }
             _ => self.shared.pool.begin().await?,
         };
 
@@ -170,6 +200,10 @@ impl WorkflowState {
 
 #[async_trait]
 impl CoreImports for WorkflowState {
+    fn task_id(&mut self) -> anyhow::Result<i64> {
+        Ok(self.task_id)
+    }
+
     fn task_name(&mut self) -> anyhow::Result<String> {
         Ok(self.name.clone())
     }

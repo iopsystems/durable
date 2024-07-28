@@ -38,22 +38,29 @@ interface http {
 }
 
 interface sql {
-    variant primitive {
-        null,
-        boolean(bool),
-        single(f32),
-        double(f64),
-        int8(s8),
-        int16(s16),
-        int32(s32),
-        int64(s64),
-        text(string),
-        bytea(list<u8>),
+    enum primitive-type {
+        boolean,
+        float4,
+        float8,
+        int1,
+        int2,
+        int4,
+        int8,
+        text,
+        bytea
     }
 
     variant value {
-        primitive(primitive),
-        array(list<primitive>)
+        null(primitive-type),
+        boolean(bool),
+        float4(f32),
+        float8(f64),
+        int1(s8),
+        int2(s16),
+        int4(s32),
+        int8(s64),
+        text(string),
+        bytea(list<u8>),
     }
 
     record column {
@@ -65,27 +72,81 @@ interface sql {
         columns: list<column>
     }
 
+    variant query-result {
+        // A query has completed and here are the number of rows that were
+        // modified.
+        count(u64),
+
+        // A single row from the query output.
+        row(row)
+    }
+
     record options {
-        // Instructs the runtime to not bother returning any rows since they
-        // won't be used by the workflow.
-        drop-returned-rows: bool
+        // Allows the runtime to limit the number of rows returned.
+        //
+        // Setting limit > 1 means that all rows will be returned.
+        limit: u8,
+
+        // Whether the runtime should keep the state in its query cache.
+        //
+        // This has no observable effects on the execution of the statement,
+        // however it may be more performant if there are lots of instances of
+        // the same workflow running on the same worker.
+        persistent: bool,
+    }
+
+    record column-decode-error {
+        index: string,
+        source: string
+    }
+
+    enum database-error-kind {
+        unique-violation,
+        foreign-key-violation,
+        not-null-violation,
+        check-violation,
+        other
+    }
+
+    record database-error {
+        message: string,
+        kind: database-error-kind,
+        code: option<string>,
+        constraint: option<string>,
+        table: option<string>,
     }
 
     variant error {
+        column-decode(column-decode-error),
+        type-not-found(string),
+        encode(string),
+        decode(string),
+        database(database-error),
         other(string)
     }
 
+    // Make a query to the database.
+    // 
+    // This function will start the query. Then rows and results can be
+    // fetched by calling `fetch` until it returns none.
+    // 
+    // Calling query again while there are still results from a previous query
+    // result in the remaining unconsumed rows being discarded.
     query: func(
         sql: string,
         params: list<value>,
         options: options,
-    ) -> result<list<row>, error>;
+    );
+
+    /// Fetch either a query result or a single row from the query.
+    fetch: func() -> option <result<query-result, error>>;
 }
 
 world core {
     // The main function that is called to actually start the workflow.
     export start: func();
 
+    import task-id: func() -> s64;
     // Get access to the task name.
     import task-name: func() -> string;
     // Get access to the encoded json data

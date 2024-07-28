@@ -1,3 +1,3 @@
 fn main() {
-    println!("cargo::rerun-if-changed=../durable/wit/durable.wit");
+    println!("cargo::rerun-if-changed=../durable-core/wit/durable.wit");
 }

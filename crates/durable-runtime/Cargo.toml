@@ -34,6 +34,7 @@ tracing-subscriber = { version = "0.3", optional = true, features = [
     "env-filter",
 ] }
 http = "1.1.0"
+async-stream = "0.3.5"
 
 [dependencies.sqlx]
 version = "0.8.0"

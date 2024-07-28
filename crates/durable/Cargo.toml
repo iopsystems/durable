@@ -7,22 +7,17 @@ edition = "2021"
 default = ["sqlx"]
 
 http = ["dep:durable-http"]
-sqlx = ["dep:sqlx", "dep:chrono"]
+sqlx = ["dep:durable-sqlx"]
 
 [dependencies]
 durable-core = { path = "../durable-core" }
 durable-http = { path = "../durable-http", optional = true }
+durable-sqlx = { path = "../durable-sqlx", optional = true }
 
 serde = { version = "1.0", features = ["derive"] }
 serde_json = { version = "1.0", features = ["raw_value"] }
 wit-bindgen-rt = "0.28.0"
 
-chrono = { version = "0.4.38", optional = true }
-
-[dependencies.sqlx]
-version = "0.8.0"
-default-features = false
-optional = true
 
 [[example]]
 name = "hello-world"
