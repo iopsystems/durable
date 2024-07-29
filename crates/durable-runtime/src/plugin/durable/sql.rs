@@ -8,7 +8,7 @@ use sqlx::postgres::PgTypeInfo;
 use sqlx::{Column, Row};
 
 use crate::bindings::durable::core::sql::{self, Host};
-use crate::plugin::{QueryResult, QueryStream};
+use crate::task::QueryResult;
 use crate::Task;
 
 #[async_trait::async_trait]
@@ -20,72 +20,55 @@ impl Host for Task {
         options: sql::Options,
     ) -> anyhow::Result<()> {
         let txn = self.state.assert_in_transaction("durable::sql::query")?;
-        let conn = match txn.conn() {
-            Some(conn) => conn,
-            None => {
-                anyhow::bail!(
-                    "no database connection associated with the current transaction".to_owned(),
-                )
-            }
-        };
 
-        let mut query = sqlx::query(&sql).persistent(options.persistent);
-        for param in params {
-            query = query.bind(param);
-        }
+        txn.start_query(move |conn| {
+            Box::pin(try_stream! {
+                let mut query = sqlx::query(&sql).persistent(options.persistent);
+                for param in params {
+                    query = query.bind(param);
+                }
 
-        let stream: QueryStream = match options.limit {
-            0 => {
-                let result = query.execute(&mut **conn).await;
+                match options.limit {
+                    0 => {
+                        let result = query.execute(&mut **conn).await?;
+                        yield sqlx::Either::Left(QueryResult::from(result));
+                    },
+                    1 =>  {
+                        let row = query.fetch_optional(&mut **conn).await?;
 
-                Box::pin(try_stream! {
-                    yield sqlx::Either::Left(QueryResult::from(result?));
-                })
-            }
-            1 => {
-                let result = query.fetch_optional(&mut **conn).await;
+                        let count = match &row {
+                            Some(_) => 1,
+                            None => 0
+                        };
 
-                Box::pin(try_stream! {
-                    let row = result?;
-                    let count = match &row {
-                        Some(_) => 1,
-                        None => 0
-                    };
+                        yield sqlx::Either::Left(QueryResult {
+                            rows_affected: count
+                        });
 
-                    yield sqlx::Either::Left(QueryResult {
-                        rows_affected: count
-                    });
+                        if let Some(row) = row {
+                            yield sqlx::Either::Right(row);
+                        }
+                    },
+                    _ => {
+                        // We don't allow multiple statements at once but this is the only way to
+                        // recover both the query result and all the query rows.
+                        #[allow(deprecated)]
+                        let result = query.fetch_many(&mut **conn);
 
-                    if let Some(row) = row {
-                        yield sqlx::Either::Right(row);
+
+                        let mut result = result;
+                        while let Some(item) = result.try_next().await? {
+                            yield item.map_left(QueryResult::from);
+                        }
                     }
-                })
-            }
-            _ => {
-                // We don't allow multiple statements at once but this is the only way to
-                // recover both the query result and all the query rows.
-                #[allow(deprecated)]
-                let result = query.fetch_many(&mut **conn);
-
-                Box::pin(try_stream! {
-                    let mut result = result;
-                    while let Some(item) = result.try_next().await? {
-                        yield item.map_left(QueryResult::from);
-                    }
-                })
-            }
-        };
-
-        // SAFETY: We make sure to clear out the stream before touching txn again
-        let stream: QueryStream<'static> = unsafe { std::mem::transmute(stream) };
-        txn.stream = Some(stream);
-
-        Ok(())
+                }
+            })
+        })
     }
 
     async fn fetch(&mut self) -> anyhow::Result<Option<Result<sql::QueryResult, sql::Error>>> {
         let txn = self.state.assert_in_transaction("durable::sql::query")?;
-        let stream = match txn.stream.as_mut() {
+        let stream = match txn.stream() {
             Some(stream) => stream,
             None => return Ok(None),
         };

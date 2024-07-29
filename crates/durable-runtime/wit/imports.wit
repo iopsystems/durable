@@ -4,6 +4,15 @@ world imports {
     import core;
     import http;
     import sql;
+
+    import wasi:cli/environment@0.2.0;
+    import wasi:cli/exit@0.2.0;
+    import wasi:cli/stdin@0.2.0;
+    import wasi:cli/stdout@0.2.0;
+    import wasi:cli/stderr@0.2.0;
+    export wasi:cli/run@0.2.0;
+
+    include wasi:io/imports@0.2.0;
 }
 
 world import-core {

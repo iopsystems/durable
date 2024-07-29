@@ -1,10 +1,9 @@
 use std::path::Path;
 
 use anyhow::Context;
+pub use anyhow::Result;
 use wit_bindgen_core::wit_parser::Resolve;
 use wit_bindgen_rust::{Opts, Ownership};
-
-pub use anyhow::Result;
 
 pub fn generate(
     source: impl AsRef<Path>,

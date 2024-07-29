@@ -15,12 +15,13 @@ use tokio::task::JoinSet;
 use tokio::time::Instant;
 use tracing::Instrument;
 
-use crate::error::AbortError;
+use crate::bindings::exports::wasi::cli::run::GuestPre;
+use crate::error::{AbortError, Exit};
 use crate::event::{Event, EventSource, NotificationInserted, TaskInserted};
 use crate::flag::{ShutdownFlag, ShutdownGuard};
-use crate::plugin::durable::DurablePlugin;
-use crate::plugin::{Plugin, TaskState};
-use crate::{Config, Task};
+use crate::plugin::{DurablePlugin, Plugin};
+use crate::task::{Task, TaskState};
+use crate::Config;
 
 pub(crate) struct SharedState {
     pub shutdown: ShutdownFlag,
@@ -55,9 +56,7 @@ impl WorkerBuilder {
             event_source: None,
             client: None,
             engine: None,
-            plugins: vec![
-                Box::new(DurablePlugin),
-            ],
+            plugins: vec![Box::new(DurablePlugin)],
         }
     }
 
@@ -369,6 +368,20 @@ impl Worker {
 
                 // Don't do anything since we no longer own the task.
             }
+            Ok(Err(e)) if e.is::<Exit>() => {
+                sqlx::query!(
+                    "UPDATE task
+                    SET state = 'complete',
+                        completed_at = CURRENT_TIMESTAMP,
+                        running_on = NULL,
+                        wasm = NULL
+                    WHERE id = $1
+                    ",
+                    task_id
+                )
+                .execute(&shared.pool)
+                .await?;
+            }
             Ok(Err(e)) => {
                 tracing::warn!("task {task_id} failed to execute with an error: {e:?}");
 
@@ -496,19 +509,27 @@ impl Worker {
                 .with_context(|| format!("failed to set up plugin `{}`", plugin.name()))?;
         }
 
-        linker.define_unknown_imports_as_traps(&component)?;
+        // linker
+        //     .define_unknown_imports_as_traps(&component)
+        //     .context("failed to define unknown imports as traps")?;
 
         let mut store = wasmtime::Store::new(&engine, task);
+
+        let guest = GuestPre::new(&component) //
+            .context("failed to pre-load the wasm:cli/run export")?;
         let instance = linker
-            .instantiate(&mut store, &component)
-            .context("failed to pre-instantiate the wasm component")?;
+            .instantiate_async(&mut store, &component)
+            .await
+            .context("failed to instantiate the wasm component")?;
 
-        let start = match instance.get_func(&mut store, "_start") {
-            Some(start) => start,
-            None => anyhow::bail!("task wasm module did not contain a `_start` function"),
-        };
+        let guest = guest
+            .load(&mut store, &instance)
+            .context("failed to load the wasi:cli/run export")?;
+        if guest.call_run(&mut store).await?.is_err() {
+            return Err(anyhow::Error::new(AbortError));
+        }
 
-        start.call_async(&mut store, &[], &mut []).await
+        Ok(())
     }
 }
 

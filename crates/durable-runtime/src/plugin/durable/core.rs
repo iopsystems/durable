@@ -2,7 +2,7 @@ use anyhow::Context;
 use serde_json::value::RawValue;
 
 use crate::bindings::durable::core::core::Host;
-use crate::plugin::{Task, TransactionOptions};
+use crate::task::{Task, TransactionOptions};
 
 #[async_trait::async_trait]
 impl Host for Task {
@@ -28,7 +28,8 @@ impl Host for Task {
         database: bool,
     ) -> anyhow::Result<Option<String>> {
         let options = TransactionOptions::new(label).database(database);
-        let data = self.state.enter(options).await?.map(|v| v.get().to_owned());
+        let data: Option<Box<RawValue>> = self.state.enter(options).await?;
+        let data = data.map(|v| v.get().to_owned());
 
         Ok(data)
     }

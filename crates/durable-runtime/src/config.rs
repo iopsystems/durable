@@ -33,6 +33,15 @@ pub struct Config {
     /// This is meant as a safety measure against workflows that would use too
     /// many resources.
     pub max_workflow_events: u32,
+
+    /// The maximum number of bytes that are permitted to be logged in a single
+    /// transaction.
+    ///
+    /// Bytes written after this cap is reached will still succeed in the guest
+    /// but will be silently dropped without being saved.
+    ///
+    /// The default limit here is 128KB.
+    pub max_log_bytes_per_transaction: usize,
 }
 
 impl Default for Config {
@@ -42,6 +51,7 @@ impl Default for Config {
             heartbeat_timeout: Duration::from_secs(120),
             max_http_timeout: Duration::from_secs(60),
             max_workflow_events: i32::MAX as u32,
+            max_log_bytes_per_transaction: 1024 * 128,
         }
     }
 }

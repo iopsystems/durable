@@ -55,7 +55,8 @@ impl Host for Task {
         &mut self,
         request: HttpRequest,
     ) -> anyhow::Result<Result<HttpResponse, HttpError>> {
-        self.state.assert_in_transaction("durable:http/http.fetch")?;
+        self.state
+            .assert_in_transaction("durable:http/http.fetch")?;
 
         Ok(self.fetch_impl(request).await)
     }

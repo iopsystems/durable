@@ -13,7 +13,6 @@ mod bindings {
     pub use self::durable::core::core::*;
 }
 
-
 pub use crate::transaction::transaction;
 
 pub mod export {

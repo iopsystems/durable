@@ -48,6 +48,7 @@ CREATE TABLE event(
     PRIMARY KEY(task_id, index),
 
     CONSTRAINT fk_task FOREIGN KEY(task_id) REFERENCES task(id)
+        ON DELETE CASCADE
 );
 
 CREATE TABLE notification(
@@ -58,6 +59,19 @@ CREATE TABLE notification(
     data            jsonb       NOT NULL,
 
     CONSTRAINT fk_task FOREIGN KEY(task_id) REFERENCES task(id)
+);
+
+CREATE TABLE logs(
+    task_id         bigint      NOT NULL,
+    index           int         NOT NULL,
+    message         text        NOT NULL,
+
+    PRIMARY KEY(task_id, index),
+
+    CONSTRAINT fk_task  FOREIGN KEY(task_id) REFERENCES task(id)
+        ON DELETE CASCADE,
+    CONSTRAINT fk_event FOREIGN KEY(task_id, index) REFERENCES event(task_id, index)
+        ON DELETE CASCADE
 );
 
 CREATE FUNCTION notify_task_inserted() RETURNS trigger as $$

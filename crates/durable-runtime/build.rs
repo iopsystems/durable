@@ -1,8 +1,17 @@
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use anyhow::Context;
 use wasmtime_wit_bindgen::*;
 use wit_parser::Resolve;
+
+macro_rules! hashmap {
+    { $( $key:expr => $value:expr ),* $(,)? } => {
+        [ $( ( $key, $value ) )* ]
+            .into_iter()
+            .map(|(key, value): (&str, &str)| (key.to_owned(), value.to_owned()))
+            .collect::<std::collections::HashMap<_, _>>()
+    }
+}
 
 fn generate(
     path: impl AsRef<Path>,
@@ -34,27 +43,52 @@ fn _generate(path: &Path, out: &Path, world: &str, opts: &Opts) -> anyhow::Resul
 }
 
 fn main() -> anyhow::Result<()> {
-    let out_dir = PathBuf::from(std::env::var_os("OUT_DIR").unwrap());
+    // let out_dir = PathBuf::from(std::env::var_os("OUT_DIR").unwrap());
+
+    // Method implementations that should be sync.
+    //
+    // In general sync interfaces are more efficient so it is better to make things
+    // sync where possible.
+    let sync = [
+        // These ones are from durable itself.
+        "task-id",
+        "task-name",
+        "task-data",
+        "abort",
+        // And these ones are from the various wasi p2 interfaces that we export.
+        "[method]error.to-debug-string",
+        "[method]input-stream.read",
+        "[method]input-stream.blocking-read",
+        "[method]input-stream.skip",
+        "[method]input-stream.blocking-skip",
+        "[method]input-stream.subscribe",
+        "[method]output-stream.check-write",
+        "[method]output-stream.flush",
+        "[method]output-stream.blocking-flush",
+        "[method]output-stream.subscribe",
+        "[method]output-stream.splice",
+        "[method]output-stream.blocking-splice",
+        "get-environment",
+        "get-arguments",
+        "initial-cwd",
+        "exit",
+        "get-stdin",
+        "get-stdout",
+        "get-stderr",
+    ];
 
     let opts = Opts {
         rustfmt: false,
         tracing: true,
         trappable_imports: TrappableImports::All,
         async_: AsyncConfig::AllExceptImports(
-            ["task-id", "task-name", "task-data", "abort"]
-                .into_iter()
-                .map(|item| item.to_string())
-                .collect(),
+            sync.into_iter().map(|item| item.to_string()).collect(),
         ),
+        with: hashmap! {},
         ..Default::default()
     };
 
-    generate(
-        "wit",
-        out_dir.join("bindings.rs"),
-        "durable:core/imports",
-        &opts,
-    )?;
+    generate("wit", "src/bindings.rs", "durable:core/imports", &opts)?;
 
     Ok(())
 }

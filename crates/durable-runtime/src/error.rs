@@ -13,3 +13,13 @@ impl fmt::Display for AbortError {
 }
 
 impl std::error::Error for AbortError {}
+
+#[derive(Copy, Clone, Debug, Default)]
+pub struct Exit;
+
+impl fmt::Display for Exit {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "this task has explicitly called exit")
+    }
+}
+impl std::error::Error for Exit {}

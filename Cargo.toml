@@ -3,6 +3,3 @@ members = [
     "crates/*",
 ]
 resolver = "2"
-
-[workspace.dependencies]
-durable = { path = "crates/durable" }

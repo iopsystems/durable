@@ -6,16 +6,21 @@ extern crate serde;
 mod config;
 mod error;
 pub mod event;
-pub mod flag;
+mod flag;
 pub mod plugin;
+pub mod task;
+pub mod util;
 mod worker;
 
-mod bindings {
-    #![allow(unused_mut)]
+#[allow(unused_mut, unused_doc_comments)]
+pub mod bindings;
+// pub mod bindings {
+//     #![allow(unused_mut)]
 
-    include!(concat!(env!("OUT_DIR"), "/bindings.rs"));
-}
+//     include!("bindings.rs");
+//     // include!(concat!(env!("OUT_DIR"), "/bindings.rs"));
+// }
 
 pub use self::config::Config;
-pub use self::plugin::Task;
+pub use self::task::Task;
 pub use self::worker::{Worker, WorkerBuilder};
