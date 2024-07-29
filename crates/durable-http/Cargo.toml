@@ -3,6 +3,9 @@ name = "durable-http"
 version = "0.1.0"
 edition = "2021"
 
+[features]
+bindgen = ["dep:durable-bindgen", "durable-core/bindgen"]
+
 [dependencies]
 durable-core = { path = "../durable-core" }
 
@@ -16,4 +19,7 @@ url = { version = "2.5.2", features = ["serde"] }
 wit-bindgen-rt = "0.28.0"
 
 [build-dependencies]
-durable-bindgen = { path = "../durable-bindgen" }
+durable-bindgen = { path = "../durable-bindgen", optional = true }
+
+[dev-dependencies]
+durable = { path = "../durable", features = ["sqlx"] }

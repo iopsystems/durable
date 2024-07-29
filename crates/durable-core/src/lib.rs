@@ -5,19 +5,23 @@ pub use serde_json::value::RawValue;
 #[macro_use]
 extern crate serde;
 
-mod start;
 mod alloc;
+mod start;
 pub mod transaction;
+
+#[allow(unused_imports)]
 mod bindings {
+    #[cfg(feature = "bindgen")]
     include!(concat!(env!("OUT_DIR"), "/bindings.rs"));
+    #[cfg(not(feature = "bindgen"))]
+    include!("bindings.rs");
 
     pub use self::durable::core::core::*;
 }
 
-pub use crate::transaction::transaction;
-
 #[doc(inline)]
 pub use crate::bindings::durable::core::core::{task_id, task_name};
+pub use crate::transaction::transaction;
 
 pub fn task_data() -> Box<RawValue> {
     let data = crate::bindings::task_data();

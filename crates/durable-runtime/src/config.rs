@@ -50,7 +50,7 @@ pub struct Config {
     /// directly construct buffers of a given size. This can lead to DOS
     /// vulnerabilities if the runtime attempts to construct an extremely large
     /// buffer. This function serves to limit that to something more reasonable.
-    /// 
+    ///
     /// By default this is set to 8MB.
     pub max_returned_buffer_len: usize,
 }

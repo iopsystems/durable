@@ -25,7 +25,10 @@ use url::Url;
 mod bindings {
     #![allow(unused_braces)]
 
+    #[cfg(feature = "bindgen")]
     include!(concat!(env!("OUT_DIR"), "/bindings.rs"));
+    #[cfg(not(feature = "bindgen"))]
+    include!("bindings.rs");
 
     pub use self::durable::core::http::*;
 }

@@ -164,7 +164,7 @@ impl<'a> sqlx::Encode<'a, sqlx::Postgres> for sql::Value {
     }
 
     fn produces(&self) -> Option<<sqlx::Postgres as sqlx::Database>::TypeInfo> {
-        fn type_info<'a, T>(value: &'a T) -> PgTypeInfo 
+        fn type_info<'a, T>(value: &'a T) -> PgTypeInfo
         where
             T: sqlx::Encode<'a, sqlx::Postgres>,
             T: sqlx::Type<sqlx::Postgres>,

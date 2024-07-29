@@ -1,6 +1,12 @@
-use std::path::Path;
+fn main() {
+    #[cfg(feature = "bindgen")]
+    generate();
+}
 
-fn main() -> durable_bindgen::Result<()> {
+#[cfg(feature = "bindgen")]
+fn generate() {
+    use std::path::Path;
+
     let out_dir = std::env::var_os("OUT_DIR").unwrap();
     let out_dir = Path::new(&out_dir);
 
@@ -9,4 +15,5 @@ fn main() -> durable_bindgen::Result<()> {
         out_dir.join("bindings.rs"),
         "durable:core/import-http",
     )
+    .expect("failed to generate wit bindings");
 }

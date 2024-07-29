@@ -27,8 +27,10 @@ fn _generate(source: &Path, out: &Path, world: &str) -> anyhow::Result<()> {
     let world = resolve.select_world(&packages, Some(world))?;
     let mut generator = opts.build();
 
-    for path in paths.iter() {
-        println!("cargo::rerun-if-changed={}", path.display());
+    if std::env::var_os("OUT_DIR").is_some() {
+        for path in paths.iter() {
+            println!("cargo::rerun-if-changed={}", path.display());
+        }
     }
 
     let mut files = Default::default();
