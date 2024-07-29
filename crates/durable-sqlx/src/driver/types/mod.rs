@@ -1,6 +1,6 @@
-use durable_core::bindings::sql;
 use sqlx::error::BoxDynError;
 
+use crate::bindings as sql;
 use crate::driver::Value;
 
 mod int;

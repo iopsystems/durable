@@ -1,23 +1,25 @@
 use std::time::Duration;
 
-use async_trait::async_trait;
 use http::{HeaderName, HeaderValue, Method};
 
-use super::WorkflowState;
-use crate::bindings::durable::http::*;
+use crate::bindings::durable::core::http::*;
+use crate::Task;
 
-impl WorkflowState {
-    async fn http_impl(&mut self, request: HttpRequest) -> Result<HttpResponse, HttpError> {
+impl Task {
+    async fn fetch_impl(&mut self, request: HttpRequest) -> Result<HttpResponse, HttpError> {
+        let config = self.state.config();
+        let client = self.state.client();
+
         let method = Method::from_bytes(request.method.as_bytes())?;
         let timeout = request
             .timeout
             .map(Duration::from_nanos)
-            .unwrap_or(self.shared.config.max_http_timeout)
-            .min(self.shared.config.max_http_timeout);
+            .unwrap_or(config.max_http_timeout)
+            .min(config.max_http_timeout);
 
         let url = reqwest::Url::parse(&request.url) //
             .map_err(|e| HttpError::InvalidUrl(e.to_string()))?;
-        let mut builder = self.shared.client.request(method, url).timeout(timeout);
+        let mut builder = client.request(method, url).timeout(timeout);
 
         if let Some(body) = request.body {
             builder = builder.body(body);
@@ -47,15 +49,15 @@ impl WorkflowState {
     }
 }
 
-#[async_trait]
-impl Host for WorkflowState {
-    async fn http(
+#[async_trait::async_trait]
+impl Host for Task {
+    async fn fetch(
         &mut self,
         request: HttpRequest,
     ) -> anyhow::Result<Result<HttpResponse, HttpError>> {
-        self.assert_in_transaction("http")?;
+        self.state.assert_in_transaction("durable:http/http.fetch")?;
 
-        Ok(self.http_impl(request).await)
+        Ok(self.fetch_impl(request).await)
     }
 }
 

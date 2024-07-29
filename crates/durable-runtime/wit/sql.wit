@@ -1,42 +1,3 @@
-package durable:core@1.0.0;
-
-// Types and functions for making HTTP requests from within the workflow.
-interface http {
-    record http-header {
-        name: string,
-        value: list<u8>,
-    }
-
-    record http-request {
-        method: string,
-        url: string,
-        headers: list<http-header>,
-        body: option<list<u8>>,
-        timeout: option<u64>,
-    }
-
-    record http-response {
-        status: u16,
-        headers: list<http-header>,
-        body: list<u8>
-    }
-
-    variant http-error {
-        timeout,
-        invalid-method,
-        invalid-url(string),
-        invalid-header-name,
-        invalid-header-value,
-        other(string)
-    }
-
-    // Make an HTTP request.
-    //
-    // # Parameters
-    // - `request` - A description of the HTTP request to make.
-    http: func(request: http-request) -> result<http-response, http-error>;
-}
-
 interface sql {
     enum primitive-type {
         boolean,
@@ -140,46 +101,4 @@ interface sql {
 
     /// Fetch either a query result or a single row from the query.
     fetch: func() -> option <result<query-result, error>>;
-}
-
-world core {
-    // The main function that is called to actually start the workflow.
-    export start: func();
-
-    import task-id: func() -> s64;
-    // Get access to the task name.
-    import task-name: func() -> string;
-    // Get access to the encoded json data
-    import task-data: func() -> string;
-
-    // Immediately abort the task with an error.
-    import abort: func(message: string);
-
-    // Start a transaction. If this transaction has already executed to completion
-    // then return the data from the last time it was executed.
-    //
-    // # Parameters
-    // - `label` - A text label that gets recorded in the event. This is used to
-    //             validate that events are in fact executing in the same order
-    //             when the workflow is restarted.
-    // - `is-db` - Whether this transaction is a database transaction and should
-    //             reserve a database connection so that sql can be used within.
-    import transaction-enter: func(label: string, is-db: bool) -> option<string>;
-
-    // Complete a transaction, saving the result of this transaction for future use.
-    //
-    // Parameters:
-    // - `data` - JSON-encoded state to save.
-    import transaction-exit: func(data: string);
-
-    // Impure functions.
-    //
-    // It is only valid to call these when within a transaction. Attempting to
-    // call them otherwise will immediately abort the workflow.
-
-    // Print a line to stdout.
-    import print: func(data: string);
-
-    import http;
-    import sql;
 }

@@ -3,14 +3,19 @@
 #[macro_use]
 extern crate serde;
 
-#[path = "bindings/mod.rs"]
-mod bindings;
 mod config;
 mod error;
 pub mod event;
 pub mod flag;
-mod task;
+pub mod plugin;
 mod worker;
 
+mod bindings {
+    #![allow(unused_mut)]
+
+    include!(concat!(env!("OUT_DIR"), "/bindings.rs"));
+}
+
 pub use self::config::Config;
+pub use self::plugin::Task;
 pub use self::worker::{Worker, WorkerBuilder};

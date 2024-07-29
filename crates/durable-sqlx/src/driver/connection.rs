@@ -1,12 +1,12 @@
 use std::str::FromStr;
 use std::time::Duration;
 
-use durable_core::bindings::sql;
 use futures_core::future::BoxFuture;
 use futures_core::stream::BoxStream;
 use log::LevelFilter;
 use url::Url;
 
+use crate::bindings as sql;
 use crate::driver::error::{convert_query_error, UnsupportedError};
 use crate::driver::{Arguments, Durable, QueryResult, Row, Statement, TypeInfo};
 

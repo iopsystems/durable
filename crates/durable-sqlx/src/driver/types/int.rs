@@ -1,9 +1,9 @@
-use durable_core::bindings::sql;
 use sqlx::encode::IsNull;
 use sqlx::error::BoxDynError;
 use sqlx::{Decode, Encode};
 
 use super::unexpected_nonnull_type;
+use crate::bindings as sql;
 use crate::driver::{Durable, TypeInfo, Value};
 
 impl Encode<'_, Durable> for i8 {

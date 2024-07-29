@@ -1,6 +1,6 @@
 use std::fmt;
 
-use durable_core::bindings::sql;
+use crate::bindings as sql;
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub struct TypeInfo(pub(crate) sql::PrimitiveType);

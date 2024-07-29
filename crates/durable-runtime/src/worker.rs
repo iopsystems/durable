@@ -15,19 +15,20 @@ use tokio::task::JoinSet;
 use tokio::time::Instant;
 use tracing::Instrument;
 
-use crate::bindings::durable::{Core, CorePre};
 use crate::error::AbortError;
 use crate::event::{Event, EventSource, NotificationInserted, TaskInserted};
 use crate::flag::{ShutdownFlag, ShutdownGuard};
-use crate::task::WorkflowState;
-use crate::Config;
+use crate::plugin::durable::DurablePlugin;
+use crate::plugin::{Plugin, TaskState};
+use crate::{Config, Task};
 
-pub struct SharedState {
+pub(crate) struct SharedState {
     pub shutdown: ShutdownFlag,
     pub pool: sqlx::PgPool,
     pub client: reqwest::Client,
     pub notifications: broadcast::Sender<NotificationInserted>,
     pub config: Config,
+    plugins: Vec<Box<dyn Plugin>>,
 }
 
 pub(crate) struct TaskData {
@@ -43,6 +44,7 @@ pub struct WorkerBuilder {
     event_source: Option<Box<dyn EventSource>>,
     client: Option<reqwest::Client>,
     engine: Option<wasmtime::Engine>,
+    plugins: Vec<Box<dyn Plugin>>,
 }
 
 impl WorkerBuilder {
@@ -53,6 +55,9 @@ impl WorkerBuilder {
             event_source: None,
             client: None,
             engine: None,
+            plugins: vec![
+                Box::new(DurablePlugin),
+            ],
         }
     }
 
@@ -78,6 +83,7 @@ impl WorkerBuilder {
             client: self.client.unwrap_or_default(),
             notifications: broadcast::channel(128).0,
             config: self.config,
+            plugins: self.plugins,
         });
 
         let engine = self.engine.unwrap_or_default();
@@ -478,21 +484,31 @@ impl Worker {
             }
         };
 
-        let state = WorkflowState::new(shared.clone(), task, worker_id);
-        let mut linker = Linker::new(&engine);
+        let mut task = Task {
+            state: TaskState::new(shared.clone(), task, worker_id),
+            plugins: Default::default(),
+        };
 
-        Core::add_to_linker(&mut linker, |state| state)?;
+        let mut linker = Linker::new(&engine);
+        for plugin in shared.plugins.iter() {
+            plugin
+                .setup(&mut linker, &mut task)
+                .with_context(|| format!("failed to set up plugin `{}`", plugin.name()))?;
+        }
+
         linker.define_unknown_imports_as_traps(&component)?;
 
-        let instance_pre = linker
-            .instantiate_pre(&component)
+        let mut store = wasmtime::Store::new(&engine, task);
+        let instance = linker
+            .instantiate(&mut store, &component)
             .context("failed to pre-instantiate the wasm component")?;
 
-        let mut store = wasmtime::Store::new(&engine, state);
-        let core = CorePre::new(instance_pre)?;
-        let instance = core.instantiate_async(&mut store).await?;
+        let start = match instance.get_func(&mut store, "_start") {
+            Some(start) => start,
+            None => anyhow::bail!("task wasm module did not contain a `_start` function"),
+        };
 
-        instance.call_start(&mut store).await
+        start.call_async(&mut store, &[], &mut []).await
     }
 }
 

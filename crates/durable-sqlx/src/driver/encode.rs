@@ -1,9 +1,9 @@
 use std::borrow::Cow;
 
-use durable_core::bindings::sql;
 use sqlx::encode::IsNull;
 use sqlx::Encode;
 
+use crate::bindings as sql;
 use crate::driver::{Durable, Value};
 
 impl Encode<'_, Durable> for &[u8] {

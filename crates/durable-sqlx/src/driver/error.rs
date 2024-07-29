@@ -1,6 +1,6 @@
 use std::fmt;
 
-use durable_core::bindings::sql;
+use crate::bindings as sql;
 
 #[derive(Clone, Debug, Default)]
 pub(crate) struct UnsupportedError(());

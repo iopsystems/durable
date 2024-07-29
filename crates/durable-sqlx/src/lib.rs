@@ -8,6 +8,14 @@ use sqlx::error::BoxDynError;
 pub mod driver;
 mod util;
 
+mod bindings {
+    #![allow(unused_braces)]
+
+    include!(concat!(env!("OUT_DIR"), "/bindings.rs"));
+
+    pub use self::durable::core::sql::*;
+}
+
 pub use sqlx::{Error, Result};
 
 #[doc(inline)]

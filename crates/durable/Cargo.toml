@@ -18,10 +18,13 @@ serde = { version = "1.0", features = ["derive"] }
 serde_json = { version = "1.0", features = ["raw_value"] }
 wit-bindgen-rt = "0.28.0"
 
-
 [[example]]
 name = "hello-world"
 
 [[example]]
 name = "http-request"
 required-features = ["http"]
+
+[[example]]
+name = "sql-query"
+required-features = ["sqlx"]

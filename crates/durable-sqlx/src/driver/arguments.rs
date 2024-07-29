@@ -1,5 +1,4 @@
-use durable_core::bindings::sql;
-
+use crate::bindings as sql;
 use crate::driver::{Durable, Value};
 
 #[derive(Default)]

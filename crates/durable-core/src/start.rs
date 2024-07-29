@@ -1,5 +1,3 @@
-use crate::bindings::{export, Guest};
-
 extern "Rust" {
     #[link_name = "_start"]
     fn _start();
@@ -23,16 +21,6 @@ pub fn durable_start(main: fn()) {
         crate::abort(&message);
     }
 }
-
-struct DurableGuest;
-
-impl Guest for DurableGuest {
-    fn start() {
-        unsafe { _start() }
-    }
-}
-
-export!(DurableGuest with_types_in crate::bindings);
 
 #[macro_export]
 macro_rules! durable_main {

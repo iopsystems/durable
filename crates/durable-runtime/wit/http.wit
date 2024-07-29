@@ -1,0 +1,35 @@
+interface http {
+    record http-header {
+        name: string,
+        value: list<u8>,
+    }
+
+    record http-request {
+        method: string,
+        url: string,
+        headers: list<http-header>,
+        body: option<list<u8>>,
+        timeout: option<u64>,
+    }
+
+    record http-response {
+        status: u16,
+        headers: list<http-header>,
+        body: list<u8>
+    }
+
+    variant http-error {
+        timeout,
+        invalid-method,
+        invalid-url(string),
+        invalid-header-name,
+        invalid-header-value,
+        other(string)
+    }
+
+    // Make an HTTP request.
+    //
+    // # Parameters
+    // - `request` - A description of the HTTP request to make.
+    fetch: func(request: http-request) -> result<http-response, http-error>;
+}

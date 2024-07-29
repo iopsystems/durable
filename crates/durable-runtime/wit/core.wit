@@ -1,0 +1,39 @@
+
+interface core {
+    // Get the task id for the current workflow.
+    task-id: func() -> s64;
+
+    // Get the task name for the current workflow.
+    task-name: func() -> string;
+
+    // Get the json-encoded task data for the current workflow.
+    task-data: func() -> string;
+
+    // Immediately abort the current task with an error.
+    abort: func(message: string);
+
+    // Start a transaction. If this transaction has already executed to completion
+    // then return the data from the last time it was executed.
+    //
+    // # Parameters
+    // - `label` - A text label that gets recorded in the event. This is used to
+    //             validate that events are in fact executing in the same order
+    //             when the workflow is restarted.
+    // - `is-db` - Whether this transaction is a database transaction and should
+    //             reserve a database connection so that sql can be used within.
+    transaction-enter: func(label: string, is-db: bool) -> option<string>;
+
+    // Complete a transaction, saving the result of this transaction for future use.
+    //
+    // Parameters:
+    // - `data` - JSON-encoded state to save.
+    transaction-exit: func(data: string);
+
+    // Impure functions.
+    //
+    // It is only valid to call these when within a transaction. Attempting to
+    // call them otherwise will immediately abort the workflow.
+
+    // Print a line to stdout.
+    print: func(data: string);
+}

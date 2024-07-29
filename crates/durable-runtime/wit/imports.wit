@@ -1,0 +1,19 @@
+package durable:core@1.0.0;
+
+world imports {
+    import core;
+    import http;
+    import sql;
+}
+
+world import-core {
+    import core;
+}
+
+world import-http {
+    import http;
+}
+
+world import-sql {
+    import sql;
+}

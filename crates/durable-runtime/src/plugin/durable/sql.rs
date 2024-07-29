@@ -1,41 +1,25 @@
 use std::fmt;
 
 use async_stream::try_stream;
-use async_trait::async_trait;
-use futures_util::stream::BoxStream;
 use futures_util::{StreamExt, TryStreamExt};
 use sqlx::encode::IsNull;
 use sqlx::postgres::types::Oid;
 use sqlx::postgres::PgTypeInfo;
 use sqlx::{Column, Row};
 
-use super::WorkflowState;
-use crate::bindings::durable::sql;
+use crate::bindings::durable::core::sql::{self, Host};
+use crate::plugin::{QueryResult, QueryStream};
+use crate::Task;
 
-pub(crate) type QueryStream<'a> =
-    BoxStream<'a, Result<sqlx::Either<QueryResult, sqlx::postgres::PgRow>, sqlx::Error>>;
-
-pub(crate) struct QueryResult {
-    pub rows_affected: u64,
-}
-
-impl From<sqlx::postgres::PgQueryResult> for QueryResult {
-    fn from(value: sqlx::postgres::PgQueryResult) -> Self {
-        Self {
-            rows_affected: value.rows_affected(),
-        }
-    }
-}
-
-#[async_trait]
-impl sql::Host for WorkflowState {
+#[async_trait::async_trait]
+impl Host for Task {
     async fn query(
         &mut self,
         sql: String,
         params: Vec<sql::Value>,
         options: sql::Options,
     ) -> anyhow::Result<()> {
-        let txn = self.assert_in_transaction("durable::sql::query")?;
+        let txn = self.state.assert_in_transaction("durable::sql::query")?;
         let conn = match txn.conn() {
             Some(conn) => conn,
             None => {
@@ -100,7 +84,7 @@ impl sql::Host for WorkflowState {
     }
 
     async fn fetch(&mut self) -> anyhow::Result<Option<Result<sql::QueryResult, sql::Error>>> {
-        let txn = self.assert_in_transaction("durable::sql::query")?;
+        let txn = self.state.assert_in_transaction("durable::sql::query")?;
         let stream = match txn.stream.as_mut() {
             Some(stream) => stream,
             None => return Ok(None),

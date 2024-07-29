@@ -19,5 +19,3 @@ fn main() {
 
     durable::print(&format!("{count} events so far!\n"));
 }
-
-durable::durable_main!(main);

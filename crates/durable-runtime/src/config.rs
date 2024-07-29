@@ -26,6 +26,13 @@ pub struct Config {
     /// Timeouts longer than this maximum will be clamped and if no timeout is
     /// provided then this is the timeout that will be used.
     pub max_http_timeout: Duration,
+
+    /// The maximum permitted number of events that can be emitted by a workflow
+    /// before it will be automatically terminated.
+    ///
+    /// This is meant as a safety measure against workflows that would use too
+    /// many resources.
+    pub max_workflow_events: u32,
 }
 
 impl Default for Config {
@@ -34,6 +41,7 @@ impl Default for Config {
             heartbeat_interval: Duration::from_secs(30),
             heartbeat_timeout: Duration::from_secs(120),
             max_http_timeout: Duration::from_secs(60),
+            max_workflow_events: i32::MAX as u32,
         }
     }
 }

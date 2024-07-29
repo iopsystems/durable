@@ -6,5 +6,3 @@ fn main() {
 
     durable::print(text);
 }
-
-durable::durable_main!(main);

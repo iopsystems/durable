@@ -1,7 +1,6 @@
 use std::borrow::Cow;
 
-use durable_core::bindings::sql;
-
+use crate::bindings as sql;
 use crate::driver::{Durable, TypeInfo};
 
 #[derive(Clone, Debug)]

@@ -2,4 +2,4 @@ fn main() {
     durable::print("Hello, World!");
 }
 
-durable::durable_main!(main);
+// durable::durable_main!(main);

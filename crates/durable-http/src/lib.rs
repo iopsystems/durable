@@ -16,14 +16,22 @@ use std::str::{FromStr, Utf8Error};
 use std::string::FromUtf8Error;
 use std::time::Duration;
 
-use durable_core::{bindings, transaction};
+use durable_core::transaction;
 use http::header::{InvalidHeaderName, InvalidHeaderValue};
 use http::{HeaderMap, HeaderName, HeaderValue, Method, StatusCode};
 use serde::{Deserialize, Serialize};
 use url::Url;
 
+mod bindings {
+    #![allow(unused_braces)]
+
+    include!(concat!(env!("OUT_DIR"), "/bindings.rs"));
+
+    pub use self::durable::core::http::*;
+}
+
 fn send(request: &Request) -> Result<Response, Error> {
-    use crate::bindings::http::*;
+    use crate::bindings::*;
 
     let label = format!("durable::http::send({} {})", request.method, request.url);
     crate::transaction::maybe_txn(&label, || {
@@ -49,7 +57,7 @@ fn send(request: &Request) -> Result<Response, Error> {
             timeout,
         };
 
-        match http(&request) {
+        match fetch(&request) {
             Ok(response) => {
                 let status = StatusCode::from_u16(response.status)
                     .map_err(|_| ErrorKind::InvalidStatus(response.status))?;

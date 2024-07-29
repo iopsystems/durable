@@ -1,10 +1,10 @@
 use std::borrow::Cow;
 
-use durable_core::bindings::sql;
 use sqlx::error::BoxDynError;
 use sqlx::Decode;
 
 use super::Value;
+use crate::bindings as sql;
 use crate::driver::Durable;
 
 fn unexpected_nullable_type(expected: &str, value: &Value) -> BoxDynError {

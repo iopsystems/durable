@@ -7,13 +7,12 @@ extern crate serde;
 
 mod start;
 pub mod transaction;
+mod bindings {
+    include!(concat!(env!("OUT_DIR"), "/bindings.rs"));
 
-pub mod bindings {
-    include!("bindings.rs");
-
-    #[allow(unused_imports)]
-    pub use self::durable::core::*;
+    pub use self::durable::core::core::*;
 }
+
 
 pub use crate::transaction::transaction;
 
@@ -21,17 +20,8 @@ pub mod export {
     pub use crate::start::durable_start;
 }
 
-/// The numeric id of the currently executing task.
-pub fn task_id() -> i64 {
-    crate::bindings::task_id()
-}
-
-/// The name of the currently executing task.
-///
-/// This is the name that was provided when the task was being created.
-pub fn task_name() -> String {
-    crate::bindings::task_name()
-}
+#[doc(inline)]
+pub use crate::bindings::durable::core::core::{task_id, task_name};
 
 pub fn task_data() -> Box<RawValue> {
     let data = crate::bindings::task_data();
@@ -47,7 +37,7 @@ pub fn task_data() -> Box<RawValue> {
 
 /// Immediately abort the workflow with a message.
 pub fn abort(message: &str) -> ! {
-    crate::bindings::abort(message);
+    crate::bindings::durable::core::core::abort(message);
 
     // SAFETY: The abort function will never return.
     unsafe { std::hint::unreachable_unchecked() }
