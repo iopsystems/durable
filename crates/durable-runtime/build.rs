@@ -1,4 +1,4 @@
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use anyhow::Context;
 use wasmtime_wit_bindgen::*;
@@ -34,7 +34,7 @@ fn _generate(path: &Path, out: &Path, world: &str, opts: &Opts) -> anyhow::Resul
 }
 
 fn main() -> anyhow::Result<()> {
-    // let out_dir = PathBuf::from(std::env::var_os("OUT_DIR").unwrap());
+    let out_dir = PathBuf::from(std::env::var_os("OUT_DIR").unwrap());
 
     // Method implementations that should be sync.
     //
@@ -79,7 +79,8 @@ fn main() -> anyhow::Result<()> {
         ..Default::default()
     };
 
-    generate("wit", "src/bindings.rs", "durable:core/imports", &opts)?;
+    let output = out_dir.join("bindings.rs");
+    generate("wit", output, "durable:core/imports", &opts)?;
 
     Ok(())
 }

@@ -13,13 +13,9 @@ pub mod util;
 mod worker;
 
 #[allow(unused_mut, unused_doc_comments)]
-pub mod bindings;
-// pub mod bindings {
-//     #![allow(unused_mut)]
-
-//     include!("bindings.rs");
-//     // include!(concat!(env!("OUT_DIR"), "/bindings.rs"));
-// }
+pub mod bindings {
+    include!(concat!(env!("OUT_DIR"), "/bindings.rs"));
+}
 
 pub use self::config::Config;
 pub use self::task::Task;
