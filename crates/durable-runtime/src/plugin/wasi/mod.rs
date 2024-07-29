@@ -4,6 +4,7 @@ use slab::Slab;
 
 mod cli;
 mod clocks;
+mod filesystem;
 mod io;
 
 #[derive(Default)]
