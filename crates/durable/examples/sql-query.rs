@@ -2,9 +2,9 @@ use durable::sqlx;
 
 fn main() {
     // First lets add some things to the event log.
-    durable::print("message 1\n");
-    durable::print("message 2\n");
-    durable::print("message 3\n");
+    println!("message 1");
+    println!("message 2");
+    println!("message 3");
 
     let task_id = durable::task_id();
     let count = durable::sqlx::transaction("reading the event log", |mut conn| {
@@ -17,5 +17,5 @@ fn main() {
         count
     });
 
-    durable::print(&format!("{count} events so far!\n"));
+    println!("{count} events so far!");
 }

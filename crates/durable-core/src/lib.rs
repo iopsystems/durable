@@ -6,6 +6,7 @@ pub use serde_json::value::RawValue;
 extern crate serde;
 
 mod start;
+mod alloc;
 pub mod transaction;
 mod bindings {
     include!(concat!(env!("OUT_DIR"), "/bindings.rs"));
@@ -14,10 +15,6 @@ mod bindings {
 }
 
 pub use crate::transaction::transaction;
-
-pub mod export {
-    pub use crate::start::durable_start;
-}
 
 #[doc(inline)]
 pub use crate::bindings::durable::core::core::{task_id, task_name};
@@ -40,11 +37,4 @@ pub fn abort(message: &str) -> ! {
 
     // SAFETY: The abort function will never return.
     unsafe { std::hint::unreachable_unchecked() }
-}
-
-pub fn print(message: &str) {
-    crate::transaction::maybe_txn("durable::print", || {
-        crate::bindings::print(message);
-        message.to_owned()
-    });
 }

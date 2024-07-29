@@ -1,33 +1,62 @@
-extern "Rust" {
-    #[link_name = "_start"]
-    fn _start();
+use std::io::Write;
+use std::panic::PanicHookInfo;
+
+use crate::bindings::exports::durable::core::setup::Guest;
+
+extern "C" {
+    #[allow(dead_code)]
+    fn durable_ctor_wrapper();
 }
 
-pub fn durable_start(main: fn()) {
-    if let Err(payload) = std::panic::catch_unwind(|| main()) {
-        let message: Option<&str> = if let Some(message) = payload.downcast_ref::<String>() {
-            Some(message)
-        } else if let Some(message) = payload.downcast_ref::<&str>() {
-            Some(message)
-        } else {
-            None
-        };
-
-        let message = match message {
-            Some(message) => format!("workflow panicked: {message}"),
-            None => format!("workflow panicked"),
-        };
-
-        crate::abort(&message);
+#[no_mangle]
+extern "C" fn durable_ctor() {
+    if cfg!(target_arch = "wasm32") {
+        std::panic::set_hook(Box::new(durable_panic_hook))
     }
 }
 
-#[macro_export]
-macro_rules! durable_main {
-    ($main:path) => {
-        #[no_mangle]
-        fn _start() {
-            $crate::export::durable_start($main)
-        }
+fn durable_panic_hook(info: &PanicHookInfo) {
+    let payload = info.payload();
+    let msg: &str = if let Some(msg) = payload.downcast_ref::<String>() {
+        msg
+    } else if let Some(msg) = payload.downcast_ref::<&str>() {
+        msg
+    } else {
+        "Box<dyn Any>"
     };
+
+    crate::transaction::maybe_txn("durable::panic", || {
+        use std::fmt::Write;
+
+        let name = crate::task_name();
+        let mut message = String::new();
+
+        let _ = write!(&mut message, "task '{name}' panicked");
+        if let Some(location) = info.location() {
+            let _ = write!(&mut message, " at {location}");
+        }
+
+        let _ = write!(&mut message, "\n{msg}\n");
+
+        let mut err = std::io::stderr();
+        if let Err(_) = err.write_all(message.as_bytes()) {
+            crate::abort(&message);
+        }
+    });
+
+    std::process::abort()
 }
+
+struct Setup;
+
+impl Guest for Setup {
+    fn durable_setup_hack() {
+        #[used]
+        static __UNUSED_LINK_HACK: unsafe extern "C" fn() = durable_ctor_wrapper;
+
+        println!("HERE IS A TEST STRING THAT SHOULD BE CALLED");
+        unsafe { durable_ctor_wrapper() };
+    }
+}
+
+crate::bindings::export!(Setup with_types_in crate::bindings);

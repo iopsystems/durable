@@ -42,6 +42,17 @@ pub struct Config {
     ///
     /// The default limit here is 128KB.
     pub max_log_bytes_per_transaction: usize,
+
+    /// The maximum permitted size, in bytes, of any buffers that are directly
+    /// controlled by the workflow program.
+    ///
+    /// Some WASI methods allow the workflow program to instruct the runtime to
+    /// directly construct buffers of a given size. This can lead to DOS
+    /// vulnerabilities if the runtime attempts to construct an extremely large
+    /// buffer. This function serves to limit that to something more reasonable.
+    /// 
+    /// By default this is set to 8MB.
+    pub max_returned_buffer_len: usize,
 }
 
 impl Default for Config {
@@ -52,6 +63,7 @@ impl Default for Config {
             max_http_timeout: Duration::from_secs(60),
             max_workflow_events: i32::MAX as u32,
             max_log_bytes_per_transaction: 1024 * 128,
+            max_returned_buffer_len: 1024 * 1024 * 8,
         }
     }
 }

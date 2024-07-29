@@ -11,3 +11,5 @@ wit-bindgen-rt = "0.28.0"
 [build-dependencies]
 durable-bindgen = { path = "../durable-bindgen" }
 
+cc = "1.0"
+

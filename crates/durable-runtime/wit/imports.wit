@@ -15,10 +15,12 @@ world imports {
     include wasi:io/imports@0.2.0;
     include wasi:clocks/imports@0.2.0;
     include wasi:filesystem/imports@0.2.0;
+    include wasi:random/imports@0.2.0;
 }
 
 world import-core {
     import core;
+    export setup;
 }
 
 world import-http {

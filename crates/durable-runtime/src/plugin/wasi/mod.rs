@@ -6,6 +6,7 @@ mod cli;
 mod clocks;
 mod filesystem;
 mod io;
+mod random;
 
 #[derive(Default)]
 pub(super) struct WasiResources {

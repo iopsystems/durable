@@ -420,6 +420,13 @@ impl TaskState {
         .await?;
 
         if !txn.logs.is_empty() {
+            tracing::debug!(
+                target: "durable::task_log",
+                "task {}: {}",
+                self.task_id(),
+                txn.logs.trim_end()
+            );
+
             sqlx::query!(
                 r#"
                 INSERT INTO logs(task_id, index, message)

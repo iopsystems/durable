@@ -497,6 +497,7 @@ impl Worker {
             }
         };
 
+        let task_id = task.id;
         let mut task = Task {
             state: TaskState::new(shared.clone(), task, worker_id),
             plugins: Default::default(),
@@ -525,7 +526,33 @@ impl Worker {
         let guest = guest
             .load(&mut store, &instance)
             .context("failed to load the wasi:cli/run export")?;
-        if guest.call_run(&mut store).await?.is_err() {
+
+        let result = guest.call_run(&mut store).await;
+        if let Some(txn) = store.data_mut().state.transaction_mut() {
+            let index = txn.index();
+            let logs = std::mem::take(&mut txn.logs);
+
+            if !logs.is_empty() {
+                tracing::debug!(
+                    target: "durable::task_log",
+                    "task {}: {}",
+                    task_id,
+                    logs.trim_end()
+                );
+
+                let _ = sqlx::query!(
+                    "INSERT INTO logs(task_id, index, message)
+                     VALUES ($1, $2, $3)",
+                    task_id,
+                    index + 1,
+                    logs
+                )
+                .execute(&shared.pool)
+                .await;
+            }
+        }
+
+        if result?.is_err() {
             return Err(anyhow::Error::new(AbortError));
         }
 

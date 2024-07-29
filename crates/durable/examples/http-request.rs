@@ -1,8 +1,17 @@
+use std::net::IpAddr;
+
+use serde::Deserialize;
+
+#[derive(Deserialize)]
+struct Ip {
+    origin: IpAddr,
+}
+
 fn main() {
     let response = durable::http::get("http://httpbin.org/ip")
         .send()
         .expect("failed to send HTTP request");
-    let text = response.text().expect("response was not valid UTF-8");
+    let resp = response.json::<Ip>().expect("response was not valid UTF-8");
 
-    durable::print(text);
+    println!("This workflow was run at {}", resp.origin);
 }

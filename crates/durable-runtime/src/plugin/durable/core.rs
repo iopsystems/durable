@@ -41,10 +41,4 @@ impl Host for Task {
 
         Ok(())
     }
-
-    async fn print(&mut self, message: String) -> anyhow::Result<()> {
-        self.state.assert_in_transaction("print")?;
-        println!("{message}");
-        Ok(())
-    }
 }

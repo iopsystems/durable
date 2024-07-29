@@ -3,3 +3,8 @@ members = [
     "crates/*",
 ]
 resolver = "2"
+
+[profile.wasm]
+inherits = "release"
+opt-level = "z"
+lto = true

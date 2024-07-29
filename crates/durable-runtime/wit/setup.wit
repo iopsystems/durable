@@ -1,0 +1,5 @@
+
+interface setup {
+    // Function called to automatically set up some things used by the durable runtime.
+    durable-setup-hack: func();
+}

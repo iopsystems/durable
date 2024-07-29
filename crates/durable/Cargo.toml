@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [features]
-default = ["sqlx"]
+default = []
 
 http = ["dep:durable-http"]
 sqlx = ["dep:durable-sqlx"]
@@ -20,6 +20,7 @@ wit-bindgen-rt = "0.28.0"
 
 [[example]]
 name = "hello-world"
+crate-type = ["bin"]
 
 [[example]]
 name = "http-request"

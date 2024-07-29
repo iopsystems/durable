@@ -28,12 +28,4 @@ interface core {
     // Parameters:
     // - `data` - JSON-encoded state to save.
     transaction-exit: func(data: string);
-
-    // Impure functions.
-    //
-    // It is only valid to call these when within a transaction. Attempting to
-    // call them otherwise will immediately abort the workflow.
-
-    // Print a line to stdout.
-    print: func(data: string);
 }
