@@ -13,6 +13,7 @@ world imports {
     export wasi:cli/run@0.2.0;
 
     include wasi:io/imports@0.2.0;
+    include wasi:clocks/imports@0.2.0;
 }
 
 world import-core {

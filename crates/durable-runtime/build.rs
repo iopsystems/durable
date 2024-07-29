@@ -4,15 +4,6 @@ use anyhow::Context;
 use wasmtime_wit_bindgen::*;
 use wit_parser::Resolve;
 
-macro_rules! hashmap {
-    { $( $key:expr => $value:expr ),* $(,)? } => {
-        [ $( ( $key, $value ) )* ]
-            .into_iter()
-            .map(|(key, value): (&str, &str)| (key.to_owned(), value.to_owned()))
-            .collect::<std::collections::HashMap<_, _>>()
-    }
-}
-
 fn generate(
     path: impl AsRef<Path>,
     out: impl AsRef<Path>,
@@ -75,6 +66,7 @@ fn main() -> anyhow::Result<()> {
         "get-stdin",
         "get-stdout",
         "get-stderr",
+        "resolution",
     ];
 
     let opts = Opts {
@@ -84,7 +76,6 @@ fn main() -> anyhow::Result<()> {
         async_: AsyncConfig::AllExceptImports(
             sync.into_iter().map(|item| item.to_string()).collect(),
         ),
-        with: hashmap! {},
         ..Default::default()
     };
 

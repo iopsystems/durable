@@ -3,6 +3,7 @@ use std::time::SystemTime;
 use slab::Slab;
 
 mod cli;
+mod clocks;
 mod io;
 
 #[derive(Default)]
