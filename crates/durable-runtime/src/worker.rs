@@ -10,6 +10,7 @@ use rand::Rng;
 use serde_json::value::RawValue;
 use sqlx::postgres::types::PgInterval;
 use sqlx::types::Json;
+use sqlx::Acquire;
 use tokio::sync::broadcast;
 use tokio::task::JoinSet;
 use tokio::time::Instant;
@@ -262,6 +263,8 @@ impl Worker {
         let _guard = ShutdownGuard::new(&shutdown);
         let mut shutdown = std::pin::pin!(shutdown.wait());
 
+        self.spawn_new_tasks().await?;
+
         'outer: loop {
             let event = tokio::select! {
                 biased;
@@ -394,14 +397,24 @@ impl Worker {
 
                 let mut tx = shared.pool.begin().await?;
 
-                sqlx::query!(
-                    "INSERT INTO event(task_id, index, label, value)
-                    VALUES ($1, -1, 'durable:error-message', $2)",
+                let mut stx = tx.begin().await?;
+                let result = sqlx::query!(
+                    "INSERT INTO logs(task_id, index, message)
+                    VALUES ($1, $2, $3)",
                     task_id,
+                    i32::MAX,
                     Json(format!("{e:?}")) as Json<String>
                 )
-                .execute(&mut *tx)
-                .await?;
+                .execute(&mut *stx)
+                .await;
+
+                match result {
+                    Ok(_) => stx.commit().await?,
+                    Err(e) => {
+                        tracing::error!("failed to write task error logs to database: {e}");
+                        stx.rollback().await?;
+                    }
+                }
 
                 sqlx::query!(
                     "UPDATE task
