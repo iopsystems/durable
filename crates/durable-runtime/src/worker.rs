@@ -139,7 +139,7 @@ impl Worker {
         .id;
 
         let heartbeat = Self::heartbeat(self.shared.clone(), self.worker_id);
-        let validate = Self::validate_workers(self.shared.clone());
+        let validate = Self::validate_workers(self.shared.clone(), self.worker_id);
         let process = self.process_events();
 
         // We want to run these all in the same tokio task so that if it has problems
@@ -203,7 +203,7 @@ impl Worker {
 
     /// This task is responsible for periodically validating that all workers in
     /// the table are still live.
-    async fn validate_workers(shared: Arc<SharedState>) -> anyhow::Result<()> {
+    async fn validate_workers(shared: Arc<SharedState>, worker_id: i64) -> anyhow::Result<()> {
         let _guard = ShutdownGuard::new(&shared.shutdown);
         let mut shutdown = std::pin::pin!(shared.shutdown.wait());
         let mut next = Instant::now();
@@ -229,8 +229,11 @@ impl Worker {
             };
 
             let result = sqlx::query!(
-                "DELETE FROM worker WHERE CURRENT_TIMESTAMP - last_heartbeat > $1",
-                timeout
+                "DELETE FROM worker
+                WHERE CURRENT_TIMESTAMP - last_heartbeat > $1
+                  AND NOT id = $2",
+                timeout,
+                worker_id
             )
             .execute(&mut *tx)
             .await?;
