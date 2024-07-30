@@ -191,6 +191,8 @@ impl Worker {
                 anyhow::bail!("worker entry was deleted from the database");
             }
 
+            tracing::trace!(target: "durable_runtime::heartbeat", "update worker heartbeat");
+
             let mut interval = shared.config.heartbeat_interval;
             let jitter = rand::thread_rng().gen_range(0..(interval / 4).as_nanos());
             interval -= Duration::from_nanos(jitter as u64);
@@ -239,7 +241,11 @@ impl Worker {
             .await?;
 
             if result.rows_affected() > 0 {
-                tracing::debug!("expired {} inactive workers", result.rows_affected());
+                tracing::trace!(
+                    target: "durable_runtime::validate_workers",
+                    "expired {} inactive workers",
+                    result.rows_affected()
+                );
             }
 
             let record = sqlx::query!(r#"SELECT COUNT(*) as "count!" FROM worker"#)
