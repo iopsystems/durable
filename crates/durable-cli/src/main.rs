@@ -1,7 +1,10 @@
 //!
 
+use std::str::FromStr;
+
 use anyhow::Context;
 use clap::Parser;
+use sqlx::ConnectOptions;
 use tokio::sync::OnceCell;
 use tracing_subscriber::prelude::*;
 
@@ -51,7 +54,11 @@ impl CommonOptions {
     pub async fn pool(&self) -> anyhow::Result<sqlx::PgPool> {
         self.pool
             .get_or_try_init(|| async {
-                sqlx::PgPool::connect(&self.database_url)
+                let options = sqlx::postgres::PgConnectOptions::from_str(&self.database_url)
+                    .context("failed to parse database URL")?
+                    .log_statements(log::LevelFilter::Debug);
+
+                sqlx::PgPool::connect_with(options)
                     .await
                     .context("failed to connect to the database")
             })

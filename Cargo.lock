@@ -685,12 +685,31 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "clap",
+ "durable-client",
  "futures-util",
+ "log",
  "serde",
  "serde_json",
  "sqlx",
  "tokio",
  "tracing-subscriber",
+]
+
+[[package]]
+name = "durable-client"
+version = "0.1.0"
+dependencies = [
+ "async-stream",
+ "chrono",
+ "crossbeam-utils",
+ "futures-core",
+ "futures-util",
+ "serde",
+ "serde_json",
+ "sha2",
+ "sqlx",
+ "wasmparser 0.214.0",
+ "weak-table",
 ]
 
 [[package]]
@@ -3252,6 +3271,7 @@ dependencies = [
  "hashbrown 0.14.5",
  "indexmap",
  "semver",
+ "serde",
 ]
 
 [[package]]
@@ -3542,6 +3562,12 @@ checksum = "347249eb56773fa728df2656cfe3a8c19437ded61a922a0b5e0839d9790e278e"
 dependencies = [
  "wast",
 ]
+
+[[package]]
+name = "weak-table"
+version = "0.3.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "323f4da9523e9a669e1eaf9c6e763892769b1d38c623913647bfdc1532fe4549"
 
 [[package]]
 name = "web-sys"

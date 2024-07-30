@@ -6,6 +6,32 @@ CREATE TABLE worker(
 
 CREATE INDEX worker_timestamp ON worker(last_heartbeat ASC);
 
+-- Wasm binaries for use by various tasks.
+--
+-- When a new task 
+CREATE TABLE wasm(
+    id          bigserial   NOT NULL PRIMARY KEY,
+
+    -- A SHA256 hash of the the wasm program here.
+    --
+    -- This is to avoid storing duplicate wasm programs in the database.
+    hash        bytea       NOT NULL CONSTRAINT hash_unique UNIQUE,
+    wasm        bytea       NOT NULL,
+
+    -- An optional name for this program.
+    --
+    -- This has no semantic meaning within the runtime. It is, however,
+    -- available for monitoring and debugging purposes.
+    name        text,
+
+    -- The last time that this program was created by a client.
+    --
+    -- Clients will update this peridically on use. A row will only be
+    -- automatically deleted from this table if there are no workflows that use
+    -- it and its last_used timestamp is more than a day in the past.
+    last_used   timestamptz NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
 CREATE TYPE task_state AS ENUM(
     'active',
     'complete',
@@ -24,11 +50,12 @@ CREATE TABLE task(
     -- The compiled WASM bytecode.
     --
     -- This gets set to NULL once the task has executed to completion.
-    wasm            bytea,
+    wasm            bigint,
     data            jsonb       NOT NULL,
 
     CONSTRAINT fk_worker FOREIGN KEY(running_on) REFERENCES worker(id)
-        ON DELETE SET NULL
+        ON DELETE SET NULL,
+    CONSTRAINT fk_wasm   FOREIGN KEY(wasm)       REFERENCES wasm(id)
 );
 
 CREATE INDEX task_queue ON task(running_on ASC)

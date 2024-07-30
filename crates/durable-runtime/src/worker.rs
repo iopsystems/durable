@@ -227,16 +227,22 @@ impl Worker {
                     .unwrap_or(i64::MAX),
             };
 
-            sqlx::query!(
+            let result = sqlx::query!(
                 "DELETE FROM worker WHERE CURRENT_TIMESTAMP - last_heartbeat > $1",
                 timeout
             )
             .execute(&mut *tx)
             .await?;
 
+            if result.rows_affected() > 0 {
+                tracing::debug!("expired {} inactive workers", result.rows_affected());
+            }
+
             let record = sqlx::query!(r#"SELECT COUNT(*) as "count!" FROM worker"#)
                 .fetch_one(&mut *tx)
                 .await?;
+
+            tx.commit().await?;
 
             // To avoid weird cases with large clusters the maximum interval is 1 day.
             let mut interval = ((shared.config.heartbeat_timeout / 2)
@@ -303,12 +309,13 @@ impl Worker {
             )
             UPDATE task
               SET running_on = $1
-             FROM selected
+             FROM selected, wasm
             WHERE selected.id = task.id
+              AND task.wasm = wasm.id
             RETURNING
                 task.id     as id,
                 task.name   as name,
-                task.wasm   as wasm,
+                wasm.wasm   as wasm,
                 task.data   as "data!: Json<Box<RawValue>>"
             "#,
             self.worker_id
