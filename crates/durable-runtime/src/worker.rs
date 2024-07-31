@@ -710,7 +710,7 @@ impl Worker {
         }
 
         if let Some(error) = error {
-            let message = format!("{error:?}");
+            let message = format!("{error:?}\n");
 
             tracing::warn!("task failed to execute with an error: {message}");
 
