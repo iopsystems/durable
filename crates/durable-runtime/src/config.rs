@@ -26,7 +26,7 @@ pub struct Config {
     ///
     /// This must be greater than 2 hours otherwise it is likely that programs
     /// will be removed out from underneath clients.
-    /// 
+    ///
     /// The default duration is 24 hours.
     pub wasm_entry_ttl: Duration,
 

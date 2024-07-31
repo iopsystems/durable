@@ -1,5 +1,6 @@
 use async_trait::async_trait;
 
+#[derive(Clone, Debug)]
 pub enum Event {
     /// A `durable:task` event was emitted.
     ///

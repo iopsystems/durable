@@ -123,8 +123,6 @@ CREATE TABLE durable.log(
     PRIMARY KEY(task_id, index),
 
     CONSTRAINT fk_task  FOREIGN KEY(task_id) REFERENCES durable.task(id)
-        ON DELETE CASCADE,
-    CONSTRAINT fk_event FOREIGN KEY(task_id, index) REFERENCES durable.event(task_id, index)
         ON DELETE CASCADE
 );
 

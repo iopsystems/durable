@@ -8,7 +8,7 @@ fn main() {
 
     let task_id = durable::task_id();
     let count = durable::sqlx::transaction("reading the event log", |mut conn| {
-        let row = sqlx::query("SELECT COUNT(*) FROM event WHERE task_id = $1")
+        let row = sqlx::query("SELECT COUNT(*) FROM durable.event WHERE task_id = $1")
             .bind(task_id)
             .fetch_one(&mut conn)
             .expect("failed to make a query to the database");

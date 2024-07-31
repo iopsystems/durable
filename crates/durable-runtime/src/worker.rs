@@ -11,20 +11,22 @@ use rand::Rng;
 use serde_json::value::RawValue;
 use sqlx::postgres::PgNotification;
 use sqlx::types::Json;
-use sqlx::Acquire;
 use tokio::sync::{broadcast, Notify};
 use tokio::task::JoinSet;
 use tokio::time::Instant;
 use tracing::Instrument;
 
 use crate::bindings::exports::wasi::cli::run::GuestPre;
-use crate::error::{AbortError, Exit};
+use crate::error::TaskStatus;
 use crate::event::{self, Event, EventSource, Notification};
 use crate::flag::{ShutdownFlag, ShutdownGuard};
 use crate::plugin::{DurablePlugin, Plugin};
 use crate::task::{Task, TaskState};
 use crate::util::{IntoPgInterval, Mailbox};
 use crate::Config;
+
+const LOG_ERROR_INDEX: i32 = i32::MAX - 1;
+const LOG_PANIC_INDEX: i32 = i32::MAX;
 
 pub(crate) struct SharedState {
     pub shutdown: ShutdownFlag,
@@ -151,6 +153,7 @@ impl Worker {
 
         self.shared.shutdown.reset();
 
+        let worker_id = self.worker_id;
         let heartbeat = Self::heartbeat(self.shared.clone(), self.worker_id);
         let validate = Self::validate_workers(self.shared.clone(), self.worker_id);
         let leader = Self::leader(self.shared.clone(), self.worker_id);
@@ -161,8 +164,10 @@ impl Worker {
         //
         // Spawned tasks are put into their own joinset because running everything in a
         // single task is not reasonable.
-        let (heartbeat, validate, leader, process) =
-            (heartbeat, validate, leader, process).join().await;
+        let (heartbeat, validate, leader, process) = (heartbeat, validate, leader, process)
+            .join()
+            .instrument(tracing::info_span!("worker", worker_id))
+            .await;
 
         let result = sqlx::query!("DELETE FROM durable.worker WHERE id = $1", self.worker_id)
             .execute(&self.shared.pool)
@@ -210,8 +215,6 @@ impl Worker {
                 anyhow::bail!("worker entry was deleted from the database");
             }
 
-            tracing::trace!(target: "durable_runtime::heartbeat", "update worker heartbeat");
-
             let mut interval = shared.config.heartbeat_interval;
             let jitter = rand::thread_rng().gen_range(0..(interval / 4).as_nanos());
             interval -= Duration::from_nanos(jitter as u64);
@@ -238,7 +241,7 @@ impl Worker {
             }
 
             let mut tx = shared.pool.begin().await?;
-            let timeout = shared.config.heartbeat_interval.into_pg_interval();
+            let timeout = shared.config.heartbeat_timeout.into_pg_interval();
 
             let result = sqlx::query!(
                 "DELETE FROM durable.worker
@@ -487,103 +490,85 @@ impl Worker {
     ) -> anyhow::Result<()> {
         let task_id = task.id;
 
-        match AssertUnwindSafe(Self::run_task_impl(shared.clone(), engine, task, worker_id))
-            .catch_unwind()
-            .await
-        {
-            Ok(Ok(())) => {
-                sqlx::query!(
-                    "UPDATE durable.task
-                    SET state = 'complete',
-                        completed_at = CURRENT_TIMESTAMP,
-                        running_on = NULL,
-                        wasm = NULL
-                    WHERE id = $1
-                    ",
-                    task_id
-                )
-                .execute(&shared.pool)
-                .await?;
-            }
-            Ok(Err(e)) if e.is::<AbortError>() => {
-                tracing::info!("task {task_id} was taken by another worker");
+        let status =
+            match AssertUnwindSafe(Self::run_task_impl(shared.clone(), engine, task, worker_id))
+                .catch_unwind()
+                .await
+            {
+                Ok(Ok(status)) => status,
+                Ok(Err(error)) => {
+                    let message = format!("{error:?}\n");
 
-                // Don't do anything since we no longer own the task.
-            }
-            Ok(Err(e)) if e.is::<Exit>() => {
-                sqlx::query!(
-                    "UPDATE durable.task
-                    SET state = 'complete',
-                        completed_at = CURRENT_TIMESTAMP,
-                        running_on = NULL,
-                        wasm = NULL
-                    WHERE id = $1
-                    ",
-                    task_id
-                )
-                .execute(&shared.pool)
-                .await?;
-            }
-            Ok(Err(e)) => {
-                tracing::warn!("task {task_id} failed to execute with an error: {e:?}");
+                    let result = sqlx::query!(
+                        "INSERT INTO durable.log(task_id, index, message)
+                        VALUES ($1, $2, $3)",
+                        task_id,
+                        LOG_ERROR_INDEX,
+                        message
+                    )
+                    .execute(&shared.pool)
+                    .await;
 
-                let mut tx = shared.pool.begin().await?;
-
-                let mut stx = tx.begin().await?;
-                let result = sqlx::query!(
-                    "INSERT INTO durable.log(task_id, index, message)
-                    VALUES ($1, $2, $3)",
-                    task_id,
-                    i32::MAX,
-                    Json(format!("{e:?}")) as Json<String>
-                )
-                .execute(&mut *stx)
-                .await;
-
-                match result {
-                    Ok(_) => stx.commit().await?,
-                    Err(e) => {
-                        tracing::error!("failed to write task error logs to database: {e}");
-                        stx.rollback().await?;
+                    if let Err(e) = result {
+                        tracing::error!("failed to save error logs to the database: {e}");
                     }
+
+                    TaskStatus::ExitFailure
                 }
+                Err(payload) => {
+                    let message: &str = if let Some(message) = payload.downcast_ref::<String>() {
+                        &message
+                    } else if let Some(message) = payload.downcast_ref::<&str>() {
+                        message
+                    } else {
+                        "Box<dyn Any>"
+                    };
 
-                sqlx::query!(
-                    "UPDATE durable.task
-                    SET state = 'failed',
-                        completed_at = CURRENT_TIMESTAMP,
-                        running_on = NULL,
-                        wasm = NULL
-                    WHERE id = $1",
-                    task_id
-                )
-                .execute(&mut *tx)
-                .await?;
+                    tracing::error!("task {task_id} panicked: {message}");
 
-                tx.commit().await?;
+                    let result = sqlx::query!(
+                        "INSERT INTO durable.log(task_id, index, message)
+                         VALUES ($1, $2, $3)",
+                        task_id,
+                        LOG_PANIC_INDEX,
+                        format!("task panicked: {message}\n")
+                    )
+                    .execute(&shared.pool)
+                    .await;
+
+                    if let Err(e) = result {
+                        tracing::error!("failed to save error logs to the database: {e}");
+                    }
+
+                    TaskStatus::ExitFailure
+                }
+            };
+
+        match status {
+            TaskStatus::NotScheduledOnWorker => {
+                tracing::debug!("task {task_id} was taken by another worker");
+
+                // Don't do anything since we no longer own this task.
             }
-            Err(e) => {
-                let message: &str = if let Some(message) = e.downcast_ref::<String>() {
-                    &message
-                } else if let Some(message) = e.downcast_ref::<&str>() {
-                    message
-                } else {
-                    "<opaque panic payload>"
-                };
-
-                tracing::error!("task {task_id} panicked: {message}");
-
-                let mut tx = shared.pool.begin().await?;
-
+            TaskStatus::Suspend => {
+                // The task should have set itself to the suspended state before
+                // returning this error code. Nothing we need to do here.
+            }
+            TaskStatus::ExitSuccess => {
                 sqlx::query!(
-                    "INSERT INTO durable.event(task_id, index, label, value)
-                    VALUES ($1, -1, 'durable:error-message', $2)",
-                    task_id,
-                    Json(message) as Json<&str>
+                    "UPDATE durable.task
+                    SET state = 'complete',
+                        completed_at = CURRENT_TIMESTAMP,
+                        running_on = NULL,
+                        wasm = NULL
+                    WHERE id = $1
+                    ",
+                    task_id
                 )
-                .execute(&mut *tx)
+                .execute(&shared.pool)
                 .await?;
-
+            }
+            TaskStatus::ExitFailure => {
                 sqlx::query!(
                     "UPDATE durable.task
                     SET state = 'failed',
@@ -593,10 +578,8 @@ impl Worker {
                     WHERE id = $1",
                     task_id
                 )
-                .execute(&mut *tx)
+                .execute(&shared.pool)
                 .await?;
-
-                tx.commit().await?;
             }
         }
 
@@ -608,7 +591,7 @@ impl Worker {
         engine: wasmtime::Engine,
         mut task: TaskData,
         worker_id: i64,
-    ) -> anyhow::Result<()> {
+    ) -> anyhow::Result<TaskStatus> {
         use wasmtime::component::*;
 
         tracing::info!("launching task `{}`", task.name);
@@ -632,7 +615,7 @@ impl Worker {
 
                 tx.commit().await?;
 
-                return Ok(());
+                return Ok(TaskStatus::ExitFailure);
             }
         };
 
@@ -679,7 +662,24 @@ impl Worker {
             .load(&mut store, &instance)
             .context("failed to load the wasi:cli/run export")?;
 
-        let result = guest.call_run(&mut store).await;
+        let mut error = None;
+        let status = match guest.call_run(&mut store).await {
+            Ok(Ok(())) => TaskStatus::ExitSuccess,
+            Ok(Err(())) => TaskStatus::ExitFailure,
+            Err(e) => {
+                if let Some(exit) = as_task_exit(&e) {
+                    exit
+                } else {
+                    error = Some(e);
+                    TaskStatus::ExitFailure
+                }
+            }
+        };
+
+        if !status.is_final() {
+            return Ok(status);
+        }
+
         if let Some(txn) = store.data_mut().state.transaction_mut() {
             let index = txn.index();
             let logs = std::mem::take(&mut txn.logs);
@@ -692,24 +692,51 @@ impl Worker {
                     logs.trim_end()
                 );
 
-                let _ = sqlx::query!(
+                if let Err(e) = sqlx::query!(
                     "INSERT INTO durable.log(task_id, index, message)
                      VALUES ($1, $2, $3)",
                     task_id,
-                    index + 1,
+                    index,
                     logs
                 )
                 .execute(&shared.pool)
-                .await;
+                .await
+                {
+                    tracing::error!("failed to save remaining logs to the database: {e}");
+                }
             }
         }
 
-        if result?.is_err() {
-            return Err(anyhow::Error::new(AbortError));
+        if let Some(error) = error {
+            let message = format!("{error:?}");
+
+            tracing::warn!("task failed to execute with an error: {message}");
+
+            let result = sqlx::query!(
+                "INSERT INTO durable.log(task_id, index, message)
+                 VALUES ($1, $2, $3)",
+                task_id,
+                LOG_ERROR_INDEX,
+                message
+            )
+            .execute(&shared.pool)
+            .await;
+
+            if let Err(e) = result {
+                tracing::error!("failed to save error logs to the database: {e}");
+            }
         }
 
-        Ok(())
+        Ok(status)
     }
+}
+
+fn as_task_exit(error: &anyhow::Error) -> Option<TaskStatus> {
+    error
+        .chain()
+        .filter_map(|e| e.downcast_ref::<TaskStatus>())
+        .copied()
+        .next()
 }
 
 pub struct PgEventSource {
@@ -752,21 +779,27 @@ impl EventSource for PgEventSource {
 
         loop {
             break match self.listener.try_recv().await {
-                Ok(Some(event)) => match event.channel() {
-                    "durable:task" => Ok(parse_event("durable:task", &event, Event::Task)),
-                    "durable:task-suspend" => Ok(parse_event(
-                        "durable:task-suspend",
-                        &event,
-                        Event::TaskSuspend,
-                    )),
-                    "durable:notification" => Ok(parse_event(
-                        "durable:notification",
-                        &event,
-                        Event::Notification,
-                    )),
-                    "durable:worker" => Ok(parse_event("durable:worker", &event, Event::Worker)),
-                    _ => continue,
-                },
+                Ok(Some(event)) => {
+                    tracing::trace!("received event {}: {}", event.channel(), event.payload());
+
+                    match event.channel() {
+                        "durable:task" => Ok(parse_event("durable:task", &event, Event::Task)),
+                        "durable:task-suspend" => Ok(parse_event(
+                            "durable:task-suspend",
+                            &event,
+                            Event::TaskSuspend,
+                        )),
+                        "durable:notification" => Ok(parse_event(
+                            "durable:notification",
+                            &event,
+                            Event::Notification,
+                        )),
+                        "durable:worker" => {
+                            Ok(parse_event("durable:worker", &event, Event::Worker))
+                        }
+                        _ => continue,
+                    }
+                }
                 Ok(None) => Ok(Event::Lagged),
                 Err(e) => {
                     tracing::warn!("listener received an error: {e}");

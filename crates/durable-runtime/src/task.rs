@@ -9,7 +9,7 @@ use serde::Serialize;
 use serde_json::value::RawValue;
 use sqlx::types::Json;
 
-use crate::error::AbortError;
+use crate::error::TaskStatus;
 use crate::util::AsyncFnOnce;
 use crate::worker::{SharedState, TaskData};
 use crate::Config;
@@ -356,6 +356,12 @@ impl TaskState {
                 );
             }
 
+            tracing::trace!(
+                index = self.txn_index,
+                "entering transaction {}",
+                options.label
+            );
+
             let mut txn = Transaction::new(options.label, self.txn_index, self.shared.clone());
             if options.database {
                 txn.conn = Some(Box::new(tx));
@@ -406,7 +412,7 @@ impl TaskState {
         if running_on != Some(self.worker_id) {
             // This task is no longer running on the current worker. Don't commit anything,
             // and abort the task.
-            return Err(anyhow::Error::new(AbortError));
+            return Err(anyhow::Error::new(TaskStatus::NotScheduledOnWorker));
         }
 
         sqlx::query!(
@@ -442,6 +448,8 @@ impl TaskState {
             .execute(&mut *tx)
             .await?;
         }
+
+        tracing::trace!(index = self.txn_index, "exiting transaction {}", txn.label);
 
         tx.commit().await?;
         self.txn_index += 1;

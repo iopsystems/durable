@@ -2,7 +2,7 @@ use wasmtime::component::Resource;
 
 use crate::bindings::wasi;
 use crate::bindings::wasi::io::streams::{InputStream, OutputStream};
-use crate::error::{AbortError, Exit};
+use crate::error::TaskStatus;
 use crate::task::Task;
 
 impl wasi::cli::environment::Host for Task {
@@ -22,8 +22,8 @@ impl wasi::cli::environment::Host for Task {
 impl wasi::cli::exit::Host for Task {
     fn exit(&mut self, status: Result<(), ()>) -> wasmtime::Result<()> {
         Err(match status {
-            Ok(()) => anyhow::Error::new(AbortError),
-            Err(()) => anyhow::Error::new(Exit),
+            Ok(()) => anyhow::Error::new(TaskStatus::ExitSuccess),
+            Err(()) => anyhow::Error::new(TaskStatus::ExitFailure),
         })
     }
 }

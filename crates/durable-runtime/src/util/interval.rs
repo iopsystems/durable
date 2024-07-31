@@ -10,7 +10,7 @@ impl IntoPgInterval for std::time::Duration {
             months: 0,
             days: 0,
             microseconds: self
-                .as_nanos()
+                .as_micros()
                 .try_into()
                 .expect("duration was longer than can be represented in a PgInterval"),
         }
