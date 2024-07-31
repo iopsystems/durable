@@ -54,7 +54,7 @@ impl Task {
                     index,
                     label,
                     value as "value!: Json<Value>"
-                FROM event
+                FROM durable.event
                 WHERE task_id = $1
                 ORDER BY index ASC
                 "#,
@@ -75,7 +75,7 @@ impl Task {
             drop(events);
 
             if count == 0 {
-                let exists = sqlx::query!("SELECT id FROM task WHERE id = $1", self.id)
+                let exists = sqlx::query!("SELECT id FROM durable.task WHERE id = $1", self.id)
                     .fetch_optional(&mut *conn)
                     .await?
                     .is_some();
@@ -87,7 +87,7 @@ impl Task {
         }
     }
 
-    pub fn log_messages<'a>(
+    pub fn read_logs<'a>(
         &'a self,
         client: &DurableClient,
     ) -> impl Stream<Item = Result<String, DurableError>> + '_ {
@@ -100,7 +100,7 @@ impl Task {
             let mut events = sqlx::query!(
                 r#"
                 SELECT message
-                FROM logs
+                FROM durable.log
                 WHERE task_id = $1
                 ORDER BY index ASC
                 "#,
@@ -117,7 +117,7 @@ impl Task {
             drop(events);
 
             if count == 0 {
-                let exists = sqlx::query!("SELECT id FROM task WHERE id = $1", self.id)
+                let exists = sqlx::query!("SELECT id FROM durable.task WHERE id = $1", self.id)
                     .fetch_optional(&mut *conn)
                     .await?
                     .is_some();

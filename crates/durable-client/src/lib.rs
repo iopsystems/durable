@@ -125,7 +125,7 @@ impl DurableClient {
 
         if last_used < now - Duration::hours(1) {
             let record = sqlx::query!(
-                "UPDATE wasm
+                "UPDATE durable.wasm
                   SET last_used = CURRENT_TIMESTAMP
                 WHERE id = $1
                 RETURNING last_used",
@@ -144,13 +144,17 @@ impl DurableClient {
             let mut stx = tx.begin().await?;
             let result = sqlx::query!(
                 "
-                INSERT INTO task(name, wasm, data, running_on)
+                INSERT INTO durable.task(name, wasm, data, running_on)
                 SELECT
                     $1 as name,
                     $2 as wasm,
                     $3 as data,
-                    (SELECT id FROM worker ORDER BY random() LIMIT 1)
-                        as running_on
+                    (SELECT id
+                       FROM durable.worker
+                      ORDER BY random()
+                      LIMIT 1
+                      FOR SHARE SKIP LOCKED
+                    ) as running_on
                 RETURNING id
                 ",
                 name,

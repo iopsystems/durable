@@ -307,7 +307,7 @@ impl TaskState {
             SELECT
                 label,
                 value as "value: Json<Box<RawValue>>"
-             FROM event
+             FROM durable.event
             WHERE task_id = $1
               AND index = $2
             "#,
@@ -396,10 +396,13 @@ impl TaskState {
             _ => self.shared.pool.begin().await?,
         };
 
-        let running_on = sqlx::query!("SELECT running_on FROM task WHERE id = $1", self.task_id())
-            .fetch_one(&mut *tx)
-            .await?
-            .running_on;
+        let running_on = sqlx::query!(
+            "SELECT running_on FROM durable.task WHERE id = $1",
+            self.task_id()
+        )
+        .fetch_one(&mut *tx)
+        .await?
+        .running_on;
         if running_on != Some(self.worker_id) {
             // This task is no longer running on the current worker. Don't commit anything,
             // and abort the task.
@@ -408,7 +411,7 @@ impl TaskState {
 
         sqlx::query!(
             r#"
-            INSERT INTO event(task_id, index, label, value)
+            INSERT INTO durable.event(task_id, index, label, value)
             VALUES ($1, $2, $3, $4)
             "#,
             self.task_id(),
@@ -429,7 +432,7 @@ impl TaskState {
 
             sqlx::query!(
                 r#"
-                INSERT INTO logs(task_id, index, message)
+                INSERT INTO durable.log(task_id, index, message)
                 VALUES ($1, $2, $3)
                 "#,
                 self.task_id(),

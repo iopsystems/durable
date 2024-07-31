@@ -21,6 +21,15 @@ pub struct Config {
     /// heartbeat.
     pub heartbeat_timeout: Duration,
 
+    /// The duration that the entry for a binary will be kept around after it
+    /// was last used before the a worker attempts to remove it.
+    ///
+    /// This must be greater than 2 hours otherwise it is likely that programs
+    /// will be removed out from underneath clients.
+    /// 
+    /// The default duration is 24 hours.
+    pub wasm_entry_ttl: Duration,
+
     /// The maximum permitted timeout when a workflow makes HTTP requests.
     ///
     /// Timeouts longer than this maximum will be clamped and if no timeout is
@@ -60,6 +69,7 @@ impl Default for Config {
         Self {
             heartbeat_interval: Duration::from_secs(30),
             heartbeat_timeout: Duration::from_secs(120),
+            wasm_entry_ttl: Duration::from_secs(24 * 3600),
             max_http_timeout: Duration::from_secs(60),
             max_workflow_events: i32::MAX as u32,
             max_log_bytes_per_transaction: 1024 * 128,

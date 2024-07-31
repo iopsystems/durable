@@ -89,7 +89,7 @@ impl ProgramData {
     ) -> sqlx::Result<Self> {
         let record = sqlx::query!(
             "
-            INSERT INTO wasm(hash, wasm, name)
+            INSERT INTO durable.wasm(hash, wasm, name)
             VALUES ($1, $2, $3)
             ON CONFLICT ON CONSTRAINT hash_unique
             DO UPDATE
@@ -115,7 +115,7 @@ impl ProgramData {
     pub async fn reregister(&self, conn: &mut PgConnection) -> sqlx::Result<()> {
         let record = sqlx::query!(
             "
-            INSERT INTO wasm(hash, wasm, name)
+            INSERT INTO durable.wasm(hash, wasm, name)
             VALUES ($1, $2, $3)
             ON CONFLICT ON CONSTRAINT hash_unique
             DO UPDATE

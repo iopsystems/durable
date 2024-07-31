@@ -4,33 +4,39 @@ use std::time::Duration;
 
 use anyhow::Context;
 use async_trait::async_trait;
+use chrono::Utc;
 use futures_concurrency::future::Join;
 use futures_util::FutureExt;
 use rand::Rng;
 use serde_json::value::RawValue;
 use sqlx::postgres::types::PgInterval;
+use sqlx::postgres::PgNotification;
 use sqlx::types::Json;
 use sqlx::Acquire;
-use tokio::sync::broadcast;
+use tokio::sync::{broadcast, Notify};
 use tokio::task::JoinSet;
 use tokio::time::Instant;
 use tracing::Instrument;
 
 use crate::bindings::exports::wasi::cli::run::GuestPre;
 use crate::error::{AbortError, Exit};
-use crate::event::{Event, EventSource, NotificationInserted, TaskInserted};
+use crate::event::{self, Event, EventSource, Notification};
 use crate::flag::{ShutdownFlag, ShutdownGuard};
 use crate::plugin::{DurablePlugin, Plugin};
 use crate::task::{Task, TaskState};
+use crate::util::Mailbox;
 use crate::Config;
 
 pub(crate) struct SharedState {
     pub shutdown: ShutdownFlag,
     pub pool: sqlx::PgPool,
     pub client: reqwest::Client,
-    pub notifications: broadcast::Sender<NotificationInserted>,
+    pub notifications: broadcast::Sender<Notification>,
     pub config: Config,
-    plugins: Vec<Box<dyn Plugin>>,
+    pub plugins: Vec<Box<dyn Plugin>>,
+
+    leader: Mailbox<i64>,
+    suspend: Notify,
 }
 
 pub(crate) struct TaskData {
@@ -84,6 +90,8 @@ impl WorkerBuilder {
             notifications: broadcast::channel(128).0,
             config: self.config,
             plugins: self.plugins,
+            leader: Mailbox::new(-1),
+            suspend: Notify::new(),
         });
 
         let engine = self.engine.unwrap_or_default();
@@ -132,14 +140,21 @@ impl Worker {
 
     pub async fn run(&mut self) -> anyhow::Result<()> {
         self.worker_id = sqlx::query!(
-            "INSERT INTO worker(last_heartbeat) VALUES (CURRENT_TIMESTAMP) RETURNING id"
+            "
+            INSERT INTO durable.worker(heartbeat_at)
+            VALUES (CURRENT_TIMESTAMP)
+            RETURNING id
+            "
         )
         .fetch_one(&self.shared.pool)
         .await?
         .id;
 
+        self.shared.shutdown.reset();
+
         let heartbeat = Self::heartbeat(self.shared.clone(), self.worker_id);
         let validate = Self::validate_workers(self.shared.clone(), self.worker_id);
+        let leader = Self::leader(self.shared.clone(), self.worker_id);
         let process = self.process_events();
 
         // We want to run these all in the same tokio task so that if it has problems
@@ -147,15 +162,17 @@ impl Worker {
         //
         // Spawned tasks are put into their own joinset because running everything in a
         // single task is not reasonable.
-        let (heartbeat, validate, process) = (heartbeat, validate, process).join().await;
+        let (heartbeat, validate, leader, process) =
+            (heartbeat, validate, leader, process).join().await;
 
-        let result = sqlx::query!("DELETE FROM worker WHERE id = $1", self.worker_id)
+        let result = sqlx::query!("DELETE FROM durable.worker WHERE id = $1", self.worker_id)
             .execute(&self.shared.pool)
             .await;
 
         process?;
         validate?;
         heartbeat?;
+        leader?;
         result?;
 
         Ok(())
@@ -176,7 +193,10 @@ impl Worker {
             }
 
             let record = sqlx::query!(
-                "UPDATE worker SET last_heartbeat = CURRENT_TIMESTAMP WHERE id = $1 RETURNING id",
+                "UPDATE durable.worker
+                  SET heartbeat_at = CURRENT_TIMESTAMP
+                WHERE id = $1
+                RETURNING id",
                 worker_id
             )
             .fetch_optional(&shared.pool)
@@ -231,8 +251,8 @@ impl Worker {
             };
 
             let result = sqlx::query!(
-                "DELETE FROM worker
-                WHERE CURRENT_TIMESTAMP - last_heartbeat > $1
+                "DELETE FROM durable.worker
+                WHERE CURRENT_TIMESTAMP - heartbeat_at > $1
                   AND NOT id = $2",
                 timeout,
                 worker_id
@@ -248,7 +268,7 @@ impl Worker {
                 );
             }
 
-            let record = sqlx::query!(r#"SELECT COUNT(*) as "count!" FROM worker"#)
+            let record = sqlx::query!(r#"SELECT COUNT(*) as "count!" FROM durable.worker"#)
                 .fetch_one(&mut *tx)
                 .await?;
 
@@ -267,12 +287,85 @@ impl Worker {
         Ok(())
     }
 
+    async fn leader(shared: Arc<SharedState>, worker_id: i64) -> anyhow::Result<()> {
+        let _guard = ShutdownGuard::new(&shared.shutdown);
+        let mut shutdown = std::pin::pin!(shared.shutdown.wait());
+
+        // Start with the instant at the current time so we do an immediate
+        let mut instant = Instant::now();
+        let mut leader_id = shared.leader.get();
+        let mut leader_stream = std::pin::pin!(shared.leader.stream());
+
+        'outer: loop {
+            tokio::select! {
+                biased;
+
+                _ = shutdown.as_mut() => break 'outer,
+                id = leader_stream.as_mut().next() => leader_id = id,
+                _ = shared.suspend.notified() => (),
+                _ = tokio::time::sleep_until(instant) => ()
+            }
+
+            if leader_id != worker_id {
+                instant += Duration::from_secs(3600);
+                continue;
+            }
+
+            let mut conn = shared.pool.acquire().await?;
+            sqlx::query!(
+                "
+                UPDATE durable.task
+                  SET state = 'active',
+                      wakeup_at = NULL,
+                      running_on = (
+                        SELECT id
+                         FROM durable.worker
+                        ORDER BY random()
+                        LIMIT 1
+                      )
+                WHERE state = 'suspended'
+                  AND COALESCE(wakeup_at <= NOW(), true)
+                "
+            )
+            .execute(&mut *conn)
+            .await?;
+
+            let wakeup_at = sqlx::query!(
+                r#"
+                SELECT wakeup_at
+                 FROM durable.task
+                WHERE state = 'suspended'
+                ORDER BY wakeup_at ASC NULLS FIRST
+                LIMIT 1
+                "#
+            )
+            .fetch_optional(&mut *conn)
+            .await?
+            .map(|record| record.wakeup_at);
+
+            let now = Utc::now();
+            let delay = match wakeup_at {
+                Some(Some(wakeup_at)) => now
+                    .signed_duration_since(wakeup_at)
+                    .to_std()
+                    .unwrap_or(Duration::ZERO),
+                Some(None) => Duration::ZERO,
+                None => Duration::from_secs(60),
+            };
+
+            instant += delay;
+        }
+
+        Ok(())
+    }
+
     async fn process_events(&mut self) -> anyhow::Result<()> {
         let shutdown = self.shared.shutdown.clone();
         let _guard = ShutdownGuard::new(&shutdown);
         let mut shutdown = std::pin::pin!(shutdown.wait());
 
         self.spawn_new_tasks().await?;
+        self.load_leader_id().await?;
 
         'outer: loop {
             let event = tokio::select! {
@@ -286,20 +379,60 @@ impl Worker {
             while let Some(_) = self.tasks.try_join_next() {}
 
             match event {
-                Event::NotificationInserted(notif) => {
+                Event::Notification(notif) => {
                     let _ = self.shared.notifications.send(notif);
-                    continue;
                 }
                 // Check if the task is scheduled to another worker. Don't do anything in that case.
-                Event::TaskInserted(TaskInserted {
+                Event::Task(event::Task {
                     running_on: Some(id),
                     ..
-                }) if id != self.worker_id => continue,
-                _ => (),
-            }
+                }) if id != self.worker_id => (),
+                Event::Task(_) => self.spawn_new_tasks().await?,
+                Event::TaskSuspend(_) => {
+                    self.shared.suspend.notify_waiters();
+                }
 
-            self.spawn_new_tasks().await?;
+                Event::Worker(event::Worker { worker_id }) => {
+                    let leader_id = self.shared.leader.get();
+                    match leader_id {
+                        id if id == worker_id => (),
+                        id if id == -1 => (),
+                        _ => continue,
+                    }
+
+                    self.load_leader_id().await?;
+                }
+
+                // We don't know what we missed so do everything.
+                Event::Lagged => {
+                    self.spawn_new_tasks().await?;
+                    self.load_leader_id().await?;
+                    self.shared.suspend.notify_waiters();
+                }
+            }
         }
+
+        Ok(())
+    }
+
+    async fn load_leader_id(&mut self) -> anyhow::Result<()> {
+        let record = sqlx::query!(
+            "
+            SELECT id
+             FROM durable.worker
+            ORDER BY started_at ASC
+            LIMIT 1
+            "
+        )
+        .fetch_optional(&self.shared.pool)
+        .await?;
+
+        let new_leader = match record {
+            Some(record) => record.id,
+            None => -1,
+        };
+
+        self.shared.leader.store(new_leader);
 
         Ok(())
     }
@@ -314,14 +447,14 @@ impl Worker {
             r#"
             WITH selected AS (
                 SELECT id
-                 FROM task
+                 FROM durable.task
                 WHERE state = 'active'
                   AND (running_on = $1 OR running_on IS NULL)
                 FOR UPDATE SKIP LOCKED
             )
-            UPDATE task
+            UPDATE durable.task
               SET running_on = $1
-             FROM selected, wasm
+             FROM selected, durable.wasm
             WHERE selected.id = task.id
               AND task.wasm = wasm.id
             RETURNING
@@ -370,7 +503,7 @@ impl Worker {
         {
             Ok(Ok(())) => {
                 sqlx::query!(
-                    "UPDATE task
+                    "UPDATE durable.task
                     SET state = 'complete',
                         completed_at = CURRENT_TIMESTAMP,
                         running_on = NULL,
@@ -389,7 +522,7 @@ impl Worker {
             }
             Ok(Err(e)) if e.is::<Exit>() => {
                 sqlx::query!(
-                    "UPDATE task
+                    "UPDATE durable.task
                     SET state = 'complete',
                         completed_at = CURRENT_TIMESTAMP,
                         running_on = NULL,
@@ -408,7 +541,7 @@ impl Worker {
 
                 let mut stx = tx.begin().await?;
                 let result = sqlx::query!(
-                    "INSERT INTO logs(task_id, index, message)
+                    "INSERT INTO durable.log(task_id, index, message)
                     VALUES ($1, $2, $3)",
                     task_id,
                     i32::MAX,
@@ -426,7 +559,7 @@ impl Worker {
                 }
 
                 sqlx::query!(
-                    "UPDATE task
+                    "UPDATE durable.task
                     SET state = 'failed',
                         completed_at = CURRENT_TIMESTAMP,
                         running_on = NULL,
@@ -453,7 +586,7 @@ impl Worker {
                 let mut tx = shared.pool.begin().await?;
 
                 sqlx::query!(
-                    "INSERT INTO event(task_id, index, label, value)
+                    "INSERT INTO durable.event(task_id, index, label, value)
                     VALUES ($1, -1, 'durable:error-message', $2)",
                     task_id,
                     Json(message) as Json<&str>
@@ -462,7 +595,7 @@ impl Worker {
                 .await?;
 
                 sqlx::query!(
-                    "UPDATE task
+                    "UPDATE durable.task
                     SET state = 'failed',
                         completed_at = CURRENT_TIMESTAMP,
                         running_on = NULL,
@@ -497,7 +630,7 @@ impl Worker {
                 let mut tx = shared.pool.begin().await?;
 
                 sqlx::query!(
-                    "UPDATE task
+                    "UPDATE durable.task
                       SET state = 'failed',
                           running_on = NULL,
                           completed_at = CURRENT_TIMESTAMP
@@ -570,7 +703,7 @@ impl Worker {
                 );
 
                 let _ = sqlx::query!(
-                    "INSERT INTO logs(task_id, index, message)
+                    "INSERT INTO durable.log(task_id, index, message)
                      VALUES ($1, $2, $3)",
                     task_id,
                     index + 1,
@@ -598,7 +731,12 @@ impl PgEventSource {
         let mut listener = sqlx::postgres::PgListener::connect_with(&pool).await?;
 
         listener
-            .listen_all(["durable:task-inserted", "durable:notification-inserted"])
+            .listen_all([
+                "durable:task",
+                "durable:task-suspend",
+                "durable:notification-inserted",
+                "durable:worker",
+            ])
             .await?;
 
         Ok(Self { listener })
@@ -608,37 +746,35 @@ impl PgEventSource {
 #[async_trait]
 impl EventSource for PgEventSource {
     async fn next(&mut self) -> anyhow::Result<Event> {
+        fn parse_event<T, F>(name: &str, event: &PgNotification, func: F) -> Event
+        where
+            F: FnOnce(T) -> Event,
+            T: serde::de::DeserializeOwned,
+        {
+            match serde_json::from_str(event.payload()) {
+                Ok(payload) => func(payload),
+                Err(e) => {
+                    tracing::warn!("listener received an invalid `{name}` notification: {e}");
+                    Event::Lagged
+                }
+            }
+        }
+
         loop {
             break match self.listener.try_recv().await {
                 Ok(Some(event)) => match event.channel() {
-                    "durable:task-inserted" => {
-                        let payload = match serde_json::from_str(event.payload()) {
-                            Ok(payload) => payload,
-                            Err(e) => {
-                                tracing::warn!(
-                                    "listener received an invalid `durable:task-inserted` \
-                                     notification: {e}"
-                                );
-                                return Ok(Event::Lagged);
-                            }
-                        };
-
-                        Ok(Event::TaskInserted(payload))
-                    }
-                    "durable:notification-inserted" => {
-                        let payload = match serde_json::from_str(event.payload()) {
-                            Ok(payload) => payload,
-                            Err(e) => {
-                                tracing::warn!(
-                                    "listener received an invalid `durable:notification-inserted` \
-                                     notification: {e}"
-                                );
-                                return Ok(Event::Lagged);
-                            }
-                        };
-
-                        Ok(Event::NotificationInserted(payload))
-                    }
+                    "durable:task" => Ok(parse_event("durable:task", &event, Event::Task)),
+                    "durable:task-suspend" => Ok(parse_event(
+                        "durable:task-suspend",
+                        &event,
+                        Event::TaskSuspend,
+                    )),
+                    "durable:notification" => Ok(parse_event(
+                        "durable:notification",
+                        &event,
+                        Event::Notification,
+                    )),
+                    "durable:worker" => Ok(parse_event("durable:worker", &event, Event::Worker)),
                     _ => continue,
                 },
                 Ok(None) => Ok(Event::Lagged),

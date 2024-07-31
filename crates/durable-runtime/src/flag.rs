@@ -33,6 +33,10 @@ impl ShutdownFlag {
         self.0.state.load(Ordering::Acquire)
     }
 
+    pub fn reset(&self) {
+        self.0.state.store(false, Ordering::Release);
+    }
+
     pub fn wait(&self) -> ShutdownFuture {
         // Early check since there is no reason to create a Notified if it is not
         // necessary.

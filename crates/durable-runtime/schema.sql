@@ -1,15 +1,36 @@
 
-CREATE TABLE worker(
+CREATE SCHEMA durable;
+
+-- Active workers in this durable cluster.
+--
+-- This table is used for a few different purposes:
+-- * By clients, to pick a random host on which to schedule new tasks.
+-- * By workers, to remove hosts which are no longer active.
+-- * By workers, to determine which worker is the current leader.
+--
+-- Note that regular cluster operation is not blocked on the leader
+-- acknowledging anything. The leader role is only responsible for performing
+-- periodic cluster-level cleanup of old unused data.
+CREATE TABLE durable.worker(
     id              bigserial   NOT NULL PRIMARY KEY,
-    last_heartbeat  timestamptz NOT NULL DEFAULT CURRENT_TIMESTAMP
+    -- The timestamp at which this worker was created.
+    --
+    -- This should _never_ be set externally, as that would cause multiple
+    -- workers to think that they are the leader.
+    started_at      timestamptz NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    heartbeat_at    timestamptz NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE INDEX worker_timestamp ON worker(last_heartbeat ASC);
+CREATE INDEX worker_started   ON durable.worker(started_at ASC);
+CREATE INDEX worker_heartbeat ON durable.worker(heartbeat_at ASC);
 
 -- Wasm binaries for use by various tasks.
 --
--- When a new task 
-CREATE TABLE wasm(
+-- This allows the binary itself to be shared by multiple jobs, all of which
+-- may be using it. Since WASM binaries tend to be rather large, (100s of KBs
+-- or larger,) this can save a lot of space in the database when there are
+-- lots of tasks flying around. 
+CREATE TABLE durable.wasm(
     id          bigserial   NOT NULL PRIMARY KEY,
 
     -- A SHA256 hash of the the wasm program here.
@@ -32,20 +53,22 @@ CREATE TABLE wasm(
     last_used   timestamptz NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE TYPE task_state AS ENUM(
+CREATE TYPE durable.task_state AS ENUM(
     'active',
+    'suspended',
     'complete',
     'failed'
 );
 
-CREATE TABLE task(
+CREATE TABLE durable.task(
     id              bigserial   NOT NULL PRIMARY KEY,
     name            text        NOT NULL,
-    state           task_state  NOT NULL DEFAULT 'active',
+    state   durable.task_state  NOT NULL DEFAULT 'active',
     running_on      bigint,
 
     created_at      timestamptz NOT NULL DEFAULT CURRENT_TIMESTAMP,
     completed_at    timestamptz,
+    wakeup_at       timestamptz,
 
     -- The compiled WASM bytecode.
     --
@@ -53,15 +76,19 @@ CREATE TABLE task(
     wasm            bigint,
     data            jsonb       NOT NULL,
 
-    CONSTRAINT fk_worker FOREIGN KEY(running_on) REFERENCES worker(id)
+    CONSTRAINT fk_worker FOREIGN KEY(running_on) REFERENCES durable.worker(id)
         ON DELETE SET NULL,
-    CONSTRAINT fk_wasm   FOREIGN KEY(wasm)       REFERENCES wasm(id)
+    CONSTRAINT fk_wasm   FOREIGN KEY(wasm)       REFERENCES durable.wasm(id)
 );
 
-CREATE INDEX task_queue ON task(running_on ASC)
+CREATE INDEX task_queue ON durable.task(running_on ASC)
     WHERE state = 'active';
+CREATE INDEX task_wasm ON durable.task(wasm)
+    WHERE wasm IS NOT NULL;
+CREATE INDEX task_suspended ON durable.task(wakeup_at ASC NULLS FIRST)
+    WHERE state = 'suspended';
 
-CREATE TABLE event(
+CREATE TABLE durable.event(
     task_id         bigint      NOT NULL,
     index           int         NOT NULL,
 
@@ -74,68 +101,144 @@ CREATE TABLE event(
 
     PRIMARY KEY(task_id, index),
 
-    CONSTRAINT fk_task FOREIGN KEY(task_id) REFERENCES task(id)
+    CONSTRAINT fk_task FOREIGN KEY(task_id) REFERENCES durable.task(id)
         ON DELETE CASCADE
 );
 
-CREATE TABLE notification(
+CREATE TABLE durable.notification(
     task_id         bigint      NOT NULL,
     created_at      timestamptz NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     event           text        NOT NULL,
     data            jsonb       NOT NULL,
 
-    CONSTRAINT fk_task FOREIGN KEY(task_id) REFERENCES task(id)
+    CONSTRAINT fk_task FOREIGN KEY(task_id) REFERENCES durable.task(id)
 );
 
-CREATE TABLE logs(
+CREATE TABLE durable.log(
     task_id         bigint      NOT NULL,
     index           int         NOT NULL,
     message         text        NOT NULL,
 
     PRIMARY KEY(task_id, index),
 
-    CONSTRAINT fk_task  FOREIGN KEY(task_id) REFERENCES task(id)
+    CONSTRAINT fk_task  FOREIGN KEY(task_id) REFERENCES durable.task(id)
         ON DELETE CASCADE,
-    CONSTRAINT fk_event FOREIGN KEY(task_id, index) REFERENCES event(task_id, index)
+    CONSTRAINT fk_event FOREIGN KEY(task_id, index) REFERENCES durable.event(task_id, index)
         ON DELETE CASCADE
 );
 
-CREATE FUNCTION notify_task_inserted() RETURNS trigger as $$
+CREATE FUNCTION durable.notify_task() RETURNS trigger as $$
     BEGIN
         PERFORM pg_notify(
-            'durable:task-inserted',
+            'durable:task',
             jsonb_build_object(
                 'id', NEW.id,
                 'running_on', NEW.running_on
             )::text
         );
-        RETURN NEW;
+        RETURN NULL;
     END;
 $$ LANGUAGE plpgsql;
 
-CREATE FUNCTION notify_notification_inserted() RETURNS trigger as $$
+CREATE FUNCTION durable.notify_task_suspended() RETURNS trigger as $$
     BEGIN
         PERFORM pg_notify(
-            'durable:notification-inserted',
+            'durable:task-suspend',
+            jsonb_build_object('id', NEW.id)::text
+        );
+        RETURN NULL;
+    END;
+$$ LANGUAGE plpgsql;
+
+CREATE FUNCTION durable.notify_task_completed() RETURNS trigger as $$
+    BEGIN
+        PERFORM pg_notify(
+            'durable:task-complete',
+            jsonb_build_object(
+                'id', NEW.id,
+                'state', NEW.state
+            )::text
+        );
+        RETURN NULL;
+    END;
+$$ LANGUAGE plpgsql;
+
+CREATE FUNCTION durable.notify_notification() RETURNS trigger as $$
+    BEGIN
+        PERFORM pg_notify(
+            'durable:notification',
             jsonb_build_object(
                 'task_id', NEW.task_id,
                 'event', NEW.event
             )::text
         );
-        RETURN NEW;
+        RETURN NULL;
+    END;
+$$ LANGUAGE plpgsql;
+
+CREATE FUNCTION durable.notify_log() RETURNS trigger AS $$
+    BEGIN
+        PERFORM pg_notify(
+            'durable:log',
+            jsonb_build_object(
+                'task_id', NEW.task_id,
+                'index', NEW.index
+            )::text
+        );
+        RETURN NULL;
+    END;
+$$ LANGUAGE plpgsql;
+
+CREATE FUNCTION durable.notify_worker() RETURNS trigger as $$
+    DECLARE
+        worker_id   bigint;
+    BEGIN
+        IF (TG_OP = 'DELETE') THEN
+            worker_id = OLD.id;
+        ELSE
+            worker_id = NEW.id;
+        END IF;
+
+        PERFORM pg_notify(
+            'durable:worker',
+            jsonb_build_object('worker_id', worker_id)::text
+        );
+        return NULL;
     END;
 $$ LANGUAGE plpgsql;
 
 CREATE TRIGGER task_inserted
-    AFTER INSERT ON task
-    FOR EACH ROW EXECUTE PROCEDURE notify_task_inserted();
+    AFTER INSERT ON durable.task
+    FOR EACH ROW EXECUTE FUNCTION durable.notify_task();
 
 CREATE TRIGGER task_updated
-    AFTER UPDATE OF running_on ON task
+    AFTER UPDATE OF running_on ON durable.task
     FOR EACH ROW WHEN (NEW.running_on IS NULL AND NEW.state = 'active')
-    EXECUTE PROCEDURE notify_task_inserted();
+    EXECUTE FUNCTION durable.notify_task();
+
+CREATE TRIGGER task_suspended
+    AFTER INSERT OR UPDATE OF state ON durable.task
+    FOR EACH ROW WHEN (NEW.state = 'suspended')
+    EXECUTE FUNCTION durable.notify_task_suspended();
+
+CREATE TRIGGER task_completed
+    AFTER INSERT OR UPDATE OF state ON durable.task
+    FOR EACH ROW WHEN (NEW.state = 'complete' OR NEW.state = 'failed')
+    EXECUTE FUNCTION durable.notify_task_completed();
 
 CREATE TRIGGER notification_inserted
-    AFTER INSERT ON notification
-    FOR EACH ROW EXECUTE PROCEDURE notify_notification_inserted();
+    AFTER INSERT ON durable.notification
+    FOR EACH ROW EXECUTE FUNCTION durable.notify_notification();
+
+CREATE TRIGGER worker_inserted
+    AFTER INSERT ON durable.worker
+    FOR EACH ROW EXECUTE FUNCTION durable.notify_worker();
+
+CREATE TRIGGER worker_deleted
+    AFTER DELETE ON durable.worker
+    FOR EACH ROW EXECUTE FUNCTION durable.notify_worker();
+
+CREATE TRIGGER logs_inserted
+    AFTER INSERT ON durable.log
+    FOR EACH ROW EXECUTE FUNCTION durable.notify_log();

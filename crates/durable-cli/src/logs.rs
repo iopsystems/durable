@@ -15,7 +15,7 @@ impl Logs {
         let client = DurableClient::new(pool)?;
         let task = Task::from_id(self.task);
 
-        let mut stream = std::pin::pin!(task.log_messages(&client));
+        let mut stream = std::pin::pin!(task.read_logs(&client));
 
         while let Some(message) = stream.try_next().await? {
             print!("{message}");

@@ -755,6 +755,8 @@ dependencies = [
  "futures-util",
  "getrandom",
  "http",
+ "parking_lot",
+ "pin-project",
  "prettyplease",
  "rand",
  "reqwest",
