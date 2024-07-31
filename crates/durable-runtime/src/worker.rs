@@ -9,7 +9,6 @@ use futures_concurrency::future::Join;
 use futures_util::FutureExt;
 use rand::Rng;
 use serde_json::value::RawValue;
-use sqlx::postgres::types::PgInterval;
 use sqlx::postgres::PgNotification;
 use sqlx::types::Json;
 use sqlx::Acquire;
@@ -24,7 +23,7 @@ use crate::event::{self, Event, EventSource, Notification};
 use crate::flag::{ShutdownFlag, ShutdownGuard};
 use crate::plugin::{DurablePlugin, Plugin};
 use crate::task::{Task, TaskState};
-use crate::util::Mailbox;
+use crate::util::{IntoPgInterval, Mailbox};
 use crate::Config;
 
 pub(crate) struct SharedState {
@@ -239,16 +238,7 @@ impl Worker {
             }
 
             let mut tx = shared.pool.begin().await?;
-            let timeout = PgInterval {
-                months: 0,
-                days: 0,
-                microseconds: shared
-                    .config
-                    .heartbeat_interval
-                    .as_micros()
-                    .try_into()
-                    .unwrap_or(i64::MAX),
-            };
+            let timeout = shared.config.heartbeat_interval.into_pg_interval();
 
             let result = sqlx::query!(
                 "DELETE FROM durable.worker
