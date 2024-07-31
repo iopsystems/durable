@@ -2,9 +2,11 @@ use async_stream::try_stream;
 use futures_core::Stream;
 use futures_util::TryStreamExt;
 use serde_json::Value;
+use sqlx::postgres::PgListener;
 use sqlx::types::Json;
 
 use crate::error::ErrorImpl;
+use crate::event::TaskComplete;
 use crate::{DurableClient, DurableError};
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
@@ -127,5 +129,65 @@ impl Task {
                 }
             }
         }
+    }
+
+    pub fn follow_logs<'a>(
+        &'a self,
+        client: &DurableClient,
+    ) -> impl Stream<Item = Result<String, DurableError>> + '_ {
+        let pool = client.pool.clone();
+
+        try_stream!({
+            let mut last_seen = -1;
+            let mut listener = PgListener::connect_with(&pool).await?;
+            listener
+                .listen_all(["durable:log", "durable:task-complete"])
+                .await?;
+
+            loop {
+                let event = listener.try_recv().await?;
+                let results = sqlx::query!(
+                    "
+                    SELECT message, index
+                     FROM durable.log
+                    WHERE task_id = $1
+                      AND index > $2
+                    ORDER BY index ASC
+                    ",
+                    self.id,
+                    last_seen
+                )
+                .fetch(&mut listener);
+
+                for await result in results {
+                    let record = result?;
+
+                    yield record.message;
+                    last_seen = last_seen.max(record.index);
+                }
+
+                match event.as_ref() {
+                    Some(event) if event.channel() != "durable:task-complete" => continue,
+                    Some(event) => match serde_json::from_str::<TaskComplete>(event.payload()) {
+                        Ok(payload) if payload.id == self.id => break,
+                        Ok(_) => continue,
+                        Err(_) => (),
+                    },
+                    None => (),
+                };
+
+                let state = sqlx::query!(
+                    r#"SELECT state::text as "state!" FROM durable.task WHERE id = $1"#,
+                    self.id
+                )
+                .fetch_one(&mut listener)
+                .await?
+                .state;
+
+                if state == "complete" || state == "suspended" {
+                    break;
+                }
+            }
+        })
     }
 }

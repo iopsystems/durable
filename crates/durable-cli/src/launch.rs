@@ -2,6 +2,7 @@ use std::path::PathBuf;
 
 use anyhow::Context;
 use durable_client::{DurableClient, ProgramOptions};
+use futures_util::TryStreamExt;
 use serde_json::value::RawValue;
 
 use crate::CommonOptions;
@@ -16,6 +17,10 @@ pub(crate) struct Launch {
 
     #[arg(long)]
     data: Option<String>,
+
+    /// Wait for the workflow to complete and print logs as we go.
+    #[arg(long, short = 'f')]
+    tail: bool
 }
 
 impl Launch {
@@ -37,6 +42,14 @@ impl Launch {
         let task = client.launch(&self.name, &program, data).await?;
 
         println!("launched new task with id {}", task.id());
+
+        if self.tail {
+            let mut logs = std::pin::pin!(task.follow_logs(&client));
+
+            while let Some(message) = logs.try_next().await? {
+                print!("{message}")
+            }
+        }
 
         Ok(())
     }

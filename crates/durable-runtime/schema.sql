@@ -78,7 +78,11 @@ CREATE TABLE durable.task(
 
     CONSTRAINT fk_worker FOREIGN KEY(running_on) REFERENCES durable.worker(id)
         ON DELETE SET NULL,
-    CONSTRAINT fk_wasm   FOREIGN KEY(wasm)       REFERENCES durable.wasm(id)
+    CONSTRAINT fk_wasm   FOREIGN KEY(wasm)       REFERENCES durable.wasm(id),
+
+    CONSTRAINT check_wasm_while_active CHECK (
+        wasm IS NOT NULL OR (state IN ('complete', 'failed'))
+    )
 );
 
 CREATE INDEX task_queue ON durable.task(running_on ASC)

@@ -15,6 +15,7 @@ mod error;
 mod program;
 mod util;
 mod workflow;
+pub mod event;
 
 pub use self::error::{DurableError, DurableErrorKind};
 pub use self::program::{Program, ProgramOptions};

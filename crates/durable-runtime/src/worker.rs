@@ -151,6 +151,8 @@ impl Worker {
         .await?
         .id;
 
+        tracing::info!("durable worker id is {}", self.worker_id);
+
         self.shared.shutdown.reset();
 
         let worker_id = self.worker_id;
