@@ -18,10 +18,6 @@ impl Host for Task {
         Ok(self.state.task_data().get().to_owned())
     }
 
-    fn abort(&mut self, message: String) -> anyhow::Result<()> {
-        anyhow::bail!("task aborted: {message}")
-    }
-
     async fn transaction_enter(
         &mut self,
         label: String,

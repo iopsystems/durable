@@ -37,8 +37,13 @@ pub fn task_data() -> Box<RawValue> {
 
 /// Immediately abort the workflow with a message.
 pub fn abort(message: &str) -> ! {
-    crate::bindings::durable::core::core::abort(message);
+    crate::transaction::maybe_txn::<_, ()>("durable::abort", || {
+        eprintln!("{message}");
 
-    // SAFETY: The abort function will never return.
-    unsafe { std::hint::unreachable_unchecked() }
+        std::process::exit(1);
+    });
+
+    // This line should never be reached, but if it does then we can panic with an
+    // unreachable instruction.
+    std::process::abort()
 }

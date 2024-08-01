@@ -9,9 +9,6 @@ interface core {
     // Get the json-encoded task data for the current workflow.
     task-data: func() -> string;
 
-    // Immediately abort the current task with an error.
-    abort: func(message: string);
-
     // Start a transaction. If this transaction has already executed to completion
     // then return the data from the last time it was executed.
     //

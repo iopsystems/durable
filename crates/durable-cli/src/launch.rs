@@ -20,7 +20,7 @@ pub(crate) struct Launch {
 
     /// Wait for the workflow to complete and print logs as we go.
     #[arg(long, short = 'f')]
-    tail: bool
+    tail: bool,
 }
 
 impl Launch {

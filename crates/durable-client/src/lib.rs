@@ -12,10 +12,10 @@ use weak_table::WeakValueHashMap;
 use crate::program::{ProgramData, ProgramHash};
 
 mod error;
+pub mod event;
 mod program;
 mod util;
 mod workflow;
-pub mod event;
 
 pub use self::error::{DurableError, DurableErrorKind};
 pub use self::program::{Program, ProgramOptions};
