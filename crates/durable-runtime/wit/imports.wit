@@ -21,6 +21,8 @@ world imports {
 world import-core {
     import core;
     export setup;
+
+    include wasi:io/imports@0.2.0;
 }
 
 world import-http {

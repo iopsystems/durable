@@ -3,29 +3,41 @@ use std::path::Path;
 use anyhow::Context;
 pub use anyhow::Result;
 use wit_bindgen_core::wit_parser::Resolve;
-use wit_bindgen_rust::{Opts, Ownership};
+use wit_bindgen_rust::{Opts, Ownership, WithOption};
+
+#[derive(Clone)]
+pub struct Options(pub Opts);
+
+impl Options {
+    pub fn new() -> Self {
+        Self(Opts {
+            format: true,
+            runtime_path: Some("wit_bindgen_rt".into()),
+            ownership: Ownership::Owning,
+            ..Default::default()
+        })
+    }
+
+    pub fn with(mut self, module: impl Into<String>) -> Self {
+        self.0.with.push((module.into(), WithOption::Generate));
+        self
+    }
+}
 
 pub fn generate(
     source: impl AsRef<Path>,
     out: impl AsRef<Path>,
     world: impl AsRef<str>,
+    options: Options,
 ) -> anyhow::Result<()> {
-    _generate(source.as_ref(), out.as_ref(), world.as_ref())
+    _generate(source.as_ref(), out.as_ref(), world.as_ref(), options)
 }
 
-fn _generate(source: &Path, out: &Path, world: &str) -> anyhow::Result<()> {
-    let opts = Opts {
-        format: false,
-        runtime_path: Some("wit_bindgen_rt".into()),
-        ownership: Ownership::Owning,
-
-        ..Default::default()
-    };
-
+fn _generate(source: &Path, out: &Path, world: &str, options: Options) -> anyhow::Result<()> {
     let mut resolve = Resolve::new();
     let (packages, paths) = resolve.push_dir(source)?;
     let world = resolve.select_world(&packages, Some(world))?;
-    let mut generator = opts.build();
+    let mut generator = options.0.build();
 
     if std::env::var_os("OUT_DIR").is_some() {
         for path in paths.iter() {

@@ -9,7 +9,7 @@ mod alloc;
 mod start;
 pub mod transaction;
 
-#[allow(unused_imports)]
+#[allow(unused_imports, unused_braces)]
 mod bindings {
     #[cfg(feature = "bindgen")]
     include!(concat!(env!("OUT_DIR"), "/bindings.rs"));
