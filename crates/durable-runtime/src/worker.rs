@@ -319,7 +319,7 @@ impl Worker {
                         LIMIT 1
                       )
                 WHERE state = 'suspended'
-                  AND COALESCE(wakeup_at <= NOW(), true)
+                  AND wakeup_at <= NOW()
                 "
             )
             .execute(&mut *conn)
@@ -327,10 +327,11 @@ impl Worker {
 
             let wakeup_at = sqlx::query!(
                 r#"
-                SELECT wakeup_at
+                SELECT wakeup_at as "wakeup_at!"
                  FROM durable.task
                 WHERE state = 'suspended'
-                ORDER BY wakeup_at ASC NULLS FIRST
+                  AND wakeup_at IS NOT NULL
+                ORDER BY wakeup_at ASC
                 LIMIT 1
                 "#
             )
@@ -340,11 +341,10 @@ impl Worker {
 
             let now = Utc::now();
             let delay = match wakeup_at {
-                Some(Some(wakeup_at)) => now
+                Some(wakeup_at) => now
                     .signed_duration_since(wakeup_at)
                     .to_std()
                     .unwrap_or(Duration::ZERO),
-                Some(None) => Duration::ZERO,
                 None => Duration::from_secs(60),
             };
 

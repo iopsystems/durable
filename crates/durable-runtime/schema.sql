@@ -89,7 +89,7 @@ CREATE INDEX task_queue ON durable.task(running_on ASC)
     WHERE state = 'active';
 CREATE INDEX task_wasm ON durable.task(wasm)
     WHERE wasm IS NOT NULL;
-CREATE INDEX task_suspended ON durable.task(wakeup_at ASC NULLS FIRST)
+CREATE INDEX task_suspended ON durable.task(wakeup_at ASC NULLS LAST)
     WHERE state = 'suspended';
 
 CREATE TABLE durable.event(
