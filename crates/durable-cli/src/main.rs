@@ -10,6 +10,7 @@ use tracing_subscriber::prelude::*;
 
 mod launch;
 mod logs;
+mod notify;
 
 #[derive(Debug, clap::Parser)]
 struct Args {
@@ -24,6 +25,7 @@ struct Args {
 enum Commands {
     Launch(self::launch::Launch),
     Logs(self::logs::Logs),
+    Notify(self::notify::Notify),
 }
 
 #[tokio::main]
@@ -38,6 +40,7 @@ async fn main() -> anyhow::Result<()> {
     match args.command {
         Commands::Launch(cmd) => cmd.run(&args.common).await,
         Commands::Logs(cmd) => cmd.run(&args.common).await,
+        Commands::Notify(cmd) => cmd.run(&args.common).await,
     }
 }
 

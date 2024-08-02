@@ -9,4 +9,6 @@ pub extern crate durable_http as http;
 pub extern crate durable_sqlx as sqlx;
 
 #[doc(inline)]
-pub use durable_core::{abort, task_data, task_id, task_name, transaction::transaction};
+pub use durable_core::{
+    abort, notification, task_data, task_id, task_name, transaction::transaction, Notification,
+};

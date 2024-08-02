@@ -1,4 +1,5 @@
 use std::any::Any;
+use std::ops::{Deref, DerefMut};
 use std::sync::Arc;
 
 use anyhow::Context;
@@ -8,8 +9,10 @@ use serde::de::DeserializeOwned;
 use serde::Serialize;
 use serde_json::value::RawValue;
 use sqlx::types::Json;
+use tokio::sync::broadcast::Receiver;
 
 use crate::error::TaskStatus;
+use crate::event::Notification;
 use crate::util::AsyncFnOnce;
 use crate::worker::{SharedState, TaskData};
 use crate::Config;
@@ -103,6 +106,24 @@ impl Transaction {
     pub fn take_conn(&mut self) -> Option<sqlx::Transaction<'static, sqlx::Postgres>> {
         self.stream = None;
         self.conn.take().map(|c| *c)
+    }
+
+    /// Attach a new database connection to this transaction.
+    ///
+    /// This returns an error if this transaction already has a database
+    /// transaction attached to it. This will also unconditionally reset any
+    /// existing query output stream in this transaction.
+    pub fn set_conn(
+        &mut self,
+        txn: sqlx::Transaction<'static, sqlx::Postgres>,
+    ) -> anyhow::Result<()> {
+        self.stream = None;
+        if self.conn.is_some() {
+            anyhow::bail!("transaction already had a database connection associated with it");
+        }
+
+        self.conn = Some(Box::new(txn));
+        Ok(())
     }
 
     /// Access the output stream for the last query run within this transaction.
@@ -213,6 +234,11 @@ impl TaskState {
     /// change out from underneath it.
     pub fn worker_id(&self) -> i64 {
         self.worker_id
+    }
+
+    /// Subscribe to notification events.
+    pub fn subscribe_notifications(&self) -> Receiver<Notification> {
+        self.shared.notifications.subscribe()
     }
 
     /// Access the database connection pool for the worker.
@@ -544,4 +570,18 @@ fn truncate_to_prev_char_boundary(s: &str, len: usize) -> &str {
         .unwrap();
 
     &s[..new_index]
+}
+
+impl Deref for Task {
+    type Target = TaskState;
+
+    fn deref(&self) -> &Self::Target {
+        &self.state
+    }
+}
+
+impl DerefMut for Task {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.state
+    }
 }

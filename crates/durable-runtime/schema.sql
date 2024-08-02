@@ -119,6 +119,8 @@ CREATE TABLE durable.notification(
     CONSTRAINT fk_task FOREIGN KEY(task_id) REFERENCES durable.task(id)
 );
 
+CREATE INDEX notification_recent ON durable.notification(task_id, created_at ASC);
+
 CREATE TABLE durable.log(
     task_id         bigint      NOT NULL,
     index           int         NOT NULL,

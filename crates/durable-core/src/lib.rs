@@ -1,5 +1,8 @@
 //!
 
+use std::time::{Duration, SystemTime};
+
+use serde::de::DeserializeOwned;
 pub use serde_json::value::RawValue;
 
 #[macro_use]
@@ -46,4 +49,35 @@ pub fn abort(message: &str) -> ! {
     // This line should never be reached, but if it does then we can panic with an
     // unreachable instruction.
     std::process::abort()
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct Notification<T = Box<RawValue>> {
+    pub created_at: SystemTime,
+    pub event: String,
+    pub data: T,
+}
+
+/// Block this task until a new notification arrives, then return the
+/// notification.
+///
+/// # Panics
+/// Panics if the notification payload could not be deserialized into `T`.
+/// If you want to avoid the chance that the notification may panic, you can use
+/// a type that can deserialize any json value, such as [`serde_json::Value`] or
+/// [`RawValue`].
+pub fn notification<T>() -> Notification<T>
+where
+    T: DeserializeOwned,
+{
+    let event = crate::bindings::durable::core::notify::notification_blocking();
+    let data: T = serde_json::from_str(&event.data) //
+        .expect("could not deserialize notification payload");
+
+    Notification {
+        created_at: SystemTime::UNIX_EPOCH
+            + Duration::new(event.created_at.seconds, event.created_at.nanoseconds),
+        event: event.event,
+        data,
+    }
 }

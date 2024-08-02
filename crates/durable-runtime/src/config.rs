@@ -62,6 +62,17 @@ pub struct Config {
     ///
     /// By default this is set to 8MB.
     pub max_returned_buffer_len: usize,
+
+    /// The duration that a task will wait on a timer or notification without
+    /// suspending itself.
+    ///
+    /// For timers, this means that if the deadline is further away then the
+    /// timeout (+10s for wakeup) then the task will be suspended. For
+    /// notifications, the task will wait for this timeout and then suspend
+    /// itself.
+    ///
+    /// By default, this timeout is 1 minute.
+    pub suspend_timeout: Duration,
 }
 
 impl Default for Config {
@@ -74,6 +85,7 @@ impl Default for Config {
             max_workflow_events: i32::MAX as u32,
             max_log_bytes_per_transaction: 1024 * 128,
             max_returned_buffer_len: 1024 * 1024 * 8,
+            suspend_timeout: Duration::from_secs(60),
         }
     }
 }

@@ -1,5 +1,6 @@
 use std::time::{Duration, SystemTime};
 
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use wasmtime::component::Resource;
 
 use super::WasiResources;
@@ -9,12 +10,6 @@ use crate::bindings::wasi::clocks::wall_clock::Datetime;
 use crate::bindings::wasi::io::poll::Pollable;
 use crate::plugin::PluginMapExt;
 use crate::task::{Task, TransactionOptions};
-
-#[derive(Serialize, Deserialize)]
-struct SerializableDateTime {
-    seconds: u64,
-    nanoseconds: u32,
-}
 
 impl From<SerializableDateTime> for Datetime {
     fn from(value: SerializableDateTime) -> Self {
@@ -37,10 +32,7 @@ impl wasi::clocks::wall_clock::Host for Task {
                         .duration_since(SystemTime::UNIX_EPOCH)
                         .unwrap_or(Duration::ZERO);
 
-                    Ok(SerializableDateTime {
-                        seconds: duration.as_secs(),
-                        nanoseconds: duration.subsec_nanos(),
-                    })
+                    Ok(Datetime::from(duration))
                 })
             })
             .await
@@ -53,10 +45,7 @@ impl wasi::clocks::wall_clock::Host for Task {
         // hosts.
         //
         // Instead we just lie and say we've got a resolution of 1us.
-        Ok(Datetime {
-            seconds: 0,
-            nanoseconds: 1000,
-        })
+        Ok(Duration::from_micros(1).into())
     }
 }
 
@@ -104,5 +93,39 @@ impl wasi::clocks::monotonic_clock::Host for Task {
     ) -> wasmtime::Result<Resource<Pollable>> {
         let now = self.now().await?;
         self.subscribe_instant(now.saturating_add(when)).await
+    }
+}
+
+#[derive(Serialize, Deserialize)]
+#[serde(remote = "Datetime")]
+struct SerializableDateTime {
+    seconds: u64,
+    nanoseconds: u32,
+}
+
+impl Serialize for Datetime {
+    fn serialize<S>(&self, ser: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        SerializableDateTime::serialize(self, ser)
+    }
+}
+
+impl<'de> Deserialize<'de> for Datetime {
+    fn deserialize<D>(de: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        SerializableDateTime::deserialize(de)
+    }
+}
+
+impl From<Duration> for Datetime {
+    fn from(value: Duration) -> Self {
+        Datetime {
+            seconds: value.as_secs(),
+            nanoseconds: value.subsec_nanos(),
+        }
     }
 }

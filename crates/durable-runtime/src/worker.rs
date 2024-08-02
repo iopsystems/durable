@@ -276,6 +276,12 @@ impl Worker {
             let jitter = rand::thread_rng().gen_range(0..(interval / 2).as_nanos());
             interval -= Duration::from_nanos(jitter as u64);
 
+            tracing::trace!(
+                target: "durable_runtime::validate_workers",
+                "sleeping for {}s",
+                interval.as_secs_f32()
+            );
+
             next += interval;
         }
 
@@ -753,7 +759,7 @@ impl PgEventSource {
             .listen_all([
                 "durable:task",
                 "durable:task-suspend",
-                "durable:notification-inserted",
+                "durable:notification",
                 "durable:worker",
             ])
             .await?;

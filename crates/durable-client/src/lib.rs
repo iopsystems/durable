@@ -14,12 +14,12 @@ use crate::program::{ProgramData, ProgramHash};
 mod error;
 pub mod event;
 mod program;
+mod task;
 mod util;
-mod workflow;
 
 pub use self::error::{DurableError, DurableErrorKind};
 pub use self::program::{Program, ProgramOptions};
-pub use self::workflow::Task;
+pub use self::task::Task;
 
 #[derive(Clone)]
 pub struct DurableClient {

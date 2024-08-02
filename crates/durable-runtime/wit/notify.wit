@@ -1,0 +1,22 @@
+
+interface notify {
+    use wasi:clocks/wall-clock@0.2.0.{datetime};
+
+    /// A notification event.
+    record event {
+        /// The wall-clock time at which this notification was created.
+        created-at: datetime,
+
+        /// The name of the event itself.
+        event: string,
+
+        /// JSON-encoded data associated with the event.
+        data: string,
+    }
+
+    /// Attempt to read the next available notification, if there is one.
+    // notification: func() -> option<event>;
+
+    /// Read the next available notification, blocking until one is available.
+    notification-blocking: func() -> event;
+}

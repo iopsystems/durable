@@ -17,10 +17,7 @@ impl Generate {
         generator.generate_for_crate(
             "durable-core",
             "durable:core/import-core",
-            Options::new()
-                .with("wasi:io/error@0.2.0")
-                .with("wasi:io/poll@0.2.0")
-                .with("wasi:io/streams@0.2.0"),
+            Options::new().with("wasi:clocks/wall-clock@0.2.0"),
         )?;
         generator.generate_for_crate("durable-http", "durable:core/import-http", Options::new())?;
         generator.generate_for_crate("durable-sqlx", "durable:core/import-sql", Options::new())?;

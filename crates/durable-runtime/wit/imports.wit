@@ -4,6 +4,7 @@ world imports {
     import core;
     import http;
     import sql;
+    import notify;
 
     import wasi:cli/environment@0.2.0;
     import wasi:cli/exit@0.2.0;
@@ -20,9 +21,8 @@ world imports {
 
 world import-core {
     import core;
+    import notify;
     export setup;
-
-    include wasi:io/imports@0.2.0;
 }
 
 world import-http {

@@ -1,6 +1,7 @@
 use async_stream::try_stream;
 use futures_core::Stream;
 use futures_util::TryStreamExt;
+use serde::Serialize;
 use serde_json::Value;
 use sqlx::postgres::PgListener;
 use sqlx::types::Json;
@@ -87,6 +88,54 @@ impl Task {
                 }
             }
         }
+    }
+
+    pub async fn notify<T>(
+        &self,
+        event: &str,
+        data: &T,
+        client: &DurableClient,
+    ) -> Result<(), DurableError>
+    where
+        T: ?Sized + Serialize,
+    {
+        let mut tx = client.pool.begin().await?;
+
+        sqlx::query!(
+            "
+            INSERT INTO durable.notification(task_id, event, data)
+            VALUES ($1, $2, $3)
+            ",
+            self.id,
+            event,
+            Json(data) as Json<&T>
+        )
+        .execute(&mut *tx)
+        .await?;
+
+        sqlx::query!(
+            "
+            UPDATE durable.task
+            SET state = 'active',
+                wakeup_at = NULL,
+                running_on = (
+                    SELECT id
+                     FROM durable.worker
+                    ORDER BY random()
+                    LIMIT 1
+                    FOR SHARE SKIP LOCKED
+                )
+            WHERE id = $1
+              AND state = 'suspended'
+            ",
+            self.id
+        )
+        .execute(&mut *tx)
+        .await?;
+
+        tx.commit().await?;
+
+        Ok(())
     }
 
     pub fn read_logs<'a>(
