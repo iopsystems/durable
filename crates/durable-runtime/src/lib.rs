@@ -20,4 +20,4 @@ pub mod bindings {
 pub use self::config::Config;
 pub use self::error::TaskStatus;
 pub use self::task::Task;
-pub use self::worker::{Worker, WorkerBuilder};
+pub use self::worker::{Worker, WorkerBuilder, WorkerHandle};

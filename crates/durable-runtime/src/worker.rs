@@ -4,6 +4,7 @@ use std::time::Duration;
 
 use anyhow::Context;
 use async_trait::async_trait;
+use cache_compute::Cached;
 use chrono::Utc;
 use futures_concurrency::future::Join;
 use futures_util::FutureExt;
@@ -11,13 +12,14 @@ use rand::Rng;
 use serde_json::value::RawValue;
 use sqlx::postgres::PgNotification;
 use sqlx::types::Json;
-use tokio::sync::{broadcast, Notify};
+use tokio::sync::{broadcast, Mutex, Notify, Semaphore};
 use tokio::task::JoinSet;
 use tokio::time::Instant;
 use tracing::Instrument;
+use wasmtime::component::Component;
 
 use crate::bindings::exports::wasi::cli::run::GuestPre;
-use crate::error::TaskStatus;
+use crate::error::{ClonableAnyhowError, TaskStatus};
 use crate::event::{self, Event, EventSource, Notification};
 use crate::flag::{ShutdownFlag, ShutdownGuard};
 use crate::plugin::{DurablePlugin, Plugin};
@@ -38,12 +40,18 @@ pub(crate) struct SharedState {
 
     leader: Mailbox<i64>,
     suspend: Notify,
+    cache: Mutex<uluru::LRUCache<ProgramCache, 32>>,
+
+    /// Limit how many task compilations are allowed to be ongoing at the same
+    /// time. These are expensive and can easily end up eating all the memory
+    /// and compute time needed by a worker if it gets hammered.
+    compile_sema: Semaphore,
 }
 
 pub(crate) struct TaskData {
     pub id: i64,
     pub name: String,
-    pub wasm: Option<Vec<u8>>,
+    pub wasm: i64,
     pub data: Json<Box<RawValue>>,
 }
 
@@ -93,6 +101,8 @@ impl WorkerBuilder {
             plugins: self.plugins,
             leader: Mailbox::new(-1),
             suspend: Notify::new(),
+            cache: Mutex::new(uluru::LRUCache::new()),
+            compile_sema: Semaphore::new(4),
         });
 
         let engine = self.engine.unwrap_or_default();
@@ -121,6 +131,11 @@ impl WorkerHandle {
     pub fn shutdown(&self) {
         self.shared.shutdown.raise();
     }
+}
+
+struct ProgramCache {
+    id: i64,
+    value: Arc<Cached<Component, ClonableAnyhowError>>,
 }
 
 pub struct Worker {
@@ -171,9 +186,13 @@ impl Worker {
             .instrument(tracing::info_span!("worker", worker_id))
             .await;
 
+        tracing::info!("deleting worker database entry");
         let result = sqlx::query!("DELETE FROM durable.worker WHERE id = $1", self.worker_id)
             .execute(&self.shared.pool)
-            .await;
+            .await
+            .context("failed to delete the worker entry from the database");
+
+        self.tasks.abort_all();
 
         process?;
         validate?;
@@ -449,19 +468,19 @@ impl Worker {
             WITH selected AS (
                 SELECT id
                  FROM durable.task
-                WHERE state = 'active'
-                  AND (running_on = $1 OR running_on IS NULL)
+                WHERE (state IN ('ready', 'active') AND running_on IS NULL)
+                   OR (state = 'ready' AND running_on = $1)
                 FOR UPDATE SKIP LOCKED
             )
             UPDATE durable.task
-              SET running_on = $1
-             FROM selected, durable.wasm
+              SET running_on = $1,
+                  state = 'active'
+             FROM selected
             WHERE selected.id = task.id
-              AND task.wasm = wasm.id
             RETURNING
                 task.id     as id,
                 task.name   as name,
-                wasm.wasm   as wasm,
+                task.wasm   as "wasm!",
                 task.data   as "data!: Json<Box<RawValue>>"
             "#,
             self.worker_id
@@ -597,48 +616,61 @@ impl Worker {
     async fn run_task_impl(
         shared: Arc<SharedState>,
         engine: wasmtime::Engine,
-        mut task: TaskData,
+        task: TaskData,
         worker_id: i64,
     ) -> anyhow::Result<TaskStatus> {
         use wasmtime::component::*;
 
         tracing::info!("launching task `{}`", task.name);
-        let wasm = match task.wasm.take() {
-            Some(wasm) => wasm,
-            None => {
-                tracing::warn!("task {} was active but had wasm field set to NULL", task.id);
+        let component = {
+            let mut cache = shared.cache.lock().await;
 
-                let mut tx = shared.pool.begin().await?;
+            match cache.find(|entry| entry.id == task.wasm) {
+                Some(entry) => entry.value.clone(),
+                None => {
+                    let cached = Arc::new(Cached::new());
 
-                sqlx::query!(
-                    "UPDATE durable.task
-                      SET state = 'failed',
-                          running_on = NULL,
-                          completed_at = CURRENT_TIMESTAMP
-                    WHERE id = $1",
-                    task.id
-                )
-                .execute(&mut *tx)
-                .await?;
+                    cache.insert(ProgramCache {
+                        id: task.wasm,
+                        value: cached.clone(),
+                    });
 
-                tx.commit().await?;
-
-                return Ok(TaskStatus::ExitFailure);
+                    cached
+                }
             }
         };
 
-        let component = tokio::task::spawn_blocking({
-            let engine = engine.clone();
-            move || Component::new(&engine, &wasm)
-        })
-        .await;
+        // Compile the component, but perform request coalescing so that it only happens
+        // once. Compiling one is an expensive operation, so if
+        let component = component
+            .get_or_compute(|| async {
+                let record = sqlx::query!("SELECT wasm FROM durable.wasm WHERE id = $1", task.wasm)
+                    .fetch_one(&shared.pool)
+                    .await
+                    .map_err(anyhow::Error::from)?;
 
-        let component = match component {
-            Ok(result) => result?,
-            Err(_) => {
-                anyhow::bail!("component compilation panicked")
-            }
-        };
+                // If an error occurs then we just allow ourselves to proceed anyway.
+                let _permit = shared.compile_sema.acquire().await;
+
+                let wasm = record.wasm;
+                let start = Instant::now();
+                let component = tokio::task::spawn_blocking({
+                    let engine = engine.clone();
+                    move || Component::new(&engine, &wasm)
+                })
+                .await
+                .context("component compilation panicked")?
+                .map_err(anyhow::Error::from)?;
+
+                tracing::debug!(
+                    id = task.wasm,
+                    "compiling new module took {}",
+                    humantime::Duration::from(start.elapsed())
+                );
+
+                Ok(component)
+            })
+            .await?;
 
         let task_id = task.id;
         let mut task = Task {

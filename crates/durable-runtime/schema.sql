@@ -54,6 +54,7 @@ CREATE TABLE durable.wasm(
 );
 
 CREATE TYPE durable.task_state AS ENUM(
+    'ready',
     'active',
     'suspended',
     'complete',
@@ -63,7 +64,7 @@ CREATE TYPE durable.task_state AS ENUM(
 CREATE TABLE durable.task(
     id              bigserial   NOT NULL PRIMARY KEY,
     name            text        NOT NULL,
-    state   durable.task_state  NOT NULL DEFAULT 'active',
+    state   durable.task_state  NOT NULL DEFAULT 'ready',
     running_on      bigint,
 
     created_at      timestamptz NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -177,6 +178,20 @@ CREATE FUNCTION durable.notify_notification() RETURNS trigger as $$
                 'event', NEW.event
             )::text
         );
+
+        -- Wake up the related task when a notification occurs.
+        UPDATE durable.task
+        SET state = 'ready',
+            wakeup_at = NULL,
+            running_on = (
+                SELECT id
+                 FROM durable.worker
+                ORDER BY random()
+                FOR SHARE SKIP LOCKED
+            )
+        WHERE id = NEW.task_id
+          AND state = 'suspended';
+
         RETURN NULL;
     END;
 $$ LANGUAGE plpgsql;
@@ -218,7 +233,7 @@ CREATE TRIGGER task_inserted
 
 CREATE TRIGGER task_updated
     AFTER UPDATE OF running_on ON durable.task
-    FOR EACH ROW WHEN (NEW.running_on IS NULL AND NEW.state = 'active')
+    FOR EACH ROW WHEN (NEW.running_on IS NULL AND NEW.state IN ('active', 'ready'))
     EXECUTE FUNCTION durable.notify_task();
 
 CREATE TRIGGER task_suspended

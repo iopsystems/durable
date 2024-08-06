@@ -113,26 +113,6 @@ impl Task {
         .execute(&mut *tx)
         .await?;
 
-        sqlx::query!(
-            "
-            UPDATE durable.task
-            SET state = 'active',
-                wakeup_at = NULL,
-                running_on = (
-                    SELECT id
-                     FROM durable.worker
-                    ORDER BY random()
-                    LIMIT 1
-                    FOR SHARE SKIP LOCKED
-                )
-            WHERE id = $1
-              AND state = 'suspended'
-            ",
-            self.id
-        )
-        .execute(&mut *tx)
-        .await?;
-
         tx.commit().await?;
 
         Ok(())

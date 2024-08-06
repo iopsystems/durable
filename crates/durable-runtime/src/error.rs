@@ -1,4 +1,5 @@
 use std::fmt;
+use std::sync::Arc;
 
 /// An error used to indicate various explicit exits when running within the
 /// worker.
@@ -39,3 +40,36 @@ impl fmt::Display for TaskStatus {
 }
 
 impl std::error::Error for TaskStatus {}
+
+#[derive(Clone)]
+pub(crate) struct ClonableAnyhowError(Arc<anyhow::Error>);
+
+impl ClonableAnyhowError {
+    pub fn new(err: anyhow::Error) -> Self {
+        Self(Arc::new(err))
+    }
+}
+
+impl fmt::Debug for ClonableAnyhowError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.0.fmt(f)
+    }
+}
+
+impl fmt::Display for ClonableAnyhowError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.0.fmt(f)
+    }
+}
+
+impl std::error::Error for ClonableAnyhowError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        self.0.source()
+    }
+}
+
+impl From<anyhow::Error> for ClonableAnyhowError {
+    fn from(error: anyhow::Error) -> Self {
+        Self::new(error)
+    }
+}

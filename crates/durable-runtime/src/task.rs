@@ -441,6 +441,12 @@ impl TaskState {
             return Err(anyhow::Error::new(TaskStatus::NotScheduledOnWorker));
         }
 
+        // tracing::info!(
+        //     label = txn.label,
+        //     "completing transaction {}",
+        //     self.txn_index
+        // );
+
         sqlx::query!(
             r#"
             INSERT INTO durable.event(task_id, index, label, value)
@@ -452,7 +458,13 @@ impl TaskState {
             Json(data) as Json<&T>
         )
         .execute(&mut *tx)
-        .await?;
+        .await
+        .with_context(|| {
+            format!(
+                "failed to insert event {} with label {}",
+                self.txn_index, txn.label
+            )
+        })?;
 
         if !txn.logs.is_empty() {
             tracing::debug!(

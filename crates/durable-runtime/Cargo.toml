@@ -6,7 +6,7 @@ edition = "2021"
 
 [features]
 default = ["cli"]
-cli = ["dep:clap", "dep:tracing-subscriber", "tokio/full"]
+cli = ["dep:clap", "dep:tracing-subscriber", "tokio/full", "backtrace-on-stack-overflow"]
 regen = []
 
 [[bin]]
@@ -20,21 +20,25 @@ anyhow = "1.0.86"
 anymap3 = "1.0.0"
 async-stream = "0.3.5"
 async-trait = "0.1.81"
+cache-compute = "0.3.0"
 chrono = { version = "0.4.38", features = ["serde"] }
 clap = { version = "4.0", optional = true, features = ["derive", "env"] }
 futures-concurrency = "7.6.1"
 futures-util = "0.3.30"
 getrandom = "0.2.15"
 http = "1.1.0"
+humantime = "2.1.0"
 parking_lot = "0.12.3"
 pin-project = "1.1.5"
 rand = "0.8.5"
 reqwest = "0.12.5"
 serde = { version = "1.0.204", features = ["derive"] }
 serde_json = { version = "1.0.120", features = ["raw_value"] }
+sha2 = "0.10.8"
 slab = "0.4.9"
-tokio = { version = "1.39.1", features = ["macros", "sync"] }
+tokio = { version = "1.39.1", features = ["macros", "sync", "rt-multi-thread"] }
 tracing = "0.1.40"
+uluru = "3.1.0"
 wasmtime = "23.0.1"
 
 [dependencies.sqlx]
@@ -45,6 +49,9 @@ features = ["postgres", "runtime-tokio", "tls-rustls", "chrono"]
 version = "0.3"
 optional = true
 features = ["fmt", "env-filter"]
+
+[target.'cfg(unix)'.dependencies]
+backtrace-on-stack-overflow = { version = "0.3", optional = true }
 
 [build-dependencies]
 anyhow = "1.0.86"
