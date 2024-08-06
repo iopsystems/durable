@@ -1,5 +1,4 @@
-use std::time::SystemTime;
-
+use chrono::{DateTime, Utc};
 use slab::Slab;
 
 mod cli;
@@ -21,7 +20,7 @@ pub(super) struct WasiResources {
 #[derive(Copy, Clone, Debug)]
 struct Pollable {
     txn: Option<i32>,
-    timeout: SystemTime,
+    timeout: DateTime<Utc>,
 }
 
 impl WasiResources {

@@ -73,6 +73,23 @@ pub struct Config {
     ///
     /// By default, this timeout is 1 minute.
     pub suspend_timeout: Duration,
+
+    /// The maximum number of tasks that are allowed to be running on this node
+    /// at once.
+    ///
+    /// Each task takes up some resources, so there is already a limit to how
+    /// many can be run at once. Reaching the available resource limit will
+    /// result in tasks failing since they could not allocate the resources they
+    /// need. Instead of having that happen, you can explicitly limit the number
+    /// of tasks that will run on the worker here.
+    ///
+    /// Note that with default memory settings there is a hard limit at 64k
+    /// active tasks on a single worker (assuming x86_64). This is because, by
+    /// default, each wasm memory uses 6GB of virtual memory, even if the memory
+    /// itself is much smaller.
+    ///
+    /// The default limit is 10000 tasks.
+    pub max_tasks: usize,
 }
 
 impl Default for Config {
@@ -86,6 +103,7 @@ impl Default for Config {
             max_log_bytes_per_transaction: 1024 * 128,
             max_returned_buffer_len: 1024 * 1024 * 8,
             suspend_timeout: Duration::from_secs(60),
+            max_tasks: 10000,
         }
     }
 }

@@ -1,5 +1,6 @@
 use std::time::{Duration, SystemTime};
 
+use chrono::{DateTime, Utc};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use wasmtime::component::Resource;
 
@@ -10,6 +11,8 @@ use crate::bindings::wasi::clocks::wall_clock::Datetime;
 use crate::bindings::wasi::io::poll::Pollable;
 use crate::plugin::PluginMapExt;
 use crate::task::{Task, TransactionOptions};
+
+const NS_PER_S: u64 = 1_000_000_000;
 
 impl From<SerializableDateTime> for Datetime {
     fn from(value: SerializableDateTime) -> Self {
@@ -56,13 +59,11 @@ impl wasi::clocks::monotonic_clock::Host for Task {
         self.state
             .maybe_do_transaction(options, |_| {
                 Box::pin(async move {
-                    let now = SystemTime::now();
-                    let duration = now
-                        .duration_since(SystemTime::UNIX_EPOCH)
-                        .unwrap_or(Duration::ZERO);
+                    let now = Utc::now();
+                    let timestamp = now.timestamp() as u64;
+                    let nanos = timestamp * NS_PER_S + now.timestamp_subsec_nanos() as u64;
 
-                    let instant = duration.as_nanos().try_into().unwrap_or(u64::MAX);
-                    Ok(instant)
+                    Ok(nanos)
                 })
             })
             .await
@@ -79,7 +80,8 @@ impl wasi::clocks::monotonic_clock::Host for Task {
 
     async fn subscribe_instant(&mut self, when: Instant) -> wasmtime::Result<Resource<Pollable>> {
         let txn = self.state.transaction().map(|txn| txn.index());
-        let timeout = SystemTime::UNIX_EPOCH + Duration::from_nanos(when);
+        let timeout = DateTime::from_timestamp((when / NS_PER_S) as i64, (when % NS_PER_S) as u32)
+            .unwrap_or(DateTime::<Utc>::MAX_UTC);
 
         let resources = self.plugins.expect_mut::<WasiResources>();
         let id = resources.pollables.insert(super::Pollable { timeout, txn });

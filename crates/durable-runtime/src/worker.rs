@@ -119,6 +119,7 @@ impl WorkerBuilder {
             // A worker id of -1 should never overlap with an existing worker id.
             worker_id: -1,
             tasks: JoinSet::new(),
+            blocked: false,
         })
     }
 }
@@ -145,6 +146,7 @@ pub struct Worker {
 
     worker_id: i64,
     tasks: JoinSet<()>,
+    blocked: bool,
 }
 
 impl Worker {
@@ -335,7 +337,7 @@ impl Worker {
             sqlx::query!(
                 "
                 UPDATE durable.task
-                  SET state = 'active',
+                  SET state = 'ready',
                       wakeup_at = NULL,
                       running_on = (
                         SELECT id
@@ -392,11 +394,23 @@ impl Worker {
                 biased;
 
                 _ = shutdown.as_mut() => break 'outer,
-                event = self.event_source.next() => event?
+                _ = self.tasks.join_next(), if !self.tasks.is_empty() => None,
+                event = self.event_source.next() => Some(event?),
             };
 
             // Clean up any tasks that have completed already.
             while let Some(_) = self.tasks.try_join_next() {}
+
+            let event = match event {
+                Some(event) => event,
+                None => {
+                    if self.blocked {
+                        self.spawn_new_tasks().await?;
+                    }
+
+                    continue;
+                }
+            };
 
             match event {
                 Event::Notification(notif) => {
@@ -460,8 +474,13 @@ impl Worker {
     /// Spawn all new tasks that are scheduled on this server and also those
     /// that aren't scheduled on any server.
     async fn spawn_new_tasks(&mut self) -> anyhow::Result<()> {
-        let mut tx = self.shared.pool.begin().await?;
+        let max_tasks = self.shared.config.max_tasks;
+        let allowed = max_tasks.saturating_sub(self.tasks.len());
+        if allowed == 0 {
+            return Ok(());
+        }
 
+        let mut tx = self.shared.pool.begin().await?;
         let tasks = sqlx::query_as!(
             TaskData,
             r#"
@@ -471,6 +490,7 @@ impl Worker {
                 WHERE (state IN ('ready', 'active') AND running_on IS NULL)
                    OR (state = 'ready' AND running_on = $1)
                 FOR UPDATE SKIP LOCKED
+                LIMIT $2
             )
             UPDATE durable.task
               SET running_on = $1,
@@ -483,10 +503,27 @@ impl Worker {
                 task.wasm   as "wasm!",
                 task.data   as "data!: Json<Box<RawValue>>"
             "#,
-            self.worker_id
+            self.worker_id,
+            allowed as i64
         )
         .fetch_all(&mut *tx)
         .await?;
+
+        if tasks.len() + self.tasks.len() >= max_tasks {
+            sqlx::query!(
+                "
+                UPDATE durable.task
+                  SET running_on = NULL
+                WHERE state = 'ready'
+                  AND running_on = $1
+                ",
+                self.worker_id
+            )
+            .execute(&mut *tx)
+            .await?;
+
+            self.blocked = true;
+        }
 
         tx.commit().await?;
 
@@ -495,15 +532,19 @@ impl Worker {
             let engine = self.engine.clone();
             let worker_id = self.worker_id;
 
-            self.tasks.spawn(async move {
-                let task_id = task.id;
-                if let Err(e) = Self::run_task(shared, engine, task, worker_id)
-                    .instrument(tracing::info_span!("task", task_id))
-                    .await
-                {
-                    tracing::error!(task_id, "worker task exited with an error: {e}");
-                }
-            });
+            self.tasks
+                .build_task()
+                .name(&format!("task {}", task.id))
+                .spawn(async move {
+                    let task_id = task.id;
+                    if let Err(e) = Self::run_task(shared, engine, task, worker_id)
+                        .instrument(tracing::info_span!("task", task_id))
+                        .await
+                    {
+                        tracing::error!(task_id, "worker task exited with an error: {e}");
+                    }
+                })
+                .context("failed to spawn task on the joinset")?;
         }
 
         Ok(())

@@ -1,6 +1,6 @@
-use std::time::{Duration, SystemTime};
-
+use anyhow::Context;
 use async_trait::async_trait;
+use chrono::{DateTime, TimeDelta, Utc};
 use wasi::io::poll::Pollable;
 use wasi::io::streams::{InputStream, OutputStream, StreamError};
 use wasmtime::component::Resource;
@@ -219,7 +219,7 @@ impl wasi::io::poll::HostPollable for Task {
                     _ => (),
                 }
 
-                let now = SystemTime::now();
+                let now = Utc::now();
                 Ok(pollable.timeout <= now)
             })
             .await
@@ -245,9 +245,8 @@ impl wasi::io::poll::HostPollable for Task {
                         _ => (),
                     }
 
-                    let now = SystemTime::now();
-
-                    if let Ok(delta) = now.duration_since(pollable.timeout) {
+                    let now = Utc::now();
+                    if let Ok(delta) = pollable.timeout.signed_duration_since(now).to_std() {
                         // TODO: We may want some sort of suspended tasks for tasks that block for a
                         //       long time. For now this just gets translated to a tokio sleep.
                         tokio::time::sleep(delta).await;
@@ -304,8 +303,8 @@ impl wasi::io::poll::Host for Task {
         let mut ready = Vec::new();
 
         while ready.is_empty() {
-            let now = SystemTime::now();
-            let mut wakeup = now;
+            let now = Utc::now();
+            let mut wakeup: Option<DateTime<Utc>> = None;
 
             for (idx, pollable) in pollables.iter().enumerate() {
                 if pollable.rep() == u32::MAX {
@@ -319,11 +318,25 @@ impl wasi::io::poll::Host for Task {
                     continue;
                 }
 
-                wakeup = wakeup.min(pollable.timeout);
+                wakeup = Some(
+                    wakeup
+                        .map(|wakeup| wakeup.min(pollable.timeout))
+                        .unwrap_or(pollable.timeout),
+                );
             }
 
             if ready.is_empty() {
-                let duration = wakeup.duration_since(now).unwrap_or(Duration::ZERO);
+                let wakeup = match wakeup {
+                    Some(wakeup) => wakeup,
+                    None => anyhow::bail!("no pollables were ready but no wakup time was computed"),
+                };
+                let duration = wakeup
+                    .signed_duration_since(now)
+                    .max(TimeDelta::zero())
+                    .to_std()
+                    .context("failed to convert the time delay to a std duraction")?;
+
+                tracing::trace!("blocking poll for {}", humantime::format_duration(duration));
                 tokio::time::sleep(duration).await;
             }
         }
