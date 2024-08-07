@@ -1,6 +1,7 @@
-use anyhow::Context;
+use std::time::Duration;
+
 use async_trait::async_trait;
-use chrono::{DateTime, TimeDelta, Utc};
+use chrono::{DateTime, Utc};
 use wasi::io::poll::Pollable;
 use wasi::io::streams::{InputStream, OutputStream, StreamError};
 use wasmtime::component::Resource;
@@ -10,6 +11,10 @@ use crate::bindings::wasi;
 use crate::plugin::PluginMapExt;
 use crate::task::TransactionOptions;
 use crate::Task;
+
+/// The duration that the task will be woken in advance of the timer becoming
+/// ready.
+const SUSPEND_PREWAKE: Duration = Duration::from_secs(10);
 
 impl wasi::io::error::HostError for Task {
     fn to_debug_string(
@@ -233,29 +238,56 @@ impl wasi::io::poll::HostPollable for Task {
 
         let resources = self.plugins.expect::<WasiResources>();
         let pollable = resources.pollables[pollable.rep() as usize];
+        let suspend_timeout = self.state.config().suspend_timeout;
 
-        let options = TransactionOptions::new("wasi:io/poll.pollable.block");
-        self.state
-            .maybe_do_transaction(options, move |txn| {
-                Box::pin(async move {
-                    match pollable.txn {
-                        Some(index) if index != txn.index() => anyhow::bail!(
-                            "attempted to use a pollable outside the transaction it was created in"
-                        ),
-                        _ => (),
-                    }
+        let entered = match self.state.transaction() {
+            Some(_) => false,
+            None => {
+                let options = TransactionOptions::new("wasi:io/poll.pollable.block");
+                if let Some(result) = self.state.enter(options).await? {
+                    return Ok(result);
+                }
 
-                    let now = Utc::now();
-                    if let Ok(delta) = pollable.timeout.signed_duration_since(now).to_std() {
-                        // TODO: We may want some sort of suspended tasks for tasks that block for a
-                        //       long time. For now this just gets translated to a tokio sleep.
-                        tokio::time::sleep(delta).await;
-                    }
+                true
+            }
+        };
 
-                    Ok(())
-                })
-            })
-            .await
+        let txn = self.state.transaction_mut().unwrap();
+        let is_external = match pollable.txn {
+            Some(index) if index != txn.index() => anyhow::bail!(
+                "attempted to use a pollable outside the transaction it was created in"
+            ),
+            Some(_) => false,
+            None => true,
+        };
+
+        let now = Utc::now();
+        let delta = pollable
+            .timeout
+            .signed_duration_since(now)
+            .to_std()
+            .unwrap_or(Duration::ZERO);
+
+        if is_external && delta > suspend_timeout + SUSPEND_PREWAKE {
+            // Avoid holding on to a db connection if we are suspending this task anyway
+            txn.take_conn();
+
+            let mut conn = self.state.pool().acquire().await?;
+            let status = self
+                .state
+                .suspend(&mut conn, Some(pollable.timeout))
+                .await?;
+
+            return Err(status.into());
+        }
+
+        tokio::time::sleep(delta).await;
+
+        if entered {
+            self.state.exit(&()).await?;
+        }
+
+        Ok(())
     }
 
     fn drop(&mut self, pollable: Resource<Pollable>) -> wasmtime::Result<()> {
@@ -299,10 +331,32 @@ impl wasi::io::poll::Host for Task {
             }
         };
 
+        let suspend_timeout = self.state.config().suspend_timeout;
         let resources = self.plugins.expect::<WasiResources>();
-        let mut ready = Vec::new();
+        let txn = self.state.transaction_mut().unwrap();
 
-        while ready.is_empty() {
+        // Check whether any of the pollables was created within the current
+        // transaction. If this is the case then we can't suspend the task because it
+        // might be sleeping based on an impure current time acquired from within the
+        // transaction.
+        let mut has_internal = false;
+        for pollable in pollables.iter() {
+            let pollable = resources.pollables[pollable.rep() as _];
+
+            match pollable.txn {
+                Some(index) if index != txn.index() => anyhow::bail!(
+                    "attempted to use a pollable outside the transaction it was created in"
+                ),
+                Some(_) => {
+                    has_internal = true;
+                    break;
+                }
+                None => (),
+            }
+        }
+
+        let mut ready = Vec::new();
+        loop {
             let now = Utc::now();
             let mut wakeup: Option<DateTime<Utc>> = None;
 
@@ -325,20 +379,31 @@ impl wasi::io::poll::Host for Task {
                 );
             }
 
-            if ready.is_empty() {
-                let wakeup = match wakeup {
-                    Some(wakeup) => wakeup,
-                    None => anyhow::bail!("no pollables were ready but no wakup time was computed"),
-                };
-                let duration = wakeup
-                    .signed_duration_since(now)
-                    .max(TimeDelta::zero())
-                    .to_std()
-                    .context("failed to convert the time delay to a std duraction")?;
-
-                tracing::trace!("blocking poll for {}", humantime::format_duration(duration));
-                tokio::time::sleep(duration).await;
+            if !ready.is_empty() {
+                break;
             }
+
+            let wakeup = match wakeup {
+                Some(wakeup) => wakeup,
+                None => anyhow::bail!("no pollables were ready but no wakeup time was computed"),
+            };
+            let duration = wakeup
+                .signed_duration_since(now)
+                .to_std()
+                .unwrap_or(Duration::ZERO);
+
+            if !has_internal && duration > suspend_timeout + SUSPEND_PREWAKE {
+                // Avoid holding on to a db connection if we are suspending this task anyway
+                let _ = txn.take_conn();
+
+                let mut conn = self.state.pool().acquire().await?;
+                let status = self.state.suspend(&mut conn, Some(wakeup)).await?;
+
+                return Err(status.into());
+            }
+
+            tracing::trace!("blocking poll for {}", humantime::format_duration(duration));
+            tokio::time::sleep(duration).await;
         }
 
         if entered {

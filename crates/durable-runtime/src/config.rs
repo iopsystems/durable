@@ -86,9 +86,11 @@ pub struct Config {
     /// Note that with default memory settings there is a hard limit at 64k
     /// active tasks on a single worker (assuming x86_64). This is because, by
     /// default, each wasm memory uses 6GB of virtual memory, even if the memory
-    /// itself is much smaller.
+    /// itself is much smaller. Depending on the sqlx database pool settings,
+    /// you may also find that there are not enough database connections to
+    /// service all the tasks.
     ///
-    /// The default limit is 10000 tasks.
+    /// The default limit is 2000 tasks.
     pub max_tasks: usize,
 }
 
@@ -103,7 +105,7 @@ impl Default for Config {
             max_log_bytes_per_transaction: 1024 * 128,
             max_returned_buffer_len: 1024 * 1024 * 8,
             suspend_timeout: Duration::from_secs(60),
-            max_tasks: 10000,
+            max_tasks: 1000,
         }
     }
 }

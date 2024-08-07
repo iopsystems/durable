@@ -170,7 +170,18 @@ impl Worker {
 
         tracing::info!("durable worker id is {}", self.worker_id);
 
+        let leader_id = sqlx::query!(
+            "SELECT id
+            FROM durable.worker
+            ORDER BY started_at ASC
+            LIMIT 1",
+        )
+        .fetch_one(&self.shared.pool)
+        .await?
+        .id;
+
         self.shared.shutdown.reset();
+        self.shared.leader.store(leader_id);
 
         let worker_id = self.worker_id;
         let heartbeat = Self::heartbeat(self.shared.clone(), self.worker_id);
@@ -318,13 +329,20 @@ impl Worker {
         let mut leader_id = shared.leader.get();
         let mut leader_stream = std::pin::pin!(shared.leader.stream());
 
+        tracing::info!("cluster leader is {}", leader_id);
+
         'outer: loop {
             tokio::select! {
                 biased;
 
                 _ = shutdown.as_mut() => break 'outer,
-                id = leader_stream.as_mut().next() => leader_id = id,
-                _ = shared.suspend.notified() => (),
+                id = leader_stream.as_mut().next() => {
+                    tracing::info!("cluster leader is now {id}");
+                    leader_id = id
+                },
+                _ = shared.suspend.notified(), if leader_id == worker_id => {
+                    tracing::info!("task suspend notification");
+                },
                 _ = tokio::time::sleep_until(instant) => ()
             }
 
@@ -334,7 +352,12 @@ impl Worker {
             }
 
             let mut conn = shared.pool.acquire().await?;
-            sqlx::query!(
+
+            // Note that we include the task id in the subquery ORDER BY clause so that
+            // postgresql is forced to evaluate it for each row.
+            //
+            // If we don't do that all the rows here get the same random number.
+            let result = sqlx::query!(
                 "
                 UPDATE durable.task
                   SET state = 'ready',
@@ -342,7 +365,7 @@ impl Worker {
                       running_on = (
                         SELECT id
                          FROM durable.worker
-                        ORDER BY random()
+                        ORDER BY random() + task.id
                         LIMIT 1
                       )
                 WHERE state = 'suspended'
@@ -351,6 +374,11 @@ impl Worker {
             )
             .execute(&mut *conn)
             .await?;
+
+            let count = result.rows_affected();
+            if count > 0 {
+                tracing::info!("woke up {count} tasks");
+            }
 
             let wakeup_at = sqlx::query!(
                 r#"
@@ -527,6 +555,10 @@ impl Worker {
 
         tx.commit().await?;
 
+        if !tasks.is_empty() {
+            tracing::info!("launching {} tasks", tasks.len());
+        }
+
         for task in tasks {
             let shared = self.shared.clone();
             let engine = self.engine.clone();
@@ -662,7 +694,9 @@ impl Worker {
     ) -> anyhow::Result<TaskStatus> {
         use wasmtime::component::*;
 
-        tracing::info!("launching task `{}`", task.name);
+        // tracing::info!(
+        //     target: "durable_runtime::worker::task_launch",
+        //     "launching task `{}`", task.name);
         let component = {
             let mut cache = shared.cache.lock().await;
 
@@ -704,6 +738,7 @@ impl Worker {
                 .map_err(anyhow::Error::from)?;
 
                 tracing::debug!(
+                    target: "durable_runtime::worker::task_compile",
                     id = task.wasm,
                     "compiling new module took {}",
                     humantime::Duration::from(start.elapsed())

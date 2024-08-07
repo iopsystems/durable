@@ -118,6 +118,7 @@ CREATE TABLE durable.notification(
     data            jsonb       NOT NULL,
 
     CONSTRAINT fk_task FOREIGN KEY(task_id) REFERENCES durable.task(id)
+        ON DELETE CASCADE
 );
 
 CREATE INDEX notification_recent ON durable.notification(task_id, created_at ASC);

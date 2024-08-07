@@ -3,12 +3,14 @@ use std::ops::{Deref, DerefMut};
 use std::sync::Arc;
 
 use anyhow::Context;
+use chrono::{DateTime, Utc};
 use futures_util::future::BoxFuture;
 use futures_util::stream::BoxStream;
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 use serde_json::value::RawValue;
 use sqlx::types::Json;
+use sqlx::PgConnection;
 use tokio::sync::broadcast::Receiver;
 
 use crate::error::TaskStatus;
@@ -493,6 +495,34 @@ impl TaskState {
         self.txn_index += 1;
 
         Ok(())
+    }
+
+    /// Mark the current transaction as suspended.
+    ///
+    /// This function will use the provided connection to do so. If the
+    /// connection is part of a transaction you can ensure that other state has
+    /// not been modified before committing the transaction.
+    ///
+    /// On success, returns a [`TaskState`] object that should be returned as an
+    /// error.
+    pub async fn suspend(
+        &mut self,
+        conn: &mut PgConnection,
+        timeout: Option<DateTime<Utc>>,
+    ) -> anyhow::Result<TaskStatus> {
+        sqlx::query!(
+            "UPDATE durable.task
+            SET state = 'suspended',
+                running_on = NULL,
+                wakeup_at = $2
+            WHERE id = $1",
+            self.task_id(),
+            timeout
+        )
+        .execute(&mut *conn)
+        .await?;
+
+        Ok(TaskStatus::Suspend)
     }
 
     pub async fn do_transaction<F, T>(
