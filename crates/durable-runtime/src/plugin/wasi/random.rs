@@ -14,18 +14,16 @@ impl wasi::random::random::Host for Task {
 
         let options = TransactionOptions::new("wasi:random/random.get-random-bytes");
         self.state
-            .maybe_do_transaction(options, move |_| {
-                Box::pin(async move {
-                    let mut data = Vec::with_capacity(len as usize);
-                    getrandom::getrandom_uninit(data.spare_capacity_mut())
-                        .context("get-random-bytes: failed to call getrandom")?;
+            .maybe_do_transaction_sync(options, move |_| {
+                let mut data = Vec::with_capacity(len as usize);
+                getrandom::getrandom_uninit(data.spare_capacity_mut())
+                    .context("get-random-bytes: failed to call getrandom")?;
 
-                    // SAFETY: getrandom_uninit returned successfully so all bytes in the spare
-                    //         capacity of the vector are initialized.
-                    unsafe { data.set_len(data.capacity()) };
+                // SAFETY: getrandom_uninit returned successfully so all bytes in the spare
+                //         capacity of the vector are initialized.
+                unsafe { data.set_len(data.capacity()) };
 
-                    Ok(data)
-                })
+                Ok(data)
             })
             .await
     }
@@ -33,15 +31,13 @@ impl wasi::random::random::Host for Task {
     async fn get_random_u64(&mut self) -> wasmtime::Result<u64> {
         let options = TransactionOptions::new("wasi:random/random.get-random-u64");
         self.state
-            .maybe_do_transaction(options, move |_| {
-                Box::pin(async move {
-                    let mut data = [0u8; std::mem::size_of::<u64>()];
+            .maybe_do_transaction_sync(options, move |_| {
+                let mut data = [0u8; std::mem::size_of::<u64>()];
 
-                    getrandom::getrandom(&mut data)
-                        .context("get-random-u64: failed to call getrandom")?;
+                getrandom::getrandom(&mut data)
+                    .context("get-random-u64: failed to call getrandom")?;
 
-                    Ok(u64::from_ne_bytes(data))
-                })
+                Ok(u64::from_ne_bytes(data))
             })
             .await
     }
@@ -59,12 +55,10 @@ impl wasi::random::insecure::Host for Task {
 
         let options = TransactionOptions::new("wasi:random/random.get-insecure-random-bytes");
         self.state
-            .maybe_do_transaction(options, move |_| {
-                Box::pin(async move {
-                    let mut data = vec![0u8; len as usize];
-                    rand::thread_rng().fill_bytes(&mut data);
-                    Ok(data)
-                })
+            .maybe_do_transaction_sync(options, move |_| {
+                let mut data = vec![0u8; len as usize];
+                rand::thread_rng().fill_bytes(&mut data);
+                Ok(data)
             })
             .await
     }
@@ -72,9 +66,7 @@ impl wasi::random::insecure::Host for Task {
     async fn get_insecure_random_u64(&mut self) -> wasmtime::Result<u64> {
         let options = TransactionOptions::new("wasi:random/random.get-insecure-random-u64");
         self.state
-            .maybe_do_transaction(options, move |_| {
-                Box::pin(async move { Ok(rand::thread_rng().next_u64()) })
-            })
+            .maybe_do_transaction_sync(options, move |_| Ok(rand::thread_rng().next_u64()))
             .await
     }
 }

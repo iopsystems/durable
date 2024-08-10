@@ -22,7 +22,7 @@ async fn main() -> anyhow::Result<()> {
     };
 
     tracing_subscriber::registry()
-        .with(console_subscriber::spawn())
+        // .with(console_subscriber::spawn())
         .with(
             tracing_subscriber::fmt::layer()
                 .without_time()
@@ -36,7 +36,7 @@ async fn main() -> anyhow::Result<()> {
         .application_name("durable-server");
     let pool = sqlx::pool::PoolOptions::new()
         .acquire_timeout(Duration::from_secs(60))
-        .max_connections(30)
+        .max_connections(50)
         .connect_with(options)
         .await
         .context("failed to connect to the database")?;
@@ -48,6 +48,7 @@ async fn main() -> anyhow::Result<()> {
     config.wasm_threads(false);
     config.profiler(wasmtime::ProfilingStrategy::PerfMap);
     config.wasm_backtrace_details(wasmtime::WasmBacktraceDetails::Enable);
+    config.debug_info(true);
 
     let engine = wasmtime::Engine::new(&config)?;
 

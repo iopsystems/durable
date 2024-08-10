@@ -105,12 +105,11 @@ impl wasi::io::streams::HostOutputStream for Task {
 
         let options = TransactionOptions::new("wasi:io/streams.output-stream.write");
         self.state
-            .maybe_do_transaction(options, move |txn| {
-                Box::pin(async move {
-                    let utf8 = String::from_utf8_lossy(&contents);
-                    txn.write_logs(&utf8);
-                    Ok(())
-                })
+            .maybe_do_transaction_sync(options, move |state| {
+                let txn = state.transaction_mut().unwrap();
+                let utf8 = String::from_utf8_lossy(&contents);
+                txn.write_logs(&utf8);
+                Ok(())
             })
             .await?;
 
@@ -216,7 +215,9 @@ impl wasi::io::poll::HostPollable for Task {
 
         let options = TransactionOptions::new("wasi:io/pollable.pollable.ready");
         self.state
-            .maybe_do_transaction_sync(options, move |txn| {
+            .maybe_do_transaction_sync(options, move |state| {
+                let txn = state.transaction_mut().unwrap();
+
                 match pollable.txn {
                     Some(index) if index != txn.index() => anyhow::bail!(
                         "attempted to use a pollable outside the transaction it was created in"

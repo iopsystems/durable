@@ -1,4 +1,5 @@
 use std::any::Any;
+use std::borrow::Cow;
 use std::ops::{Deref, DerefMut};
 use std::sync::Arc;
 
@@ -43,7 +44,7 @@ impl Extend<Self> for QueryResult {
 
 /// A running workflow transaction.
 pub struct Transaction {
-    label: String,
+    label: Cow<'static, str>,
     index: i32,
 
     // SAFETY NOTE:
@@ -64,7 +65,7 @@ pub struct Transaction {
 }
 
 impl Transaction {
-    fn new(label: String, index: i32, shared: Arc<SharedState>) -> Self {
+    fn new(label: Cow<'static, str>, index: i32, shared: Arc<SharedState>) -> Self {
         Self {
             label,
             index,
@@ -271,12 +272,12 @@ impl TaskState {
 
 #[derive(Clone, Debug)]
 pub struct TransactionOptions {
-    label: String,
+    label: Cow<'static, str>,
     database: bool,
 }
 
 impl TransactionOptions {
-    pub fn new(label: impl Into<String>) -> Self {
+    pub fn new(label: impl Into<Cow<'static, str>>) -> Self {
         Self {
             label: label.into(),
             database: false,
@@ -317,10 +318,45 @@ impl TaskState {
     /// * The transaction index exceeds [`Config::max_workflow_events`] and this
     ///   transaction is not already recorded in the database.
     /// * The requested label does not match the one recorded in the database.
-    pub async fn enter<T>(&mut self, options: TransactionOptions) -> anyhow::Result<Option<T>>
+    pub async fn enter<T>(&mut self, mut options: TransactionOptions) -> anyhow::Result<Option<T>>
     where
         T: DeserializeOwned,
     {
+        let is_db_txn = std::mem::take(&mut options.database);
+        let mut tx = None;
+        let mut conn;
+        let conn: &mut PgConnection = if is_db_txn {
+            let tx = tx.insert(self.pool().begin().await?);
+            &mut **tx
+        } else {
+            conn = self.pool().acquire().await?;
+            &mut *conn
+        };
+
+        if let Some(value) = self.enter_impl(options, &mut *conn).await? {
+            return Ok(Some(value));
+        }
+
+        if let Some(tx) = tx {
+            let txn = self.transaction_mut().unwrap();
+            txn.conn = Some(Box::new(tx));
+        }
+
+        Ok(None)
+    }
+
+    async fn enter_impl<T>(
+        &mut self,
+        options: TransactionOptions,
+        conn: &mut PgConnection,
+    ) -> anyhow::Result<Option<T>>
+    where
+        T: DeserializeOwned,
+    {
+        if options.database {
+            anyhow::bail!("database transactions are not supported for this operation");
+        }
+
         if let Some(txn) = self.transaction() {
             anyhow::bail!(
                 "attempted to start transaction {:?} while already within transaction {:?}",
@@ -329,7 +365,6 @@ impl TaskState {
             );
         }
 
-        let mut tx = self.pool().begin().await?;
         let record = sqlx::query!(
             r#"
             SELECT
@@ -342,12 +377,10 @@ impl TaskState {
             self.task_id(),
             self.txn_index
         )
-        .fetch_optional(&mut *tx)
+        .fetch_optional(&mut *conn)
         .await?;
 
         if let Some(record) = record {
-            tx.rollback().await?;
-
             if record.label != options.label {
                 anyhow::bail!(
                     "workflow execution is non-deterministic: stored event at index {} has label \
@@ -375,8 +408,6 @@ impl TaskState {
                 .unwrap_or(i32::MAX);
 
             if self.txn_index >= max_txn_index {
-                tx.rollback().await?;
-
                 anyhow::bail!(
                     "workflow exceeded the configured maximum number of allowed workflow \
                      transactions (configured limit is {})",
@@ -390,14 +421,11 @@ impl TaskState {
                 options.label
             );
 
-            let mut txn = Transaction::new(options.label, self.txn_index, self.shared.clone());
-            if options.database {
-                txn.conn = Some(Box::new(tx));
-            } else {
-                tx.commit().await?;
-            }
-
-            self.txn = Some(txn);
+            self.txn = Some(Transaction::new(
+                options.label,
+                self.txn_index,
+                self.shared.clone(),
+            ));
             Ok(None)
         }
     }
@@ -413,85 +441,139 @@ impl TaskState {
     where
         T: ?Sized + Serialize,
     {
+        let txn = match self.transaction_mut() {
+            Some(txn) => txn,
+            None => anyhow::bail!("attempted to exit a transaction without having entered one"),
+        };
+
+        // If the transaction has a database connection then we need to use that,
+        // otherwise grab a new connection from the pool. exit_impl doesn't require that
+        // we be in a database transaction, so there is no need to enter one if we are
+        // not already in one.
+        let mut tx = None;
+        let mut conn;
+        let conn: &mut PgConnection = match txn.take_conn() {
+            Some(mut txn) => {
+                // Check if the transaction is not in an aborted state by running a query
+                if sqlx::query("SELECT 1").execute(&mut *txn).await.is_ok() {
+                    let tx = tx.insert(txn);
+                    &mut **tx
+                } else {
+                    txn.rollback().await?;
+                    conn = self.shared.pool.acquire().await?;
+                    &mut *conn
+                }
+            }
+            _ => {
+                conn = self.shared.pool.acquire().await?;
+                &mut *conn
+            }
+        };
+
+        if let Err(e) = self.exit_impl(data, &mut *conn).await {
+            if let Some(tx) = tx {
+                let _ = tx.rollback().await;
+            }
+
+            return Err(e);
+        }
+
+        if let Some(tx) = tx {
+            tx.commit().await?;
+        }
+
+        Ok(())
+    }
+
+    async fn exit_impl<T>(&mut self, data: &T, conn: &mut PgConnection) -> anyhow::Result<()>
+    where
+        T: ?Sized + Serialize,
+    {
         let mut txn = match self.txn.take() {
             Some(txn) => txn,
             None => anyhow::bail!("attempted to exit a transaction without having entered one"),
         };
 
-        let mut tx = match txn.take_conn() {
-            Some(mut tx) => {
-                // Check if the transaction is not in an aborted state by running a query
-                if sqlx::query("SELECT 1").execute(&mut *tx).await.is_ok() {
-                    tx
-                } else {
-                    self.shared.pool.begin().await?
-                }
-            }
-            _ => self.shared.pool.begin().await?,
+        if txn.conn().is_some() {
+            anyhow::bail!("database transactions are not supported by this operation");
+        }
+
+        let logs;
+        let message = if txn.logs.is_empty() {
+            None
+        } else {
+            logs = std::mem::take(&mut txn.logs);
+            let logs = logs.trim_end();
+
+            tracing::debug!(
+                target: "durable_runtime::task_log",
+                "task {}: {}",
+                self.task_id(),
+                txn.logs
+            );
+
+            Some(logs)
         };
 
+        // This complicated query here does a few different things:
+        // 1. It inserts an event into the event table,
+        // 2. It inserts a log event into the log table, and,
+        // 3. It fetches the running_on field for the task we are currently running.
+        //
+        // Doing this all at once has multiple advantages:
+        // - We avoid multiple roundtrips to the database.
+        // - Since all the statements are conditional on running_on = worker_id, we can
+        //   run this outside of a transaction with no issues.
         let running_on = sqlx::query!(
-            "SELECT running_on FROM durable.task WHERE id = $1",
-            self.task_id()
+            r#"
+            WITH
+                current_task AS (
+                    SELECT id, running_on
+                    FROM durable.task
+                    WHERE id = $1
+                      AND running_on = $6
+                    LIMIT 1
+                ),
+                insert_event AS (
+                    INSERT INTO durable.event(task_id, index, label, value)
+                    SELECT
+                        id as task_id,
+                        $2 as index,
+                        $3 as label,
+                        $4 as value
+                    FROM current_task
+                    RETURNING task_id
+                ),
+                insert_log AS (
+                    INSERT INTO durable.log(task_id, index, message)
+                    SELECT task_id, index, message
+                    FROM (VALUES ($1, $2, $5)) as t(task_id, index, message)
+                    JOIN current_task task ON task.id = task_id
+                    WHERE message IS NOT NULL
+                    RETURNING task_id
+                )
+            SELECT running_on
+             FROM current_task
+            LEFT JOIN insert_event event ON event.task_id = id
+            LEFT JOIN insert_event log   ON log.task_id = id
+            "#,
+            self.task_id(),
+            self.txn_index,
+            &*txn.label,
+            Json(data) as Json<&T>,
+            message,
+            self.worker_id
         )
-        .fetch_one(&mut *tx)
+        .fetch_one(&mut *conn)
         .await?
         .running_on;
+
         if running_on != Some(self.worker_id) {
             // This task is no longer running on the current worker. Don't commit anything,
             // and abort the task.
             return Err(anyhow::Error::new(TaskStatus::NotScheduledOnWorker));
         }
 
-        // tracing::info!(
-        //     label = txn.label,
-        //     "completing transaction {}",
-        //     self.txn_index
-        // );
-
-        sqlx::query!(
-            r#"
-            INSERT INTO durable.event(task_id, index, label, value)
-            VALUES ($1, $2, $3, $4)
-            "#,
-            self.task_id(),
-            self.txn_index,
-            txn.label,
-            Json(data) as Json<&T>
-        )
-        .execute(&mut *tx)
-        .await
-        .with_context(|| {
-            format!(
-                "failed to insert event {} with label {}",
-                self.txn_index, txn.label
-            )
-        })?;
-
-        if !txn.logs.is_empty() {
-            tracing::debug!(
-                target: "durable::task_log",
-                "task {}: {}",
-                self.task_id(),
-                txn.logs.trim_end()
-            );
-
-            sqlx::query!(
-                r#"
-                INSERT INTO durable.log(task_id, index, message)
-                VALUES ($1, $2, $3)
-                "#,
-                self.task_id(),
-                self.txn_index,
-                std::mem::take(&mut txn.logs)
-            )
-            .execute(&mut *tx)
-            .await?;
-        }
-
-        tracing::trace!(index = self.txn_index, "exiting transaction {}", txn.label);
-
-        tx.commit().await?;
         self.txn_index += 1;
 
         Ok(())
@@ -523,6 +605,37 @@ impl TaskState {
         .await?;
 
         Ok(TaskStatus::Suspend)
+    }
+
+    /// Execute the provided function. If not in a transaction, then wrap it in
+    /// a transaction, otherwise just executed it in the current transaction.
+    pub async fn maybe_do_transaction_sync<F, T>(
+        &mut self,
+        options: TransactionOptions,
+        func: F,
+    ) -> anyhow::Result<T>
+    where
+        F: for<'t> FnOnce(&'t mut Self) -> anyhow::Result<T>,
+        T: Serialize + DeserializeOwned + Send,
+    {
+        if options.database {
+            anyhow::bail!("maybe_do_transaction_sync cannot request a database transaction");
+        }
+
+        if self.transaction().is_some() {
+            return func(self);
+        }
+
+        let mut conn = self.pool().acquire().await?;
+        if let Some(data) = self.enter_impl(options, &mut *conn).await? {
+            return Ok(data);
+        }
+
+        let data = func(self)?;
+
+        self.exit_impl(&data, &mut *conn).await?;
+
+        Ok(data)
     }
 
     pub async fn do_transaction<F, T>(
@@ -581,19 +694,6 @@ impl TaskState {
             })
         })
         .await
-    }
-
-    pub async fn maybe_do_transaction_sync<F, T>(
-        &mut self,
-        options: TransactionOptions,
-        func: F,
-    ) -> anyhow::Result<T>
-    where
-        F: FnOnce(&mut Transaction) -> anyhow::Result<T> + Send + 'static,
-        T: Serialize + DeserializeOwned + Send,
-    {
-        self.maybe_do_transaction(options, |txn| Box::pin(async move { func(txn) }))
-            .await
     }
 }
 

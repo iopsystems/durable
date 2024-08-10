@@ -340,9 +340,7 @@ impl Worker {
                     tracing::info!("cluster leader is now {id}");
                     leader_id = id
                 },
-                _ = shared.suspend.notified(), if leader_id == worker_id => {
-                    tracing::info!("task suspend notification");
-                },
+                _ = shared.suspend.notified(), if leader_id == worker_id => (),
                 _ = tokio::time::sleep_until(instant) => ()
             }
 
