@@ -1,0 +1,19 @@
+[package]
+name = "durable-migrate"
+version = "0.1.0"
+edition = "2021"
+
+[features]
+default = ["migrate"]
+migrate = ["dep:sqlx"]
+
+[dependencies]
+thiserror = "1.0.63"
+
+[dependencies.sqlx]
+version = "0.8.0"
+optional = true
+features = ["postgres"]
+
+[dev-dependencies]
+tempdir = "0.3.7"
