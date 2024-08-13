@@ -561,7 +561,6 @@ impl Migrator {
     pub fn embed(&self, options: &EmbedOptions) -> String {
         use std::fmt::Write;
 
-        let cow = "::std::borrow::Cow";
         let mut content = String::new();
         let sources = self.sources.as_deref();
 
@@ -572,9 +571,14 @@ impl Migrator {
             )
         };
 
-        writeln!(
+        write!(
             content,
-            "pub const {name}: {path}::Migrator = {path}::Migrator::from_static(&[\n",
+            "\
+pub const {name}: {path}::Migrator = {path}::Migrator::from_static({{
+    use ::std::borrow::Cow;
+
+    &[
+",
             name = options.name,
             path = options.crate_path
         )
@@ -595,20 +599,19 @@ impl Migrator {
                         .map(|source| include_path(&source))
                         .unwrap_or_else(|| format!("{:?}", revert));
 
-                    format!("Some({cow}::Borrowed({down}))")
+                    format!("Some(Cow::Borrowed({down}))")
                 }
                 None => "None".into(),
             };
 
-            writeln!(
+            write!(
                 content,
-                "\
-    {path}::Migration {{
-        version: {version},
-        name: {cow}::Borrowed({name:?}),
-        sql: {cow}::Borrowed({up}),
-        revert: {down},
-    }},
+                "       {path}::Migration {{
+            version: {version},
+            name: Cow::Borrowed({name:?}),
+            sql: Cow::Borrowed({up}),
+            revert: {down},
+        }},
 ",
                 path = options.crate_path,
                 version = migration.version,
@@ -627,7 +630,14 @@ impl Migrator {
             }
         }
 
-        write!(content, "]);\n").unwrap();
+        write!(
+            content,
+            "    \
+    ]
+}});
+"
+        )
+        .unwrap();
 
         if options.print_cargo_directives {
             if let Some(sources) = &self.sources {
