@@ -5,15 +5,24 @@ version = "0.1.0"
 edition = "2021"
 
 [features]
-default = ["cli"]
+default = []
+regen = []
+
+# Dependencies and features needed for the CLI.
 cli = [
     "dep:clap",
     "dep:tracing-subscriber",
-    "console-subscriber",
-    "tokio/full",
-    "backtrace-on-stack-overflow",
+    "dep:backtrace-on-stack-overflow",
+    # "tokio/full",
 ]
-regen = []
+
+# Enable the use of tokio-console with the runtime CLI.
+#
+# This doesn't do much unless --cfg tokio_unstable is included in rustflags.
+tokio-console = [
+    "dep:console-subscriber",
+    "tokio/tracing"
+]
 
 [[bin]]
 name = "durable-server"
@@ -46,10 +55,11 @@ serde = { version = "1.0.204", features = ["derive"] }
 serde_json = { version = "1.0.120", features = ["raw_value"] }
 sha2 = "0.10.8"
 slab = "0.4.9"
-tokio = { version = "1.39.1", features = ["macros", "sync", "rt-multi-thread", "tracing"] }
+tokio = { version = "1.39.1", features = ["macros", "sync", "rt-multi-thread"] }
 tracing = "0.1.40"
 uluru = "3.1.0"
 wasmtime = "23.0.1"
+cfg-if = "1.0.0"
 
 [dependencies.sqlx]
 version = "0.8.0"

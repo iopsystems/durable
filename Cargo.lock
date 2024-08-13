@@ -886,6 +886,7 @@ dependencies = [
  "async-trait",
  "backtrace-on-stack-overflow",
  "cache-compute",
+ "cfg-if",
  "chrono",
  "clap",
  "console-subscriber",

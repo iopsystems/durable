@@ -84,5 +84,7 @@ fn main() -> anyhow::Result<()> {
     let output = out_dir.join("migrations.rs");
     std::fs::write(&output, &embed)?;
 
+    println!("cargo::rustc-check-cfg=cfg(tokio_unstable)");
+
     Ok(())
 }

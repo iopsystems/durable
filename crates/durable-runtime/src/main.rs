@@ -2,6 +2,7 @@ use std::str::FromStr;
 use std::time::Duration;
 
 use anyhow::Context;
+use cfg_if::cfg_if;
 use clap::Parser;
 use durable_runtime::{WorkerBuilder, WorkerHandle};
 use tracing_subscriber::layer::SubscriberExt;
@@ -26,14 +27,19 @@ async fn main() -> anyhow::Result<()> {
         backtrace_on_stack_overflow::enable()
     };
 
-    tracing_subscriber::registry()
-        // .with(console_subscriber::spawn())
-        .with(
-            tracing_subscriber::fmt::layer()
-                .without_time()
-                .with_filter(tracing_subscriber::EnvFilter::from_default_env()),
-        )
-        .init();
+    let registry = tracing_subscriber::registry().with(
+        tracing_subscriber::fmt::layer()
+            .without_time()
+            .with_filter(tracing_subscriber::EnvFilter::from_default_env()),
+    );
+
+    cfg_if! {
+        if #[cfg(feature = "tokio-console")] {
+            let registry = registry.with(console_subscriber::spawn());
+        }
+    }
+
+    registry.init();
 
     let args = Args::parse();
     let options = sqlx::postgres::PgConnectOptions::from_str(&args.database_url)

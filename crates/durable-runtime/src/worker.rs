@@ -5,6 +5,7 @@ use std::time::Duration;
 use anyhow::Context;
 use async_trait::async_trait;
 use cache_compute::Cached;
+use cfg_if::cfg_if;
 use chrono::Utc;
 use futures_concurrency::future::Join;
 use futures_util::FutureExt;
@@ -613,20 +614,27 @@ impl Worker {
             let shared = self.shared.clone();
             let engine = self.engine.clone();
             let worker_id = self.worker_id;
+            let future = async move {
+                let task_id = task.id;
+                if let Err(e) = Self::run_task(shared, engine, task, worker_id)
+                    .instrument(tracing::info_span!("task", task_id))
+                    .await
+                {
+                    tracing::error!(task_id, "worker task exited with an error: {e}");
+                }
+            };
 
-            self.tasks
-                .build_task()
-                .name(&format!("task {}", task.id))
-                .spawn(async move {
-                    let task_id = task.id;
-                    if let Err(e) = Self::run_task(shared, engine, task, worker_id)
-                        .instrument(tracing::info_span!("task", task_id))
-                        .await
-                    {
-                        tracing::error!(task_id, "worker task exited with an error: {e}");
-                    }
-                })
-                .context("failed to spawn task on the joinset")?;
+            cfg_if! {
+                if #[cfg(all(tokio_unstable, feature = "tokio-console"))] {
+                    self.tasks
+                        .build_task(future)
+                        .name(&format!("task {}", task.id))
+                        .spawn()
+                        .context("failed to spawn task on the joinset")?;
+                } else {
+                    self.tasks.spawn(future);
+                }
+            }
         }
 
         Ok(())
