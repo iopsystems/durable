@@ -6,14 +6,12 @@ edition = "2021"
 
 [features]
 default = []
-regen = []
 
 # Dependencies and features needed for the CLI.
 cli = [
     "dep:clap",
     "dep:tracing-subscriber",
     "dep:backtrace-on-stack-overflow",
-    # "tokio/full",
 ]
 
 # Enable the use of tokio-console with the runtime CLI.
