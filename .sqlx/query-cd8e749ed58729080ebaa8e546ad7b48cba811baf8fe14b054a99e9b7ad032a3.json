@@ -1,0 +1,12 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n                UPDATE durable.task\n                  SET state = 'ready',\n                      wakeup_at = NULL,\n                      running_on = (\n                        SELECT id\n                         FROM durable.worker\n                        ORDER BY random() + task.id\n                        LIMIT 1\n                      )\n                WHERE state = 'suspended'\n                  AND wakeup_at <= NOW()\n                ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": []
+  },
+  "hash": "cd8e749ed58729080ebaa8e546ad7b48cba811baf8fe14b054a99e9b7ad032a3"
+}

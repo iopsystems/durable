@@ -1,0 +1,24 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n                INSERT INTO durable.task(name, wasm, data, running_on)\n                SELECT\n                    $1 as name,\n                    $2 as wasm,\n                    $3 as data,\n                    (SELECT id\n                       FROM durable.worker\n                      ORDER BY random()\n                      LIMIT 1\n                      FOR SHARE SKIP LOCKED\n                    ) as running_on\n                RETURNING id\n                ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Int8",
+        "Jsonb"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "b511a7413e5da11eba8dc10ac1b3a26a12857ff4e7c3c02ddbd11aa8f17422f7"
+}

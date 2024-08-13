@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n                UPDATE durable.task\n                  SET running_on = NULL\n                WHERE state = 'ready'\n                  AND running_on = $1\n                ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Int8"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "20d16d2914bc03e3bdd46f015697c90c9c71d40e32432cf173a7fd6fb77c5ce8"
+}

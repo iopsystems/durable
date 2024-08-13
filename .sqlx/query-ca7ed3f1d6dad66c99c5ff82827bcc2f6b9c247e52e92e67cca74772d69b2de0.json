@@ -1,0 +1,34 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        DELETE FROM durable.notification\n        WHERE ctid IN (\n            SELECT ctid\n             FROM durable.notification\n            WHERE task_id = $1\n            ORDER BY created_at ASC\n            LIMIT 1\n            FOR UPDATE\n        )\n        RETURNING\n            created_at,\n            event,\n            data as \"data: Json<Box<RawValue>>\"\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "created_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 1,
+        "name": "event",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 2,
+        "name": "data: Json<Box<RawValue>>",
+        "type_info": "Jsonb"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int8"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "ca7ed3f1d6dad66c99c5ff82827bcc2f6b9c247e52e92e67cca74772d69b2de0"
+}

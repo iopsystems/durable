@@ -1,0 +1,22 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE durable.wasm\n                  SET last_used = CURRENT_TIMESTAMP\n                WHERE id = $1\n                RETURNING last_used",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "last_used",
+        "type_info": "Timestamptz"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int8"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "e51bc79d620d5936658a524a8f4ee06c5e2d11a52c24843cab6aa6866a9de873"
+}

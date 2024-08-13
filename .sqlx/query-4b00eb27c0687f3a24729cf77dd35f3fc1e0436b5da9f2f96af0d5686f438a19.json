@@ -1,0 +1,22 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n                SELECT message\n                FROM durable.log\n                WHERE task_id = $1\n                ORDER BY index ASC\n                ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "message",
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int8"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "4b00eb27c0687f3a24729cf77dd35f3fc1e0436b5da9f2f96af0d5686f438a19"
+}
