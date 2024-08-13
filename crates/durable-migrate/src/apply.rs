@@ -4,7 +4,7 @@ use sqlx::postgres::PgRow;
 use sqlx::{Connection, Row};
 
 use crate::error::{DivergingMigrationError, ErrorData};
-use crate::{Error, Migrator, Options, Target, TransactionMode};
+use crate::{Error, Migrator, Options, Table, Target, TransactionMode};
 
 struct DatabaseMigration {
     version: i64,
@@ -22,6 +22,7 @@ enum Operation<'a> {
     Revert {
         version: i64,
         revert: &'a str,
+        name: &'a str,
     },
 }
 
@@ -32,13 +33,9 @@ impl<'a> Operation<'a> {
 }
 
 impl Migrator {
-    async fn setup(
-        &self,
-        conn: &mut sqlx::PgConnection,
-        options: &Options,
-    ) -> Result<(), Error> {
+    async fn setup(&self, conn: &mut sqlx::PgConnection, options: &Options) -> Result<(), Error> {
         if let Some(schema) = options.migration_table.schema.as_deref() {
-            sqlx::query(&format!("CREATE SCHEMA {schema:?} IF NOT EXISTS"))
+            sqlx::query(&format!("CREATE SCHEMA IF NOT EXISTS {schema:?}"))
                 .execute(&mut *conn)
                 .await?;
         }
@@ -46,10 +43,10 @@ impl Migrator {
         #[rustfmt::skip]
         let query = format!(
             "\
-            CREATE TABLE {table}(\
+            CREATE TABLE IF NOT EXISTS {table}(\
                 version     bigint  NOT NULL PRIMARY KEY CHECK((version >= 0)),\
                 name        text    NOT NULL,\
-                revert      text ,\
+                revert      text\
             )\
             ",
             table = options.migration_table.as_sql()
@@ -117,6 +114,7 @@ impl Migrator {
             for m in applied.values().rev() {
                 operations.push(Operation::Revert {
                     version: m.version as i64,
+                    name: &m.name,
                     revert: if options.prefer_local_revert {
                         known
                             .get(&m.version)
@@ -190,6 +188,7 @@ impl Migrator {
                 .map(|m| {
                     Ok(Operation::Revert {
                         version: m.version,
+                        name: &m.name,
                         revert: if options.prefer_local_revert {
                             known
                                 .get(&m.version)
@@ -227,11 +226,7 @@ impl Migrator {
         }
     }
 
-    pub async fn run(
-        &self,
-        conn: &mut sqlx::PgConnection,
-        options: &Options,
-    ) -> Result<(), Error> {
+    pub async fn run(&self, conn: &mut sqlx::PgConnection, options: &Options) -> Result<(), Error> {
         let mut tx = None;
 
         let conn = if options.dry_run || options.transaction_mode == TransactionMode::Single {
@@ -263,16 +258,14 @@ impl Migrator {
                         sql,
                         revert,
                     } => {
-                        sqlx::query(sql).execute(&mut *tx).await?;
+                        tracing::debug!("running migration {version} - {name}");
 
-                        #[rustfmt::skip]
-                    let query = format!(
-                        "\
-                        INSERT INTO {table}(version, name, revert) \
-                        VALUES ($1, $2, $3) \
-                        ",
-                        table = options.migration_table.as_sql()
-                    );
+                        sqlx::raw_sql(sql).execute(&mut *tx).await?;
+
+                        let query = format!(
+                            "INSERT INTO {table}(version, name, revert) VALUES ($1, $2, $3) ",
+                            table = options.migration_table.as_sql()
+                        );
                         sqlx::query(&query)
                             .bind(version)
                             .bind(name)
@@ -281,23 +274,22 @@ impl Migrator {
                             .await?;
                     }
                     &Operation::Revert {
-                        version, revert, ..
+                        version,
+                        revert,
+                        name,
                     } => {
-                        #[rustfmt::skip]
-                    let query = format!(
-                        "\
-                        DELETE FROM {table} \
-                        WHERE version = $1 \
-                        RETURNING version \
-                        ",
-                        table = options.migration_table.as_sql()
-                    );
+                        tracing::debug!("reverting migration {version} - {name}");
+
+                        let query = format!(
+                            "DELETE FROM {table} WHERE version = $1 RETURNING version",
+                            table = options.migration_table.as_sql()
+                        );
                         sqlx::query(&query)
                             .bind(version)
                             .fetch_one(&mut *tx)
                             .await?;
 
-                        sqlx::query(revert).execute(&mut *tx).await?;
+                        sqlx::raw_sql(revert).execute(&mut *tx).await?;
                     }
                 }
 
@@ -310,6 +302,12 @@ impl Migrator {
             } else {
                 tx.commit().await?;
             }
+
+            result?;
+        }
+
+        if operations.is_empty() {
+            tracing::debug!("database schema is up to date!");
         }
 
         if let Some(tx) = tx {
@@ -321,5 +319,28 @@ impl Migrator {
         }
 
         Ok(())
+    }
+
+    pub async fn read_database_version(
+        &self,
+        conn: &mut sqlx::PgConnection,
+        migration_table: &Table,
+    ) -> Result<Option<u64>, Error> {
+        let options = Options {
+            migration_table: migration_table.clone(),
+            allow_revert: false,
+            dry_run: true,
+            prefer_local_revert: false,
+            target: Target::Latest,
+            transaction_mode: TransactionMode::Single,
+        };
+
+        let applied = self.applied_migrations(&mut *conn, &options).await?;
+
+        // Emit an error if our migrations are invalid or the diverge from those in the
+        // database.
+        let _ = self.operations(&applied, &options)?;
+
+        Ok(applied.last().map(|migration| migration.version as u64))
     }
 }

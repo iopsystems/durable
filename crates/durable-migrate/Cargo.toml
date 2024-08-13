@@ -5,10 +5,11 @@ edition = "2021"
 
 [features]
 default = ["migrate"]
-migrate = ["dep:sqlx"]
+migrate = ["dep:sqlx", "dep:tracing"]
 
 [dependencies]
 thiserror = "1.0.63"
+tracing = { version = "0.1.40", optional = true }
 
 [dependencies.sqlx]
 version = "0.8.0"

@@ -7,6 +7,7 @@ mod config;
 mod error;
 pub mod event;
 mod flag;
+pub mod migrate;
 pub mod plugin;
 pub mod task;
 pub mod util;

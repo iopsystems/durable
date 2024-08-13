@@ -1,4 +1,5 @@
 
+-- We store the migrations table at durable.migrations so the
 CREATE SCHEMA IF NOT EXISTS durable;
 
 -- Active workers in this durable cluster.

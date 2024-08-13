@@ -3,13 +3,13 @@ use std::path::PathBuf;
 use durable_bindgen::Options;
 
 #[derive(Debug, clap::Args)]
-pub struct Generate {}
+pub struct Bindings {}
 
 struct Generator {
     workspace_root: PathBuf,
 }
 
-impl Generate {
+impl Bindings {
     pub fn run(self) -> anyhow::Result<()> {
         let workspace_root = crate::workspace_root()?;
         let generator = Generator { workspace_root };

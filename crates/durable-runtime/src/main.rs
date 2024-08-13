@@ -12,6 +12,11 @@ use tracing_subscriber::Layer;
 struct Args {
     #[arg(long, env = "DATABASE_URL")]
     database_url: String,
+
+    /// Automatically migrate the database during worker startup if the database
+    /// version does not match the expected version.
+    #[arg(long)]
+    migrate: bool,
 }
 
 #[tokio::main]
@@ -52,7 +57,11 @@ async fn main() -> anyhow::Result<()> {
 
     let engine = wasmtime::Engine::new(&config)?;
 
-    let mut worker = WorkerBuilder::new(pool).engine(engine).build().await?;
+    let mut worker = WorkerBuilder::new(pool)
+        .engine(engine)
+        .migrate(args.migrate)
+        .build()
+        .await?;
 
     let handle = worker.handle();
 

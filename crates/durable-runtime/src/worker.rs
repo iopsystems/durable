@@ -62,6 +62,7 @@ pub struct WorkerBuilder {
     client: Option<reqwest::Client>,
     engine: Option<wasmtime::Engine>,
     plugins: Vec<Box<dyn Plugin>>,
+    migrate: bool,
 }
 
 impl WorkerBuilder {
@@ -73,6 +74,7 @@ impl WorkerBuilder {
             client: None,
             engine: None,
             plugins: vec![Box::new(DurablePlugin)],
+            migrate: false,
         }
     }
 
@@ -91,7 +93,57 @@ impl WorkerBuilder {
         self
     }
 
+    /// Whether the database should be automatically migrated on runner startup
+    /// if the schema version in the database differs from what we expect.
+    ///
+    /// If true, this will attempt to migrate the database during the
+    /// [`WorkerBuilder::build`] call. Otherwise, this will error if the
+    /// database version does not match the worker version.
+    ///
+    /// This is a low-effort way to ensure that the database is always as
+    /// expected when running with a single worker. It is not recommended to use
+    /// in a larger cluster.
+    ///
+    /// Note that automatic migrations will never revert previous migrations,
+    /// this means that if you downgrade the runner then it will fail to start
+    /// until a manual database revert is performed.
+    ///
+    /// This is false by default.
+    pub fn migrate(mut self, migrate: bool) -> Self {
+        self.migrate = migrate;
+        self
+    }
+
     pub async fn build(self) -> anyhow::Result<Worker> {
+        let migrator = crate::migrate::Migrator::new();
+        let mut conn = self.pool.acquire().await?;
+        if self.migrate {
+            let options = crate::migrate::Options {
+                target: migrator.latest(),
+                transaction_mode: durable_migrate::TransactionMode::Single,
+                ..Default::default()
+            };
+
+            migrator
+                .migrate(&mut conn, &options)
+                .await
+                .context("failed to migrate the database")?;
+        } else {
+            let version = migrator
+                .read_database_version(&mut conn)
+                .await?
+                .unwrap_or(0);
+            let latest = migrator.latest_version();
+
+            if version != latest {
+                anyhow::bail!(
+                    "database version does not match that required by this durable worker \
+                     (expected {latest}, got {version} instead)"
+                )
+            }
+        }
+        drop(conn);
+
         let shared = Arc::new(SharedState {
             shutdown: ShutdownFlag::new(),
             pool: self.pool,

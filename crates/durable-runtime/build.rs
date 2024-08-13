@@ -1,6 +1,7 @@
 use std::path::{Path, PathBuf};
 
 use anyhow::Context;
+use durable_migrate::{EmbedOptions, Migrator};
 use wasmtime_wit_bindgen::*;
 use wit_parser::Resolve;
 
@@ -22,10 +23,6 @@ fn _generate(path: &Path, out: &Path, world: &str, opts: &Opts) -> anyhow::Resul
     for path in paths.iter() {
         println!("cargo::rerun-if-changed={}", path.display());
     }
-
-    let file = syn::parse_str::<syn::File>(&bindings) //
-        .context("generated bindings were not valid rust")?;
-    let bindings = prettyplease::unparse(&file);
 
     std::fs::write(out, &bindings)
         .with_context(|| format!("failed to write bindings to `{}`", out.display()))?;
@@ -81,6 +78,11 @@ fn main() -> anyhow::Result<()> {
 
     let output = out_dir.join("bindings.rs");
     generate("wit", output, "durable:core/imports", &opts)?;
+
+    let migrator = Migrator::from_dir("migrations")?;
+    let embed = migrator.embed(&EmbedOptions::default());
+    let output = out_dir.join("migrations.rs");
+    std::fs::write(&output, &embed)?;
 
     Ok(())
 }

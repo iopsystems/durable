@@ -2,8 +2,10 @@ use std::path::PathBuf;
 
 use anyhow::Context;
 use clap::Parser;
+use tracing_subscriber::prelude::*;
 
-mod generate;
+mod gen;
+mod migrate;
 
 #[derive(Debug, clap::Parser)]
 pub struct Args {
@@ -13,14 +15,25 @@ pub struct Args {
 
 #[derive(Debug, clap::Subcommand)]
 pub enum Command {
-    Generate(self::generate::Generate),
+    Generate(self::gen::Gen),
+    Migrate(self::migrate::Migrate),
 }
 
 fn main() -> anyhow::Result<()> {
     let args = Args::parse();
 
+    tracing_subscriber::registry()
+        .with(tracing_subscriber::EnvFilter::from_default_env())
+        .with(
+            tracing_subscriber::fmt::layer()
+                .without_time()
+                .with_writer(std::io::stdout),
+        )
+        .init();
+
     match args.command {
         Command::Generate(cmd) => cmd.run(),
+        Command::Migrate(cmd) => cmd.run(),
     }
 }
 

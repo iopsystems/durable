@@ -2,7 +2,11 @@
 members = ["crates/*"]
 resolver = "2"
 
+[profile.release]
+debug = true
+
 [profile.wasm]
 inherits = "release"
 opt-level = "z"
 lto = true
+debug = "line-tables-only"

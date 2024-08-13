@@ -164,6 +164,7 @@ macro_rules! used_in_docs {
     };
 }
 
+#[cfg(feature = "migrate")]
 mod apply;
 mod error;
 
@@ -227,6 +228,7 @@ impl Table {
         }
     }
 
+    #[cfg_attr(not(feature = "migrate"), allow(dead_code))]
     fn as_sql(&self) -> String {
         match self.schema.as_deref() {
             Some(schema) => format!("{schema:?}.{:?}", self.name),
@@ -396,9 +398,9 @@ impl Migrator {
             };
 
             let is_up = match ext {
-                ".up.sql" => true,
-                ".down.sql" => false,
-                _ if ext.ends_with(".sql") => {
+                "up.sql" => true,
+                "down.sql" => false,
+                _ if ext == "sql" || ext.ends_with(".sql") => {
                     return Err(Error::InvalidMigrationExt(file_name.into()).into())
                 }
                 _ => continue,
@@ -502,6 +504,11 @@ impl Migrator {
     pub fn latest(&self) -> Option<u64> {
         self.migrations.last().map(|migration| migration.version)
     }
+
+    /// Get all the migrations contained within this migrator.
+    pub fn migrations(&self) -> &[Migration] {
+        &self.migrations
+    }
 }
 
 /// Options controlling the output of [`Migrator::embed`].
@@ -554,8 +561,16 @@ impl Migrator {
     pub fn embed(&self, options: &EmbedOptions) -> String {
         use std::fmt::Write;
 
+        let cow = "::std::borrow::Cow";
         let mut content = String::new();
         let sources = self.sources.as_deref();
+
+        let include_path = |path: &Path| {
+            format!(
+                r#"include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/", {:?}))"#,
+                path.display().to_string()
+            )
+        };
 
         writeln!(
             content,
@@ -570,17 +585,19 @@ impl Migrator {
 
             let up = source
                 .filter(|_| options.use_includes)
-                .map(|source| format!("include_str!(\"{}\")", source.up.display()))
+                .map(|source| include_path(&source.up))
                 .unwrap_or_else(|| format!("{:?}", migration.sql));
             let down = match migration.revert.as_deref() {
-                Some(revert) => Some(
-                    source
+                Some(revert) => {
+                    let down = source
                         .filter(|_| options.use_includes)
                         .and_then(|source| source.down.as_deref())
-                        .map(|source| format!("include_str!(\"{}\")", source.display()))
-                        .unwrap_or_else(|| format!("{:?}", revert)),
-                ),
-                None => None,
+                        .map(|source| include_path(&source))
+                        .unwrap_or_else(|| format!("{:?}", revert));
+
+                    format!("Some({cow}::Borrowed({down}))")
+                }
+                None => "None".into(),
             };
 
             writeln!(
@@ -588,9 +605,9 @@ impl Migrator {
                 "\
     {path}::Migration {{
         version: {version},
-        name: ::std::borrow::Cow::Borrowed({name:?}),
-        sql: ::std::borrow::Cow::Borrowed({up:?}),
-        revert: ::std::borrow::Cow::Borrowed({down:?}),
+        name: {cow}::Borrowed({name:?}),
+        sql: {cow}::Borrowed({up}),
+        revert: {down},
     }},
 ",
                 path = options.crate_path,

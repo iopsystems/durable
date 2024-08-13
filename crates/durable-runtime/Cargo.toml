@@ -21,6 +21,8 @@ path = "src/main.rs"
 required-features = ["cli"]
 
 [dependencies]
+durable-migrate = { path = "../durable-migrate" }
+
 ahash = "0.8.11"
 anyhow = "1.0.86"
 anymap3 = "1.0.0"
@@ -62,8 +64,8 @@ features = ["fmt", "env-filter"]
 backtrace-on-stack-overflow = { version = "0.3", optional = true }
 
 [build-dependencies]
+durable-migrate = { path = "../durable-migrate", default-features = false }
+
 anyhow = "1.0.86"
-prettyplease = "0.2.20"
-syn = { version = "2.0.72", features = ["full"] }
 wasmtime-wit-bindgen = "23.0.1"
 wit-parser = "0.212.0"
