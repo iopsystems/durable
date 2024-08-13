@@ -6,7 +6,7 @@ fn main() {
     println!("message 2");
     println!("message 3");
 
-    let task_id = durable::task_id();
+    let task_id = durable::task().id();
     let count = durable::sqlx::transaction("reading the event log", |mut conn| {
         let row = sqlx::query("SELECT COUNT(*) FROM durable.event WHERE task_id = $1")
             .bind(task_id)

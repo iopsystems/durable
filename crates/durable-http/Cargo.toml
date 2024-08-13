@@ -22,4 +22,4 @@ wit-bindgen-rt = "0.28.0"
 durable-bindgen = { path = "../durable-bindgen", optional = true }
 
 [dev-dependencies]
-durable = { path = "../durable", features = ["sqlx"] }
+durable = { path = "../durable", features = ["http"] }

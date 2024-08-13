@@ -2,7 +2,8 @@ use std::time::{Duration, Instant};
 
 fn main() {
     let now = Instant::now();
-    let name = durable::task_name();
+    let task = durable::task();
+    let name = task.name();
 
     println!("task {name} started!");
 

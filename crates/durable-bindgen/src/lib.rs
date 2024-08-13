@@ -24,6 +24,12 @@ impl Options {
     }
 }
 
+impl Default for Options {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 pub fn generate(
     source: impl AsRef<Path>,
     out: impl AsRef<Path>,

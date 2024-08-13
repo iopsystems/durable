@@ -1,10 +1,10 @@
-use durable::Notification;
+use durable::notify::Notification;
 
 fn main() {
     println!("Waiting for a `task-exit` notification...");
 
     loop {
-        let notif: Notification = durable::notification();
+        let notif: Notification = durable::notify::wait();
 
         println!(
             "Got `{}` notification with data: {}",

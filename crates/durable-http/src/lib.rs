@@ -3,12 +3,12 @@
 //! The easiest way to get started is to use the module-level methods to create
 //! a [`RequestBuilder`].
 //!
-//! ```
+//! ```no_run
 //! let response = durable::http::get("http://httpbin.org/ip")
 //!     .send()
 //!     .expect("failed to make an HTTP request");
 //!
-//! durable::print(response.text().unwrap());
+//! println!("{}", response.text().unwrap());
 //! ```
 
 use core::fmt;

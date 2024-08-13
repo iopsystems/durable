@@ -26,6 +26,7 @@ mod bindings {
 pub use crate::bindings::durable::core::core::{task_id, task_name};
 pub use crate::transaction::transaction;
 
+/// Read the JSON data that this task was created with.
 pub fn task_data() -> Box<RawValue> {
     let data = crate::bindings::task_data();
     let data = data.into_boxed_str();

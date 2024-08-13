@@ -19,6 +19,7 @@ fn generate_bindings() {
         "wit",
         out_dir.join("bindings.rs"),
         "durable:core/import-core",
+        durable_bindgen::Options::new().with("wasi:clocks/wall-clock@0.2.0"),
     )
     .expect("failed to compile the bindings");
 }

@@ -1,5 +1,5 @@
 fn main() {
-    let task_name = durable::task_name();
+    let task = durable::task();
 
-    println!("Hello, {task_name}!");
+    println!("Hello, {}!", task.name());
 }

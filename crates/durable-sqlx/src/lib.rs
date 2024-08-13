@@ -1,4 +1,28 @@
-//! Interact with the runtime's database from within a workflow.
+//! Make SQL queries as part of your workflow.
+//!
+//! This module provides a [SQLx](sqlx) driver and wrappers that allow you to
+//! interact with the database that the durable runtime is running on. As
+//! durable is designed to share a database with your application, this allows
+//! you to make all SQL transactions you wish to perform.
+//! 
+//! # Quickstart
+//! In order to get a database connection you need to enter a database transaction.
+//! You do this by calling the [`transaction`] function:
+//! 
+//! ```
+//! use durable::sqlx::transaction;
+//! 
+//! transaction(
+//!     "do the thing with the database",
+//!     |conn| -> durable::Result<()> {
+//!         sqlx::query("INSERT INTO foo(id) VALUES ($1)")
+//!             .bind(7)
+//!             .execute(&mut *conn)?;
+//! 
+//!         Ok(())
+//!     }
+//! );
+//! ```
 
 use driver::{Durable, QueryResult, Row};
 use serde::de::DeserializeOwned;
@@ -128,7 +152,7 @@ where
 /// representing the bound value:
 ///
 /// ```rust,no_run
-/// # async fn example2() -> sqlx::Result<()> {
+/// # fn example2() -> sqlx::Result<()> {
 /// # let mut conn: durable::sqlx::Connection = unimplemented!();
 /// let user_input = "Alice's Apples";
 ///
@@ -139,8 +163,7 @@ where
 ///      OR content LIKE '%' || $1 || '%'",
 /// )
 /// .bind(user_input)
-/// .fetch_all(&mut conn)
-/// .await?;
+/// .fetch_all(&mut conn)?;
 /// # Ok(())
 /// # }
 /// ```

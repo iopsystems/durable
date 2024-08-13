@@ -14,6 +14,7 @@ fn generate() {
         "wit",
         out_dir.join("bindings.rs"),
         "durable:core/import-http",
+        durable_bindgen::Options::new(),
     )
     .expect("failed to generate wit bindings");
 }

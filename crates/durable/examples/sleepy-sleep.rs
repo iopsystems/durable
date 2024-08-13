@@ -1,7 +1,8 @@
 use std::time::{Duration, Instant};
 
 fn main() {
-    let task = durable::task_name();
+    let task = durable::task();
+    let task = task.name();
 
     println!("{task}: sleeping for 600s!");
 
