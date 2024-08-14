@@ -849,6 +849,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "durable-examples"
+version = "0.0.0"
+dependencies = [
+ "durable",
+ "serde",
+]
+
+[[package]]
 name = "durable-http"
 version = "0.1.0"
 dependencies = [

@@ -1,0 +1,11 @@
+[package]
+name = "durable-examples"
+version = "0.0.0"
+edition = "2021"
+publish = false
+
+[dependencies]
+durable = { workspace = true, features = ["http", "sqlx"] }
+
+[dev-dependencies]
+serde = { version = "1.0", features = ["derive"] }

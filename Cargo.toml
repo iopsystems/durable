@@ -1,6 +1,15 @@
 [workspace]
-members = ["crates/*"]
+members = ["crates/*", "examples"]
 resolver = "2"
+
+[workspace.dependencies]
+durable         = { path = "crates/durable" }
+durable-http    = { path = "crates/durable-http" }
+durable-sqlx    = { path = "crates/durable-sqlx" }
+durable-core    = { path = "crates/durable-core" }
+durable-client  = { path = "crates/durable-client" }
+durable-migrate = { path = "crates/durable-migrate" }
+durable-runtime = { path = "crates/durable-runtime" }
 
 [profile.release]
 debug = true
