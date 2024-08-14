@@ -503,7 +503,6 @@ impl TaskState {
             None
         } else {
             logs = std::mem::take(&mut txn.logs);
-            let logs = logs.trim_end();
 
             tracing::debug!(
                 target: "durable_runtime::task_log",
