@@ -7,8 +7,6 @@
 mod arguments;
 mod connection;
 mod database;
-mod decode;
-mod encode;
 mod error;
 mod row;
 mod statement;

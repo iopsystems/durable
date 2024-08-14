@@ -4,23 +4,23 @@
 //! interact with the database that the durable runtime is running on. As
 //! durable is designed to share a database with your application, this allows
 //! you to make all SQL transactions you wish to perform.
-//! 
+//!
 //! # Quickstart
-//! In order to get a database connection you need to enter a database transaction.
-//! You do this by calling the [`transaction`] function:
-//! 
+//! In order to get a database connection you need to enter a database
+//! transaction. You do this by calling the [`transaction`] function:
+//!
 //! ```
 //! use durable::sqlx::transaction;
-//! 
+//!
 //! transaction(
 //!     "do the thing with the database",
 //!     |conn| -> durable::Result<()> {
 //!         sqlx::query("INSERT INTO foo(id) VALUES ($1)")
 //!             .bind(7)
 //!             .execute(&mut *conn)?;
-//! 
+//!
 //!         Ok(())
-//!     }
+//!     },
 //! );
 //! ```
 

@@ -56,15 +56,6 @@ fn decode_int(value: &Value) -> Result<i64, BoxDynError> {
     }
 }
 
-impl Decode<'_, Durable> for bool {
-    fn decode(value: <Durable as sqlx::Database>::ValueRef<'_>) -> Result<Self, BoxDynError> {
-        match &value.0 {
-            &sql::Value::Boolean(v) => Ok(v),
-            _ => Err(unexpected_nonnull_type("bool", value)),
-        }
-    }
-}
-
 impl Decode<'_, Durable> for i8 {
     fn decode(value: <Durable as sqlx::Database>::ValueRef<'_>) -> Result<Self, BoxDynError> {
         decode_int(value)?

@@ -632,8 +632,7 @@ pub const {name}: {path}::Migrator = {path}::Migrator::from_static({{
 
         write!(
             content,
-            "    \
-    ]
+            "    ]
 }});
 "
         )

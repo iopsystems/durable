@@ -3,7 +3,11 @@ use sqlx::error::BoxDynError;
 use crate::bindings as sql;
 use crate::driver::Value;
 
+mod boolean;
+mod bytea;
+mod float;
 mod int;
+mod text;
 
 fn unexpected_nullable_type(expected: &str, value: &Value) -> BoxDynError {
     format!("expected {expected}, got {} instead", value.type_info()).into()
