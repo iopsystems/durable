@@ -2,6 +2,7 @@
 name = "durable-http"
 version = "0.1.0"
 edition = "2021"
+license = { workspace = true }
 
 [features]
 bindgen = ["dep:durable-bindgen", "durable-core/bindgen"]

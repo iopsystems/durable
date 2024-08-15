@@ -3,6 +3,7 @@
 name = "durable-runtime"
 version = "0.1.0"
 edition = "2021"
+license = { workspace = true }
 
 [features]
 # Enable the use of tokio-console with the runtime CLI.
