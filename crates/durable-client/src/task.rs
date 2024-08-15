@@ -293,6 +293,21 @@ impl Task {
             if matches!(state, TaskState::Complete | TaskState::Failed) {
                 return Ok(ExitStatus { state });
             }
+
+            loop {
+                let event = match listener.try_recv().await? {
+                    Some(event) => event,
+                    None => break,
+                };
+
+                let Ok(event) = serde_json::from_str::<TaskComplete>(event.payload()) else {
+                    break;
+                };
+
+                if event.id == self.id {
+                    break;
+                }
+            }
         }
     }
 }
