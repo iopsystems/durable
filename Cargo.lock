@@ -946,6 +946,22 @@ name = "durable-test"
 version = "0.1.0"
 
 [[package]]
+name = "durable-worker"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "backtrace-on-stack-overflow",
+ "clap",
+ "console-subscriber",
+ "durable-runtime",
+ "sqlx",
+ "tokio",
+ "tracing",
+ "tracing-subscriber",
+ "wasmtime",
+]
+
+[[package]]
 name = "either"
 version = "1.13.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"

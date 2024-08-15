@@ -20,7 +20,7 @@ To try it out locally, run
 # Note that the setup provided here is insecure.
 docker run -p 5432:5432 -e POSTGRES_HOST_AUTH_METHOD=trust -d --rm postgres:15
 
-cargo run --bin durable-server --features cli -- \
+cargo run --bin durable-worker --features cli -- \
     --database-url postgres://postgres@localhost:5432/postgres \
     --migrate
 ```

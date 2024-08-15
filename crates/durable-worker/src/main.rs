@@ -2,7 +2,6 @@ use std::str::FromStr;
 use std::time::Duration;
 
 use anyhow::Context;
-use cfg_if::cfg_if;
 use clap::Parser;
 use durable_runtime::{WorkerBuilder, WorkerHandle};
 use tracing_subscriber::layer::SubscriberExt;
@@ -33,11 +32,8 @@ async fn main() -> anyhow::Result<()> {
             .with_filter(tracing_subscriber::EnvFilter::from_default_env()),
     );
 
-    cfg_if! {
-        if #[cfg(feature = "tokio-console")] {
-            let registry = registry.with(console_subscriber::spawn());
-        }
-    }
+    #[cfg(feature = "tokio-console")]
+    let registry = registry.with(console_subscriber::spawn());
 
     registry.init();
 

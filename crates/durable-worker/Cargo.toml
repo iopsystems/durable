@@ -1,0 +1,22 @@
+[package]
+name = "durable-worker"
+version = "0.1.0"
+edition = "2021"
+
+[features]
+tokio-console = ["durable-runtime/tokio-console"]
+
+[dependencies]
+durable-runtime = { workspace = true }
+
+anyhow = "1.0"
+clap = { version = "4.0", features = ["derive", "env"] }
+console-subscriber = { version = "0.4.0", optional = true }
+sqlx = { version = "0.8.0", features = ["postgres"] }
+tokio = { version = "1.0", features = ["full"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["fmt", "env-filter"] }
+wasmtime = "23.0"
+
+[target.'cfg(unix)'.dependencies]
+backtrace-on-stack-overflow = "0.3"

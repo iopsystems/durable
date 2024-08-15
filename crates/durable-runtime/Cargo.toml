@@ -5,15 +5,6 @@ version = "0.1.0"
 edition = "2021"
 
 [features]
-default = []
-
-# Dependencies and features needed for the CLI.
-cli = [
-    "dep:clap",
-    "dep:tracing-subscriber",
-    "dep:backtrace-on-stack-overflow",
-]
-
 # Enable the use of tokio-console with the runtime CLI.
 #
 # This doesn't do much unless --cfg tokio_unstable is included in rustflags.
@@ -21,11 +12,6 @@ tokio-console = [
     "dep:console-subscriber",
     "tokio/tracing"
 ]
-
-[[bin]]
-name = "durable-server"
-path = "src/main.rs"
-required-features = ["cli"]
 
 [dependencies]
 durable-migrate = { path = "../durable-migrate" }
