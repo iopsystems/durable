@@ -1,0 +1,8 @@
+experimental = ["setup-scripts"]
+
+[script.build-test-bins]
+command = "bash crates/durable-test/setup.sh"
+
+[[profile.default.scripts]]
+filter = 'rdeps(durable-test)'
+setup = "build-test-bins"

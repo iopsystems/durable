@@ -17,6 +17,44 @@ pub struct Event {
     pub value: Value,
 }
 
+#[derive(Clone, Debug, Eq, PartialEq, Hash)]
+pub struct ExitStatus {
+    state: TaskState,
+}
+
+impl ExitStatus {
+    pub fn success(&self) -> bool {
+        matches!(self.state, TaskState::Complete)
+    }
+}
+
+/// The current state of a task.
+#[non_exhaustive]
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]
+pub enum TaskState {
+    Ready,
+    Active,
+    Suspended,
+    Complete,
+    Failed,
+
+    #[doc(hidden)]
+    Unknown,
+}
+
+impl TaskState {
+    fn from_str(state: &str) -> Self {
+        match state {
+            "ready" => Self::Ready,
+            "active" => Self::Active,
+            "suspended" => Self::Suspended,
+            "complete" => Self::Complete,
+            "failed" => Self::Failed,
+            _ => Self::Unknown,
+        }
+    }
+}
+
 /// A handle for a workflow task.
 ///
 /// Generally, you should get this by calling [`DurableClient::launch`] but you
@@ -41,6 +79,7 @@ impl Task {
         self.id
     }
 
+    /// Get a real-time stream of task events as they occur.
     pub fn events<'a>(
         &'a self,
         client: &DurableClient,
@@ -90,6 +129,7 @@ impl Task {
         }
     }
 
+    /// Send a notification to the task.
     pub async fn notify<T>(
         &self,
         event: &str,
@@ -118,6 +158,7 @@ impl Task {
         Ok(())
     }
 
+    /// Read the task logs that have occurred up to this point.
     pub fn read_logs<'a>(
         &'a self,
         client: &DurableClient,
@@ -160,6 +201,10 @@ impl Task {
         }
     }
 
+    /// Read the task logs as they occur.
+    ///
+    /// Note that this holds on to a database connection for the whole time it
+    /// is running (for the listener).
     pub fn follow_logs<'a>(
         &'a self,
         client: &DurableClient,
@@ -218,5 +263,36 @@ impl Task {
                 }
             }
         })
+    }
+
+    /// Wait for the task to complete.
+    ///
+    /// Note that depending on the task this could take a long time.
+    pub async fn wait(&self, client: &DurableClient) -> Result<ExitStatus, DurableError> {
+        let mut listener = PgListener::connect_with(&client.pool).await?;
+        listener.listen("durable:task-complete").await?;
+
+        loop {
+            let record = sqlx::query!(
+                r#"
+                SELECT state::text as "state!"
+                FROM durable.task
+                WHERE id = $1
+                "#,
+                self.id
+            )
+            .fetch_optional(&mut listener)
+            .await?;
+
+            let state = match record {
+                Some(record) => record.state,
+                None => return Err(ErrorImpl::NonexistantWorkflowId(self.id).into()),
+            };
+            let state = TaskState::from_str(&state);
+
+            if matches!(state, TaskState::Complete | TaskState::Failed) {
+                return Ok(ExitStatus { state });
+            }
+        }
     }
 }

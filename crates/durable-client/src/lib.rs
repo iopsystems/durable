@@ -19,7 +19,7 @@ mod util;
 
 pub use self::error::{DurableError, DurableErrorKind};
 pub use self::program::{Program, ProgramOptions};
-pub use self::task::Task;
+pub use self::task::{ExitStatus, Task, TaskState};
 
 #[derive(Clone)]
 pub struct DurableClient {

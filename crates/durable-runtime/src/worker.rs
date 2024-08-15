@@ -64,6 +64,7 @@ pub struct WorkerBuilder {
     wasmtime_config: Option<wasmtime::Config>,
     plugins: Vec<Box<dyn Plugin>>,
     migrate: bool,
+    validate: bool,
 }
 
 impl WorkerBuilder {
@@ -76,6 +77,7 @@ impl WorkerBuilder {
             wasmtime_config: None,
             plugins: vec![Box::new(DurablePlugin)],
             migrate: false,
+            validate: true,
         }
     }
 
@@ -115,6 +117,12 @@ impl WorkerBuilder {
         self
     }
 
+    /// Validate that the database matches what this worker needs.
+    pub fn validate_database(mut self, validate: bool) -> Self {
+        self.validate = validate;
+        self
+    }
+
     pub async fn build(self) -> anyhow::Result<Worker> {
         let migrator = crate::migrate::Migrator::new();
         let mut conn = self.pool.acquire().await?;
@@ -129,7 +137,7 @@ impl WorkerBuilder {
                 .migrate(&mut conn, &options)
                 .await
                 .context("failed to migrate the database")?;
-        } else {
+        } else if self.validate {
             let version = migrator
                 .read_database_version(&mut conn)
                 .await?

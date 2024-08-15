@@ -1,0 +1,7 @@
+[package]
+name = "durable-test-workflows"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+durable = { workspace = true, features = ["http", "sqlx"] }
