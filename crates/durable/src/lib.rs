@@ -19,9 +19,6 @@
 //! # Features
 //! - `http` - enables the [`http`] module and everything within.
 //! - `sqlx` - enables the [`sqlx`] module and everything within.
-//! - `bindgen` - regenerates the component bindings as part of the `build.rs`
-//!   scripts. Generally you shouldn't need this, as the crates ship up-to-date
-//!   bindings already.
 
 #![cfg_attr(docsrs, feature(doc_cfg))]
 
