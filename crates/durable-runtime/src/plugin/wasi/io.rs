@@ -240,6 +240,7 @@ impl wasi::io::poll::HostPollable for Task {
         let resources = self.plugins.expect::<WasiResources>();
         let pollable = resources.pollables[pollable.rep() as usize];
         let suspend_timeout = self.state.config().suspend_timeout;
+        let suspend_margin = self.state.config().suspend_margin;
 
         let entered = match self.state.transaction() {
             Some(_) => false,
@@ -269,7 +270,7 @@ impl wasi::io::poll::HostPollable for Task {
             .to_std()
             .unwrap_or(Duration::ZERO);
 
-        if is_external && delta > suspend_timeout + SUSPEND_PREWAKE {
+        if is_external && delta > suspend_timeout + suspend_margin {
             // Avoid holding on to a db connection if we are suspending this task anyway
             txn.take_conn();
 

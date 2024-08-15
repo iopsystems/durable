@@ -50,17 +50,12 @@ async fn main() -> anyhow::Result<()> {
 
     let mut config = wasmtime::Config::new();
     config.cache_config_load_default()?;
-    config.async_support(true);
     config.cranelift_opt_level(wasmtime::OptLevel::Speed);
-    config.wasm_threads(false);
     config.profiler(wasmtime::ProfilingStrategy::PerfMap);
-    config.wasm_backtrace_details(wasmtime::WasmBacktraceDetails::Enable);
     config.debug_info(true);
 
-    let engine = wasmtime::Engine::new(&config)?;
-
     let mut worker = WorkerBuilder::new(pool)
-        .engine(engine)
+        .wasmtime_config(config)
         .migrate(args.migrate)
         .build()
         .await?;

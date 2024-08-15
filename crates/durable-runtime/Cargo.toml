@@ -44,6 +44,7 @@ tracing = "0.1.40"
 uluru = "3.1.0"
 wasmtime = "23.0.1"
 cfg-if = "1.0.0"
+derive_setters = "0.1.6"
 
 [dependencies.sqlx]
 version = "0.8.0"

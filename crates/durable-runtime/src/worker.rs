@@ -61,7 +61,7 @@ pub struct WorkerBuilder {
     pool: sqlx::PgPool,
     event_source: Option<Box<dyn EventSource>>,
     client: Option<reqwest::Client>,
-    engine: Option<wasmtime::Engine>,
+    wasmtime_config: Option<wasmtime::Config>,
     plugins: Vec<Box<dyn Plugin>>,
     migrate: bool,
 }
@@ -73,7 +73,7 @@ impl WorkerBuilder {
             pool,
             event_source: None,
             client: None,
-            engine: None,
+            wasmtime_config: None,
             plugins: vec![Box::new(DurablePlugin)],
             migrate: false,
         }
@@ -89,8 +89,8 @@ impl WorkerBuilder {
         self
     }
 
-    pub fn engine(mut self, engine: wasmtime::Engine) -> Self {
-        self.engine = Some(engine);
+    pub fn wasmtime_config(mut self, config: wasmtime::Config) -> Self {
+        self.wasmtime_config = Some(config);
         self
     }
 
@@ -158,7 +158,17 @@ impl WorkerBuilder {
             compile_sema: Semaphore::new(4),
         });
 
-        let engine = self.engine.unwrap_or_default();
+        let mut config = self.wasmtime_config.unwrap_or_else(|| {
+            let mut config = wasmtime::Config::new();
+            config.wasm_backtrace_details(wasmtime::WasmBacktraceDetails::Enable);
+            config.cranelift_opt_level(wasmtime::OptLevel::Speed);
+            config.debug_info(true);
+            config
+        });
+
+        config.async_support(true);
+
+        let engine = wasmtime::Engine::new(&config)?;
         let event_source = match self.event_source {
             Some(source) => source,
             None => Box::new(PgEventSource::new(&shared.pool).await?),
@@ -420,8 +430,9 @@ impl Worker {
                         LIMIT 1
                       )
                 WHERE state = 'suspended'
-                  AND wakeup_at <= NOW()
-                "
+                  AND wakeup_at <= (NOW() - $1::interval)
+                ",
+                shared.config.suspend_margin.into_pg_interval()
             )
             .execute(&mut *conn)
             .await?;

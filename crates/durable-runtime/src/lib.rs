@@ -13,11 +13,7 @@ pub mod task;
 pub mod util;
 mod worker;
 
-#[allow(
-    rustdoc::invalid_html_tags,
-    unused_mut,
-    unused_doc_comments
-)]
+#[allow(rustdoc::invalid_html_tags, unused_mut, unused_doc_comments)]
 pub mod bindings {
     include!(concat!(env!("OUT_DIR"), "/bindings.rs"));
 }
