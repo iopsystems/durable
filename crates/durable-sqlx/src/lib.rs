@@ -179,10 +179,10 @@ where
 /// the database server itself.
 ///
 /// ##### SQLx supports many different types for parameter binding, not just strings.
-/// Any type that implements [`Encode<DB>`][Encode] and [`Type<DB>`] can be
-/// bound as a parameter.
+/// Any type that implements [`Encode<DB>`][sqlx::Encode] and
+/// [`Type<DB>`][sqlx::Type] can be bound as a parameter.
 ///
-/// See [the `types` module][crate::types] (links to `sqlx_core::types` but you
+/// See [the `types` module][sqlx::types] (links to `sqlx_core::types` but you
 /// should use `sqlx::types`) for details.
 ///
 /// As an additional benefit, query parameters are usually sent in a compact
