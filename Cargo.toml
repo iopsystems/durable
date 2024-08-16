@@ -3,6 +3,7 @@ members = ["crates/*", "examples"]
 resolver = "2"
 
 [workspace.package]
+version = "0.1.1"
 license = "Apache-2.0 OR MIT"
 publish = ["iop-systems"]
 repository = "https://github.com/iopsystems/durable"
@@ -10,10 +11,11 @@ homepage = "https://github.com/iopsystems/durable"
 
 
 [workspace.dependencies]
-durable         = { version = "0.1.0", registry = "iop-systems", path = "crates/durable" }
-durable-http    = { version = "0.1.0", registry = "iop-systems", path = "crates/durable-http" }
-durable-sqlx    = { version = "0.1.0", registry = "iop-systems", path = "crates/durable-sqlx" }
-durable-core    = { version = "0.1.0", registry = "iop-systems", path = "crates/durable-core" }
+durable         = { version = "0.1.1", registry = "iop-systems", path = "crates/durable" }
+durable-http    = { version = "0.1.1", registry = "iop-systems", path = "crates/durable-http" }
+durable-sqlx    = { version = "0.1.1", registry = "iop-systems", path = "crates/durable-sqlx" }
+durable-core    = { version = "0.1.1", registry = "iop-systems", path = "crates/durable-core" }
+
 durable-client  = { version = "0.1.0", registry = "iop-systems", path = "crates/durable-client" }
 durable-migrate = { version = "0.1.0", registry = "iop-systems", path = "crates/durable-migrate" }
 durable-runtime = { version = "0.1.0", registry = "iop-systems", path = "crates/durable-runtime" }
