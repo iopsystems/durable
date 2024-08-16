@@ -3,6 +3,9 @@ name = "durable-worker"
 version = "0.0.0"
 edition = "2021"
 license = { workspace = true }
+publish = { workspace = true }
+homepage = { workspace = true }
+repository = { workspace = true }
 
 [features]
 tokio-console = ["durable-runtime/tokio-console"]

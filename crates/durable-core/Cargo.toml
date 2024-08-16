@@ -3,6 +3,9 @@ name = "durable-core"
 version = "0.1.0"
 edition = "2021"
 license = { workspace = true }
+publish = { workspace = true }
+homepage = { workspace = true }
+repository = { workspace = true }
 
 [features]
 bindgen = ["dep:durable-bindgen"]
@@ -13,7 +16,7 @@ serde_json = { version = "1.0", features = ["raw_value"] }
 wit-bindgen-rt = "0.28.0"
 
 [build-dependencies]
-durable-bindgen = { path = "../durable-bindgen", optional = true }
+durable-bindgen = { workspace = true, optional = true }
 
 cc = "1.0"
 

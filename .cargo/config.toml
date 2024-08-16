@@ -2,3 +2,6 @@
 [alias]
 xtask = "run -p xtask --"
 durable = "run -p durable-cli --bin durable --"
+
+[registries]
+iop-systems = { index = "sparse+http://systemslab-cargo.storage.googleapis.com/" }

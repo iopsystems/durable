@@ -3,12 +3,14 @@ name = "xtask"
 version = "0.0.0"
 edition = "2021"
 license = { workspace = true }
+publish = false
 
 [dependencies]
-durable-bindgen = { path = "../durable-bindgen" }
-durable-migrate = { path = "../durable-migrate" }
+durable-bindgen = { workspace = true }
+durable-migrate = { workspace = true }
 
 anyhow = "1.0.86"
+cargo_metadata = "0.18.1"
 clap = { version = "4.5.11", features = ["derive"] }
 dotenvy = "0.15.7"
 serde = { version = "1.0.204", features = ["derive"] }

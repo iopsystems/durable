@@ -3,6 +3,9 @@ name = "durable"
 version = "0.1.0"
 edition = "2021"
 license = { workspace = true }
+publish = { workspace = true }
+homepage = { workspace = true }
+repository = { workspace = true }
 
 [features]
 default = []
@@ -13,9 +16,9 @@ sqlx = ["dep:durable-sqlx"]
 bindgen = ["durable-core/bindgen", "durable-http?/bindgen", "durable-sqlx?/bindgen"]
 
 [dependencies]
-durable-core = { path = "../durable-core" }
-durable-http = { path = "../durable-http", optional = true }
-durable-sqlx = { path = "../durable-sqlx", optional = true }
+durable-core = { workspace = true }
+durable-http = { workspace = true, optional = true }
+durable-sqlx = { workspace = true, optional = true }
 
 serde = { version = "1.0", features = ["derive"] }
 serde_json = { version = "1.0", features = ["raw_value"] }

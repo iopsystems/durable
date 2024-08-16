@@ -3,12 +3,15 @@ name = "durable-http"
 version = "0.1.0"
 edition = "2021"
 license = { workspace = true }
+publish = { workspace = true }
+homepage = { workspace = true }
+repository = { workspace = true }
 
 [features]
 bindgen = ["dep:durable-bindgen", "durable-core/bindgen"]
 
 [dependencies]
-durable-core = { path = "../durable-core" }
+durable-core = { workspace = true }
 
 chrono = "0.4"
 http = "1.0"
@@ -20,7 +23,7 @@ url = { version = "2.5.2", features = ["serde"] }
 wit-bindgen-rt = "0.28.0"
 
 [build-dependencies]
-durable-bindgen = { path = "../durable-bindgen", optional = true }
+durable-bindgen = { workspace = true, optional = true }
 
 [dev-dependencies]
-durable = { path = "../durable", features = ["http"] }
+durable = { workspace = true, features = ["http"] }

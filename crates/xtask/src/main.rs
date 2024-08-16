@@ -7,6 +7,7 @@ use tracing_subscriber::prelude::*;
 mod dev;
 mod gen;
 mod migrate;
+mod package;
 
 #[derive(Debug, clap::Parser)]
 pub struct Args {
@@ -19,6 +20,7 @@ pub enum Command {
     Generate(self::gen::Gen),
     Migrate(self::migrate::Migrate),
     Dev(self::dev::Dev),
+    Package(self::package::Package),
 }
 
 fn main() -> anyhow::Result<()> {
@@ -37,24 +39,15 @@ fn main() -> anyhow::Result<()> {
         Command::Generate(cmd) => cmd.run(),
         Command::Migrate(cmd) => cmd.run(),
         Command::Dev(cmd) => cmd.run(),
+        Command::Package(cmd) => cmd.run(),
     }
 }
 
 fn workspace_root() -> anyhow::Result<PathBuf> {
-    use serde::Deserialize;
+    let metadata = cargo_metadata::MetadataCommand::new()
+        .no_deps()
+        .exec()
+        .context("failed to run `cargo metadata`")?;
 
-    #[derive(Deserialize)]
-    struct Metadata {
-        workspace_root: PathBuf,
-    }
-
-    let sh = xshell::Shell::new()?;
-    let metadata = xshell::cmd!(sh, "cargo metadata --format-version 1")
-        .quiet()
-        .read()?;
-
-    let metadata: Metadata = serde_json::from_str(&metadata)
-        .context("failed to deserialize the output of cargo metadata")?;
-
-    Ok(metadata.workspace_root)
+    Ok(metadata.workspace_root.into_std_path_buf())
 }
