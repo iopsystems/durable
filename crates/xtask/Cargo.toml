@@ -7,7 +7,7 @@ publish = false
 
 [dependencies]
 durable-bindgen = { workspace = true }
-durable-migrate = { workspace = true }
+durable-migrate = { workspace = true, features = ["migrate"] }
 
 anyhow = "1.0.86"
 cargo_metadata = "0.18.1"
