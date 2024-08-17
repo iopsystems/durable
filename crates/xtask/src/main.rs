@@ -8,6 +8,7 @@ mod dev;
 mod gen;
 mod migrate;
 mod package;
+mod publish;
 
 #[derive(Debug, clap::Parser)]
 pub struct Args {
@@ -21,6 +22,7 @@ pub enum Command {
     Migrate(self::migrate::Migrate),
     Dev(self::dev::Dev),
     Package(self::package::Package),
+    Publish(self::publish::Publish),
 }
 
 fn main() -> anyhow::Result<()> {
@@ -40,6 +42,7 @@ fn main() -> anyhow::Result<()> {
         Command::Migrate(cmd) => cmd.run(),
         Command::Dev(cmd) => cmd.run(),
         Command::Package(cmd) => cmd.run(),
+        Command::Publish(cmd) => cmd.run(),
     }
 }
 
