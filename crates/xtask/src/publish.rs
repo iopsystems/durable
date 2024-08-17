@@ -85,15 +85,15 @@ impl Publish {
             let cd = &name[2..4];
 
             let index = format!("crates/{ab}/{cd}/{name}/{version}.crate");
-            let path = repository.join(&index);
+            let index = repository.join(&index);
 
-            if path.exists() {
+            if index.exists() {
                 println!("Skipping {name} {version}");
                 continue;
             }
 
             println!("Publishing {name} {version}");
-            // xshell::cmd!(sh, "margo add {path} --registry {repository}").run()?;
+            xshell::cmd!(sh, "margo add {path} --registry {repository}").run()?;
         }
 
         Ok(())
