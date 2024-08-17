@@ -16,7 +16,7 @@ durable-http    = { version = "0.1.1", registry = "iop-systems", path = "crates/
 durable-sqlx    = { version = "0.1.1", registry = "iop-systems", path = "crates/durable-sqlx" }
 durable-core    = { version = "0.1.1", registry = "iop-systems", path = "crates/durable-core" }
 
-durable-client  = { version = "0.1.0", registry = "iop-systems", path = "crates/durable-client" }
+durable-client  = { version = "0.1.1", registry = "iop-systems", path = "crates/durable-client" }
 durable-migrate = { version = "0.1.0", registry = "iop-systems", path = "crates/durable-migrate" }
 durable-runtime = { version = "0.1.0", registry = "iop-systems", path = "crates/durable-runtime" }
 durable-bindgen = { version = "0.1.0", registry = "iop-systems", path = "crates/durable-bindgen" }
