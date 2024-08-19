@@ -29,7 +29,13 @@ use serde::de::DeserializeOwned;
 use serde::Serialize;
 use sqlx::error::BoxDynError;
 
+use crate::util::BlockingStream;
+
+#[macro_use]
+extern crate serde;
+
 pub mod driver;
+mod error;
 mod util;
 
 mod bindings {
@@ -43,11 +49,11 @@ mod bindings {
     pub use self::durable::core::sql::*;
 }
 
-pub use sqlx::{Error, Result};
-
 #[doc(inline)]
 pub use crate::driver::Connection;
-use crate::util::BlockingStream;
+pub use crate::error::Error;
+
+pub type Result<T, E = Error> = std::result::Result<T, E>;
 
 /// Run a durable transaction with a database transaction.
 ///
@@ -278,23 +284,23 @@ where
     }
 
     /// Execute the query and return the total number of rows affected.
-    pub fn execute<'e, 'c: 'e, E>(self, executor: E) -> Result<QueryResult, sqlx::Error>
+    pub fn execute<'e, 'c: 'e, E>(self, executor: E) -> Result<QueryResult>
     where
         'q: 'e,
         A: 'e,
         E: sqlx::Executor<'c, Database = Durable>,
     {
-        crate::util::block_on(self.0.execute(executor))
+        crate::util::block_on(self.0.execute(executor)).map_err(Into::into)
     }
 
     /// Execute the query and return the generated results as an iterator.
-    pub fn fetch<'e, 'c: 'e, E>(self, executor: E) -> impl Iterator<Item = Result<Row, Error>> + 'e
+    pub fn fetch<'e, 'c: 'e, E>(self, executor: E) -> impl Iterator<Item = Result<Row>> + 'e
     where
         'q: 'e,
         A: 'e,
         E: sqlx::Executor<'c, Database = Durable>,
     {
-        BlockingStream::new(self.0.fetch(executor))
+        BlockingStream::new(self.0.fetch(executor)).map(|e| e.map_err(Into::into))
     }
 
     /// Execute the query and return all the resulting rows collected into a
@@ -306,13 +312,13 @@ where
     ///
     /// To avoid exhausting available memory, ensure the result set has a known
     /// upper bound, e.g. using `LIMIT`.
-    pub fn fetch_all<'e, 'c: 'e, E>(self, executor: E) -> Result<Vec<Row>, sqlx::Error>
+    pub fn fetch_all<'e, 'c: 'e, E>(self, executor: E) -> Result<Vec<Row>>
     where
         'q: 'e,
         A: 'e,
         E: sqlx::Executor<'c, Database = Durable>,
     {
-        crate::util::block_on(self.0.fetch_all(executor))
+        crate::util::block_on(self.0.fetch_all(executor)).map_err(Into::into)
     }
 
     /// Execute the query, returning the first row or [`Error::RowNotFound`]
@@ -331,13 +337,13 @@ where
     /// value, you're good.
     ///
     /// Otherwise, you might want to add `LIMIT 1` to your query.
-    pub fn fetch_one<'e, 'c: 'e, E>(self, executor: E) -> Result<Row, Error>
+    pub fn fetch_one<'e, 'c: 'e, E>(self, executor: E) -> Result<Row>
     where
         'q: 'e,
         A: 'e,
         E: sqlx::Executor<'c, Database = Durable>,
     {
-        crate::util::block_on(self.0.fetch_one(executor))
+        crate::util::block_on(self.0.fetch_one(executor)).map_err(Into::into)
     }
 
     /// Execute the query, returning the first row or `None` otherwise.
@@ -355,13 +361,13 @@ where
     /// value, you're good.
     ///
     /// Otherwise, you might want to add `LIMIT 1` to your query.
-    pub fn fetch_optional<'e, 'c: 'e, E>(self, executor: E) -> Result<Option<Row>, Error>
+    pub fn fetch_optional<'e, 'c: 'e, E>(self, executor: E) -> Result<Option<Row>>
     where
         'q: 'e,
         A: 'e,
         E: sqlx::Executor<'c, Database = Durable>,
     {
-        crate::util::block_on(self.0.fetch_optional(executor))
+        crate::util::block_on(self.0.fetch_optional(executor)).map_err(From::from)
     }
 }
 
@@ -386,14 +392,14 @@ where
     O: for<'r> sqlx::FromRow<'r, Row> + Send + Unpin,
 {
     /// Execute the query and return the generated results as a iterator.
-    pub fn fetch<'e, 'c: 'e, E>(self, executor: E) -> impl Iterator<Item = Result<O, Error>> + 'e
+    pub fn fetch<'e, 'c: 'e, E>(self, executor: E) -> impl Iterator<Item = Result<O>> + 'e
     where
         'q: 'e,
         E: sqlx::Executor<'c, Database = Durable> + 'e,
         O: 'e,
         A: 'e,
     {
-        BlockingStream::new(self.0.fetch(executor))
+        BlockingStream::new(self.0.fetch(executor)).map(|v| v.map_err(From::from))
     }
 
     /// Execute the query and return all the resulting rows collected into a
@@ -405,14 +411,14 @@ where
     ///
     /// To avoid exhausting available memory, ensure the result set has a known
     /// upper bound, e.g. using `LIMIT`.
-    pub fn fetch_all<'e, 'c: 'e, E>(self, executor: E) -> Result<Vec<O>, Error>
+    pub fn fetch_all<'e, 'c: 'e, E>(self, executor: E) -> Result<Vec<O>>
     where
         'q: 'e,
         E: sqlx::Executor<'c, Database = Durable> + 'e,
         O: 'e,
         A: 'e,
     {
-        crate::util::block_on(self.0.fetch_all(executor))
+        crate::util::block_on(self.0.fetch_all(executor)).map_err(From::from)
     }
 
     /// Execute the query, returning the first row or [`Error::RowNotFound`]
@@ -431,14 +437,14 @@ where
     /// value, you're good.
     ///
     /// Otherwise, you might want to add `LIMIT 1` to your query.
-    pub fn fetch_one<'e, 'c: 'e, E>(self, executor: E) -> Result<O, Error>
+    pub fn fetch_one<'e, 'c: 'e, E>(self, executor: E) -> Result<O>
     where
         'q: 'e,
         E: sqlx::Executor<'c, Database = Durable> + 'e,
         O: 'e,
         A: 'e,
     {
-        crate::util::block_on(self.0.fetch_one(executor))
+        crate::util::block_on(self.0.fetch_one(executor)).map_err(From::from)
     }
 
     /// Execute the query, returning the first row or `None` otherwise.
@@ -456,14 +462,14 @@ where
     /// value, you're good.
     ///
     /// Otherwise, you might want to add `LIMIT 1` to your query.
-    pub fn fetch_optional<'e, 'c: 'e, E>(self, executor: E) -> Result<Option<O>, Error>
+    pub fn fetch_optional<'e, 'c: 'e, E>(self, executor: E) -> Result<Option<O>>
     where
         'q: 'e,
         E: sqlx::Executor<'c, Database = Durable> + 'e,
         O: 'e,
         A: 'e,
     {
-        crate::util::block_on(self.0.fetch_optional(executor))
+        crate::util::block_on(self.0.fetch_optional(executor)).map_err(From::from)
     }
 }
 
@@ -475,14 +481,14 @@ pub struct Map<'q, F, A>(sqlx::query::Map<'q, Durable, F, A>);
 
 impl<'q, F, O, A> Map<'q, F, A>
 where
-    F: FnMut(Row) -> Result<O, Error> + Send,
+    F: FnMut(Row) -> sqlx::Result<O> + Send,
     O: Send + Unpin,
     A: sqlx::IntoArguments<'q, Durable> + Send + 'q,
 {
     /// Map each row in the result to another type.
     ///
     /// See [`try_map`](Map::try_map) for a fallible version of this method.
-    pub fn map<G, P>(self, g: G) -> Map<'q, impl FnMut(Row) -> Result<P, Error> + Send, A>
+    pub fn map<G, P>(self, g: G) -> Map<'q, impl FnMut(Row) -> sqlx::Result<P> + Send, A>
     where
         G: FnMut(O) -> P + Send,
         P: Unpin,
@@ -491,23 +497,23 @@ where
     }
 
     /// Map each row in the result to another type.
-    pub fn try_map<G, P>(self, g: G) -> Map<'q, impl FnMut(Row) -> Result<P, Error> + Send, A>
+    pub fn try_map<G, P>(self, g: G) -> Map<'q, impl FnMut(Row) -> sqlx::Result<P> + Send, A>
     where
-        G: FnMut(O) -> Result<P, Error> + Send,
+        G: FnMut(O) -> sqlx::Result<P> + Send,
         P: Unpin,
     {
         Map(self.0.try_map(g))
     }
 
     /// Execute the query and return the generated results as a iterator.
-    pub fn fetch<'e, 'c: 'e, E>(self, executor: E) -> impl Iterator<Item = Result<O, Error>> + 'e
+    pub fn fetch<'e, 'c: 'e, E>(self, executor: E) -> impl Iterator<Item = Result<O>> + 'e
     where
         'q: 'e,
         E: sqlx::Executor<'c, Database = Durable> + 'e,
         F: 'e,
         O: 'e,
     {
-        BlockingStream::new(self.0.fetch(executor))
+        BlockingStream::new(self.0.fetch(executor)).map(|v| v.map_err(From::from))
     }
 
     /// Execute the query and return all the resulting rows collected into a
@@ -519,14 +525,14 @@ where
     ///
     /// To avoid exhausting available memory, ensure the result set has a known
     /// upper bound, e.g. using `LIMIT`.
-    pub fn fetch_all<'e, 'c: 'e, E>(self, executor: E) -> Result<Vec<O>, Error>
+    pub fn fetch_all<'e, 'c: 'e, E>(self, executor: E) -> Result<Vec<O>>
     where
         'q: 'e,
         E: sqlx::Executor<'c, Database = Durable> + 'e,
         F: 'e,
         O: 'e,
     {
-        crate::util::block_on(self.0.fetch_all(executor))
+        crate::util::block_on(self.0.fetch_all(executor)).map_err(From::from)
     }
 
     /// Execute the query, returning the first row or [`Error::RowNotFound`]
@@ -545,14 +551,14 @@ where
     /// value, you're good.
     ///
     /// Otherwise, you might want to add `LIMIT 1` to your query.
-    pub fn fetch_one<'e, 'c: 'e, E>(self, executor: E) -> Result<O, Error>
+    pub fn fetch_one<'e, 'c: 'e, E>(self, executor: E) -> Result<O>
     where
         'q: 'e,
         E: sqlx::Executor<'c, Database = Durable> + 'e,
         F: 'e,
         O: 'e,
     {
-        crate::util::block_on(self.0.fetch_one(executor))
+        crate::util::block_on(self.0.fetch_one(executor)).map_err(From::from)
     }
 
     /// Execute the query, returning the first row or `None` otherwise.
@@ -570,13 +576,13 @@ where
     /// value, you're good.
     ///
     /// Otherwise, you might want to add `LIMIT 1` to your query.
-    pub fn fetch_optional<'e, 'c: 'e, E>(self, executor: E) -> Result<Option<O>, Error>
+    pub fn fetch_optional<'e, 'c: 'e, E>(self, executor: E) -> Result<Option<O>>
     where
         'q: 'e,
         E: sqlx::Executor<'c, Database = Durable> + 'e,
         F: 'e,
         O: 'e,
     {
-        crate::util::block_on(self.0.fetch_optional(executor))
+        crate::util::block_on(self.0.fetch_optional(executor)).map_err(From::from)
     }
 }

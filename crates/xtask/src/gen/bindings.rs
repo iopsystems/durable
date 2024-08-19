@@ -20,7 +20,13 @@ impl Bindings {
             Options::new().with("wasi:clocks/wall-clock@0.2.0"),
         )?;
         generator.generate_for_crate("durable-http", "durable:core/import-http", Options::new())?;
-        generator.generate_for_crate("durable-sqlx", "durable:core/import-sql", Options::new())?;
+        generator.generate_for_crate(
+            "durable-sqlx",
+            "durable:core/import-sql",
+            Options::new()
+                .with_additional_derive_attribute("serde::Serialize")
+                .with_additional_derive_attribute("serde::Deserialize"),
+        )?;
 
         Ok(())
     }

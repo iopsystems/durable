@@ -3,8 +3,9 @@ use std::borrow::Cow;
 use crate::bindings as sql;
 use crate::driver::{Durable, TypeInfo};
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 #[repr(transparent)]
+#[serde(transparent)]
 pub struct Value(pub(crate) sql::Value);
 
 impl Value {

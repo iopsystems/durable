@@ -14,7 +14,9 @@ fn generate() {
         "wit",
         out_dir.join("bindings.rs"),
         "durable:core/import-sql",
-        durable_bindgen::Options::new(),
+        durable_bindgen::Options::new()
+            .with_additional_derive_attribute("serde::Serialize")
+            .with_additional_derive_attribute("serde::Deserialize"),
     )
     .expect("failed to generate wit bindings");
 }

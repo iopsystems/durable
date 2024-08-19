@@ -1,3 +1,4 @@
+use std::borrow::Cow;
 use std::fmt;
 
 use crate::bindings as sql;
@@ -20,7 +21,7 @@ impl fmt::Display for UnsupportedError {
 impl std::error::Error for UnsupportedError {}
 
 #[derive(Debug)]
-struct DatabaseError(sql::DatabaseError);
+pub(crate) struct DatabaseError(pub(crate) sql::DatabaseError);
 
 impl sqlx::error::DatabaseError for DatabaseError {
     fn message(&self) -> &str {
@@ -37,6 +38,18 @@ impl sqlx::error::DatabaseError for DatabaseError {
             sql::DatabaseErrorKind::CheckViolation => ErrorKind::CheckViolation,
             _ => ErrorKind::Other,
         }
+    }
+
+    fn code(&self) -> Option<Cow<'_, str>> {
+        self.0.code.as_deref().map(Cow::Borrowed)
+    }
+
+    fn constraint(&self) -> Option<&str> {
+        self.0.constraint.as_deref()
+    }
+
+    fn table(&self) -> Option<&str> {
+        self.0.table.as_deref()
     }
 
     fn as_error(&self) -> &(dyn std::error::Error + Send + Sync + 'static) {

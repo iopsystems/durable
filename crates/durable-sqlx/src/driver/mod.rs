@@ -18,6 +18,7 @@ mod value;
 pub use self::arguments::Arguments;
 pub use self::connection::{ConnectOptions, Connection};
 pub use self::database::{Durable, QueryResult};
+pub(crate) use self::error::DatabaseError;
 pub use self::row::{Column, Row};
 pub use self::statement::Statement;
 pub use self::transaction::TransactionManager;

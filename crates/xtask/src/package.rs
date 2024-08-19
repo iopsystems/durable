@@ -5,10 +5,7 @@ use cargo_metadata::MetadataCommand;
 
 #[derive(Debug, clap::Args)]
 pub struct Package {
-    #[arg(
-        trailing_var_arg = true,
-        allow_hyphen_values = true
-    )]
+    #[arg(trailing_var_arg = true, allow_hyphen_values = true)]
     args: Vec<OsString>,
 }
 

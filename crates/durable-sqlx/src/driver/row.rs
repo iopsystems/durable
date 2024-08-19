@@ -1,7 +1,7 @@
 use crate::bindings as sql;
 use crate::driver::{Durable, TypeInfo, Value};
 
-#[derive(Debug)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct Row {
     columns: Vec<Column>,
     values: Vec<Value>,
@@ -93,7 +93,7 @@ impl sqlx::Row for Row {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct Column {
     ordinal: usize,
     name: String,

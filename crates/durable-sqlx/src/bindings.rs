@@ -6,11 +6,10 @@ pub mod durable {
         pub mod sql {
             #[used]
             #[doc(hidden)]
-            #[cfg(target_arch = "wasm32")]
             static __FORCE_SECTION_REF: fn() = super::super::super::__link_custom_section_describing_imports;
             use super::super::super::_rt;
             #[repr(u8)]
-            #[derive(Clone, Copy, Eq, PartialEq)]
+            #[derive(Clone, Copy, Eq, PartialEq, serde::Deserialize, serde::Serialize)]
             pub enum PrimitiveType {
                 Boolean,
                 Float4,
@@ -78,7 +77,7 @@ pub mod durable {
                     }
                 }
             }
-            #[derive(Clone)]
+            #[derive(Clone, serde::Deserialize, serde::Serialize)]
             pub enum Value {
                 Null(PrimitiveType),
                 Boolean(bool),
@@ -118,7 +117,7 @@ pub mod durable {
                     }
                 }
             }
-            #[derive(Clone)]
+            #[derive(Clone, serde::Deserialize, serde::Serialize)]
             pub struct Column {
                 pub name: _rt::String,
                 pub value: Value,
@@ -134,7 +133,7 @@ pub mod durable {
                         .finish()
                 }
             }
-            #[derive(Clone)]
+            #[derive(Clone, serde::Deserialize, serde::Serialize)]
             pub struct Row {
                 pub columns: _rt::Vec<Column>,
             }
@@ -146,7 +145,7 @@ pub mod durable {
                     f.debug_struct("Row").field("columns", &self.columns).finish()
                 }
             }
-            #[derive(Clone)]
+            #[derive(Clone, serde::Deserialize, serde::Serialize)]
             pub enum QueryResult {
                 /// A query has completed and here are the number of rows that were
                 /// modified.
@@ -170,7 +169,7 @@ pub mod durable {
                 }
             }
             #[repr(C)]
-            #[derive(Clone, Copy)]
+            #[derive(Clone, Copy, serde::Deserialize, serde::Serialize)]
             pub struct Options {
                 /// Allows the runtime to limit the number of rows returned.
                 ///
@@ -194,7 +193,7 @@ pub mod durable {
                         .finish()
                 }
             }
-            #[derive(Clone)]
+            #[derive(Clone, serde::Deserialize, serde::Serialize)]
             pub struct ColumnDecodeError {
                 pub index: _rt::String,
                 pub source: _rt::String,
@@ -211,7 +210,7 @@ pub mod durable {
                 }
             }
             #[repr(u8)]
-            #[derive(Clone, Copy, Eq, PartialEq)]
+            #[derive(Clone, Copy, Eq, PartialEq, serde::Deserialize, serde::Serialize)]
             pub enum DatabaseErrorKind {
                 UniqueViolation,
                 ForeignKeyViolation,
@@ -260,7 +259,7 @@ pub mod durable {
                     }
                 }
             }
-            #[derive(Clone)]
+            #[derive(Clone, serde::Deserialize, serde::Serialize)]
             pub struct DatabaseError {
                 pub message: _rt::String,
                 pub kind: DatabaseErrorKind,
@@ -282,7 +281,7 @@ pub mod durable {
                         .finish()
                 }
             }
-            #[derive(Clone)]
+            #[derive(Clone, serde::Deserialize, serde::Serialize)]
             pub enum Error {
                 ColumnDecode(ColumnDecodeError),
                 TypeNotFound(_rt::String),
@@ -934,7 +933,7 @@ mod _rt {
     extern crate alloc as alloc_crate;
 }
 #[cfg(target_arch = "wasm32")]
-#[link_section = "component-type:wit-bindgen:0.28.0:import-sql:encoded world"]
+#[link_section = "component-type:wit-bindgen:0.30.0:import-sql:encoded world"]
 #[doc(hidden)]
 pub static __WIT_BINDGEN_COMPONENT_TYPE: [u8; 875] = *b"\
 \0asm\x0d\0\x01\0\0\x19\x16wit-component-encoding\x04\0\x07\xea\x05\x01A\x02\x01\
@@ -955,10 +954,9 @@ s\0\x04\0\x05error\x03\0\x15\x01p\x04\x01@\x03\x03sqls\x06params\x17\x07options\
 \x01\0\x04\0\x05query\x01\x18\x01j\x01\x0b\x01\x16\x01k\x19\x01@\0\0\x1a\x04\0\x05\
 fetch\x01\x1b\x03\x01\x16durable:core/sql@1.0.0\x05\0\x04\x01\x1ddurable:core/im\
 port-sql@1.0.0\x04\0\x0b\x10\x01\0\x0aimport-sql\x03\0\0\0G\x09producers\x01\x0c\
-processed-by\x02\x0dwit-component\x070.214.0\x10wit-bindgen-rust\x060.28.0";
+processed-by\x02\x0dwit-component\x070.215.0\x10wit-bindgen-rust\x060.30.0";
 #[inline(never)]
 #[doc(hidden)]
-#[cfg(target_arch = "wasm32")]
 pub fn __link_custom_section_describing_imports() {
     wit_bindgen_rt::maybe_link_cabi_realloc();
 }

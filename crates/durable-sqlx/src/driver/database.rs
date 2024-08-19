@@ -1,3 +1,5 @@
+use serde::{Deserialize, Serialize};
+
 use crate::driver::{
     Arguments, Column, Connection, Row, Statement, TransactionManager, TypeInfo, Value,
 };
@@ -22,7 +24,7 @@ impl sqlx::Database for Durable {
     const URL_SCHEMES: &'static [&'static str] = &[];
 }
 
-#[derive(Copy, Clone, Default, Debug)]
+#[derive(Copy, Clone, Default, Debug, Serialize, Deserialize)]
 pub struct QueryResult {
     rows_affected: u64,
 }
