@@ -6,6 +6,7 @@ license = { workspace = true }
 publish = { workspace = true }
 homepage = { workspace = true }
 repository = { workspace = true }
+description = "Database migration support for durable"
 
 [features]
 migrate = ["dep:sqlx", "dep:tracing"]

@@ -6,6 +6,7 @@ license = { workspace = true }
 publish = { workspace = true }
 homepage = { workspace = true }
 repository = { workspace = true }
+description = "Bindings generator for durable"
 
 [dependencies]
 anyhow = "1.0.86"

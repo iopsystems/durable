@@ -6,6 +6,7 @@ license = { workspace = true }
 publish = { workspace = true }
 homepage = { workspace = true }
 repository = { workspace = true }
+description = "HTTP client for durable workflows"
 
 [features]
 bindgen = ["dep:durable-bindgen", "durable-core/bindgen"]
