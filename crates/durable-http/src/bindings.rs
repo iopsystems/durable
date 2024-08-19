@@ -6,7 +6,6 @@ pub mod durable {
         pub mod http {
             #[used]
             #[doc(hidden)]
-            #[cfg(target_arch = "wasm32")]
             static __FORCE_SECTION_REF: fn() = super::super::super::__link_custom_section_describing_imports;
             use super::super::super::_rt;
             #[derive(Clone)]
@@ -374,7 +373,7 @@ mod _rt {
     extern crate alloc as alloc_crate;
 }
 #[cfg(target_arch = "wasm32")]
-#[link_section = "component-type:wit-bindgen:0.28.0:import-http:encoded world"]
+#[link_section = "component-type:wit-bindgen:0.30.0:import-http:encoded world"]
 #[doc(hidden)]
 pub static __WIT_BINDGEN_COMPONENT_TYPE: [u8; 495] = *b"\
 \0asm\x0d\0\x01\0\0\x19\x16wit-component-encoding\x04\0\x07\xed\x02\x01A\x02\x01\
@@ -386,11 +385,10 @@ d\0\0\x0binvalid-url\x01s\0\x13invalid-header-name\0\0\x14invalid-header-value\0
 \0\x05other\x01s\0\x04\0\x0ahttp-error\x03\0\x0a\x01j\x01\x09\x01\x0b\x01@\x01\x07\
 request\x07\0\x0c\x04\0\x05fetch\x01\x0d\x03\x01\x17durable:core/http@1.0.0\x05\0\
 \x04\x01\x1edurable:core/import-http@1.0.0\x04\0\x0b\x11\x01\0\x0bimport-http\x03\
-\0\0\0G\x09producers\x01\x0cprocessed-by\x02\x0dwit-component\x070.214.0\x10wit-\
-bindgen-rust\x060.28.0";
+\0\0\0G\x09producers\x01\x0cprocessed-by\x02\x0dwit-component\x070.215.0\x10wit-\
+bindgen-rust\x060.30.0";
 #[inline(never)]
 #[doc(hidden)]
-#[cfg(target_arch = "wasm32")]
 pub fn __link_custom_section_describing_imports() {
     wit_bindgen_rt::maybe_link_cabi_realloc();
 }

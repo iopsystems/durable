@@ -22,6 +22,11 @@ impl Options {
         self.0.with.push((module.into(), WithOption::Generate));
         self
     }
+
+    pub fn with_additional_derive_attribute(mut self, attr: impl Into<String>) -> Self {
+        self.0.additional_derive_attributes.push(attr.into());
+        self
+    }
 }
 
 impl Default for Options {

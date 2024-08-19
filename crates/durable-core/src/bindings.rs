@@ -6,7 +6,6 @@ pub mod durable {
         pub mod core {
             #[used]
             #[doc(hidden)]
-            #[cfg(target_arch = "wasm32")]
             static __FORCE_SECTION_REF: fn() = super::super::super::__link_custom_section_describing_imports;
             use super::super::super::_rt;
             #[allow(unused_unsafe, clippy::all)]
@@ -166,7 +165,6 @@ pub mod durable {
         pub mod notify {
             #[used]
             #[doc(hidden)]
-            #[cfg(target_arch = "wasm32")]
             static __FORCE_SECTION_REF: fn() = super::super::super::__link_custom_section_describing_imports;
             use super::super::super::_rt;
             pub type Datetime = super::super::super::wasi::clocks::wall_clock::Datetime;
@@ -244,7 +242,6 @@ pub mod wasi {
         pub mod wall_clock {
             #[used]
             #[doc(hidden)]
-            #[cfg(target_arch = "wasm32")]
             static __FORCE_SECTION_REF: fn() = super::super::super::__link_custom_section_describing_imports;
             /// A time and date in seconds plus nanoseconds.
             #[repr(C)]
@@ -345,7 +342,6 @@ pub mod exports {
             pub mod setup {
                 #[used]
                 #[doc(hidden)]
-                #[cfg(target_arch = "wasm32")]
                 static __FORCE_SECTION_REF: fn() = super::super::super::super::__link_custom_section_describing_imports;
                 use super::super::super::super::_rt;
                 #[doc(hidden)]
@@ -427,7 +423,7 @@ macro_rules! __export_import_core_impl {
 #[doc(inline)]
 pub(crate) use __export_import_core_impl as export;
 #[cfg(target_arch = "wasm32")]
-#[link_section = "component-type:wit-bindgen:0.28.0:import-core:encoded world"]
+#[link_section = "component-type:wit-bindgen:0.30.0:import-core:encoded world"]
 #[doc(hidden)]
 pub static __WIT_BINDGEN_COMPONENT_TYPE: [u8; 626] = *b"\
 \0asm\x0d\0\x01\0\0\x19\x16wit-component-encoding\x04\0\x07\xf0\x03\x01A\x02\x01\
@@ -443,10 +439,9 @@ notification-blocking\x01\x04\x03\x01\x19durable:core/notify@1.0.0\x05\x03\x01B\
 \x01@\0\x01\0\x04\0\x12durable-setup-hack\x01\0\x04\x01\x18durable:core/setup@1.\
 0.0\x05\x04\x04\x01\x1edurable:core/import-core@1.0.0\x04\0\x0b\x11\x01\0\x0bimp\
 ort-core\x03\0\0\0G\x09producers\x01\x0cprocessed-by\x02\x0dwit-component\x070.2\
-14.0\x10wit-bindgen-rust\x060.28.0";
+15.0\x10wit-bindgen-rust\x060.30.0";
 #[inline(never)]
 #[doc(hidden)]
-#[cfg(target_arch = "wasm32")]
 pub fn __link_custom_section_describing_imports() {
     wit_bindgen_rt::maybe_link_cabi_realloc();
 }
