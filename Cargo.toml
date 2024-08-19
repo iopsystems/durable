@@ -21,6 +21,10 @@ durable-migrate = { version = "0.1.0", registry = "iop-systems", path = "crates/
 durable-runtime = { version = "0.1.2", registry = "iop-systems", path = "crates/durable-runtime" }
 durable-bindgen = { version = "0.1.0", registry = "iop-systems", path = "crates/durable-bindgen" }
 
+wit-bindgen-core = { version = "0.30.0" }
+wit-bindgen-rust = { version = "0.30.0" }
+wit-bindgen-rt   = { version = "0.30.0" }
+
 [profile.release]
 debug = true
 

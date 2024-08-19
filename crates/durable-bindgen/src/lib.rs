@@ -42,7 +42,7 @@ pub fn generate(
 fn _generate(source: &Path, out: &Path, world: &str, options: Options) -> anyhow::Result<()> {
     let mut resolve = Resolve::new();
     let (packages, paths) = resolve.push_dir(source)?;
-    let world = resolve.select_world(&packages, Some(world))?;
+    let world = resolve.select_world(packages, Some(world))?;
     let mut generator = options.0.build();
 
     if std::env::var_os("OUT_DIR").is_some() {

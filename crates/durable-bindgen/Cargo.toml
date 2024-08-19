@@ -11,5 +11,5 @@ repository = { workspace = true }
 anyhow = "1.0.86"
 prettyplease = "0.2.20"
 syn = { version = "2.0.72", features = ["full"] }
-wit-bindgen-core = "0.28.0"
-wit-bindgen-rust = "0.28.0"
+wit-bindgen-core = { workspace = true }
+wit-bindgen-rust = { workspace = true }
