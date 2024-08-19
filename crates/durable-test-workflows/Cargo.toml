@@ -5,5 +5,8 @@ edition = "2021"
 license = { workspace = true }
 publish = false
 
+[lib]
+test = false
+
 [dependencies]
 durable = { workspace = true, features = ["http", "sqlx"] }
