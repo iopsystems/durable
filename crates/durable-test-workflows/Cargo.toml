@@ -9,4 +9,6 @@ publish = false
 test = false
 
 [dependencies]
+anyhow = "1.0"
+
 durable = { workspace = true, features = ["http", "sqlx"] }

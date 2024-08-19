@@ -1028,6 +1028,7 @@ dependencies = [
  "serde",
  "sqlx",
  "sqlx-core",
+ "thiserror",
  "url",
  "wit-bindgen-rt",
 ]
@@ -1051,6 +1052,7 @@ dependencies = [
 name = "durable-test-workflows"
 version = "0.0.0"
 dependencies = [
+ "anyhow",
  "durable",
 ]
 

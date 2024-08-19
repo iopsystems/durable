@@ -1,32 +1,16 @@
-use anyhow::Context;
-use durable_client::{DurableClient, ProgramOptions};
-use durable_runtime::WorkerBuilder;
+use durable_client::DurableClient;
 use futures::TryStreamExt;
 
 #[sqlx::test]
 async fn check_task_details(pool: sqlx::PgPool) -> anyhow::Result<()> {
-    let mut worker = WorkerBuilder::new(pool.clone())
-        .config(crate::test_config())
-        .validate_database(false)
-        .build()
-        .await?;
-    let handle = worker.handle();
-
-    tokio::spawn(async move {
-        let _ = worker.run().await;
-    });
-
+    let _guard = durable_test::spawn_worker(pool.clone()).await?;
     let client = DurableClient::new(pool)?;
-    let program = client
-        .program(
-            ProgramOptions::from_file(crate::test_binary("task-details.wasm"))
-                .context("failed to load task-details.wasm file")?,
-        )
-        .await?;
+    let program = crate::load_binary(&client, "task-details.wasm").await?;
 
     let task = client
         .launch("test task", &program, &serde_json::json!(null))
         .await?;
+    crate::tail_logs(&client, &task);
     let status = task.wait(&client).await?;
 
     assert!(status.success());
@@ -52,7 +36,22 @@ Task Details:
         )
     );
 
-    handle.shutdown();
+    Ok(())
+}
+
+#[sqlx::test(fixtures("extra-table"))]
+async fn run_sqlx_test(pool: sqlx::PgPool) -> anyhow::Result<()> {
+    let _guard = durable_test::spawn_worker(pool.clone()).await?;
+    let client = DurableClient::new(pool)?;
+    let program = crate::load_binary(&client, "sqlx-use-test-data.wasm").await?;
+
+    let task = client
+        .launch("test task", &program, &serde_json::json!(null))
+        .await?;
+    crate::tail_logs(&client, &task);
+    let status = task.wait(&client).await?;
+
+    assert!(status.success());
 
     Ok(())
 }
