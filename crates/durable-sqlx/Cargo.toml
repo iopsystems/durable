@@ -10,9 +10,11 @@ description = "SQLx bindings for durable guests"
 
 [features]
 bindgen = ["dep:durable-bindgen", "durable-core/bindgen"]
+macros = ["durable-sqlx-macros", "sqlx/macros"]
 
 [dependencies]
 durable-core = { workspace = true }
+durable-sqlx-macros = { path = "../durable-sqlx-macros", optional = true }
 
 async-stream = "0.3.5"
 futures-core = "0.3.30"
@@ -29,4 +31,4 @@ thiserror = "1.0.63"
 durable-bindgen = { workspace = true, optional = true }
 
 [dev-dependencies]
-durable = { workspace = true, features = ["sqlx"] }
+durable = { workspace = true, features = ["sqlx", "sqlx-macros"] }

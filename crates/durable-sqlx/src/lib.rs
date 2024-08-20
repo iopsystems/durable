@@ -36,7 +36,13 @@ extern crate serde;
 
 pub mod driver;
 mod error;
+#[cfg(feature = "macros")]
+mod macros;
 mod util;
+
+#[cfg(feature = "macros")]
+#[doc(hidden)]
+pub use crate::macros::exports;
 
 mod bindings {
     #![allow(unused_braces)]
@@ -222,6 +228,30 @@ where
     O: for<'r> sqlx::FromRow<'r, Row>,
 {
     QueryAs(sqlx::query_as_with(sql, arguments))
+}
+
+/// Execute a single SQL query as a prepared statement (transparently cached)
+/// and extract the first column of each row.
+///
+/// This is a thin wrapper around [`sqlx::query_scalar`]. See the docs there for
+/// more.
+pub fn query_scalar<'q, O>(sql: &'q str) -> QueryScalar<'q, O, driver::Arguments>
+where
+    (O,): for<'r> sqlx::FromRow<'r, Row>,
+{
+    QueryScalar(sqlx::query_scalar(sql))
+}
+
+/// Execute a SQL query as a prepared statement (transparently cached), with the
+/// given arguments, and extract the first column of each row.
+///
+/// See [`query_scalar()`] for details.
+pub fn query_scalar_with<'q, O, A>(sql: &'q str, arguments: A) -> QueryScalar<'q, O, A>
+where
+    A: sqlx::IntoArguments<'q, Durable>,
+    (O,): for<'r> sqlx::FromRow<'r, Row>,
+{
+    QueryScalar(sqlx::query_scalar_with(sql, arguments))
 }
 
 /// A sincle SQL query as a prepared statement. Returned by [`query()`].
@@ -582,6 +612,134 @@ where
         E: sqlx::Executor<'c, Database = Durable> + 'e,
         F: 'e,
         O: 'e,
+    {
+        crate::util::block_on(self.0.fetch_optional(executor)).map_err(From::from)
+    }
+}
+
+#[must_use = "query must be executed to affect database"]
+pub struct QueryScalar<'q, O, A>(sqlx::query::QueryScalar<'q, Durable, O, A>);
+
+impl<'q, O, A> sqlx::Execute<'q, Durable> for QueryScalar<'q, O, A>
+where
+    O: Send,
+    A: sqlx::IntoArguments<'q, Durable> + Send + 'q,
+{
+    fn sql(&self) -> &'q str {
+        self.0.sql()
+    }
+
+    fn statement(&self) -> Option<&<Durable as sqlx::Database>::Statement<'q>> {
+        self.0.statement()
+    }
+
+    fn take_arguments(
+        &mut self,
+    ) -> std::result::Result<Option<<Durable as sqlx::Database>::Arguments<'q>>, BoxDynError> {
+        self.0.take_arguments()
+    }
+
+    fn persistent(&self) -> bool {
+        self.0.persistent()
+    }
+}
+
+impl<'q, O> QueryScalar<'q, O, driver::Arguments> {
+    /// Bind a value for use with this SQL query.
+    ///
+    /// See [`Query::bind`](crate::Query::bind).
+    pub fn bind<T>(self, value: T) -> Self
+    where
+        T: sqlx::Encode<'q, Durable> + sqlx::Type<Durable> + 'q,
+    {
+        Self(self.0.bind(value))
+    }
+}
+
+impl<'q, O, A> QueryScalar<'q, O, A>
+where
+    O: Send + Unpin,
+    A: sqlx::IntoArguments<'q, Durable> + 'q,
+    (O,): Send + Unpin,
+    (O,): for<'r> sqlx::FromRow<'r, driver::Row>,
+{
+    /// Execute the query and return the generated results as a stream.
+    pub fn fetch<'e, 'c: 'e, E>(self, executor: E) -> impl Iterator<Item = Result<O>> + 'e
+    where
+        'q: 'e,
+        E: sqlx::Executor<'c, Database = Durable> + 'e,
+        A: 'e,
+        O: 'e,
+    {
+        BlockingStream::new(self.0.fetch(executor)).map(|v| v.map_err(From::from))
+    }
+
+    /// Execute the query and return all the resulting rows collected into a
+    /// [`Vec`].
+    ///
+    /// ### Note: beware result set size.
+    /// This will attempt to collect the full result set of the query into
+    /// memory.
+    ///
+    /// To avoid exhausting available memory, ensure the result set has a known
+    /// upper bound, e.g. using `LIMIT`.
+    pub fn fetch_all<'e, 'c: 'e, E>(self, executor: E) -> Result<Vec<O>>
+    where
+        'q: 'e,
+        E: sqlx::Executor<'c, Database = Durable> + 'e,
+        O: 'e,
+        A: 'e,
+    {
+        crate::util::block_on(self.0.fetch_all(executor)).map_err(From::from)
+    }
+
+    /// Execute the query, returning the first row or [`Error::RowNotFound`]
+    /// otherwise.
+    ///
+    /// ### Note: for best performance, ensure the query returns at most one row.
+    /// Depending on the driver implementation, if your query can return more
+    /// than one row, it may lead to wasted CPU time and bandwidth on the
+    /// database server.
+    ///
+    /// Even when the driver implementation takes this into account, ensuring
+    /// the query returns at most one row can result in a more optimal query
+    /// plan.
+    ///
+    /// If your query has a `WHERE` clause filtering a unique column by a single
+    /// value, you're good.
+    ///
+    /// Otherwise, you might want to add `LIMIT 1` to your query.
+    pub fn fetch_one<'e, 'c: 'e, E>(self, executor: E) -> Result<O>
+    where
+        'q: 'e,
+        E: sqlx::Executor<'c, Database = Durable> + 'e,
+        O: 'e,
+        A: 'e,
+    {
+        crate::util::block_on(self.0.fetch_one(executor)).map_err(From::from)
+    }
+
+    /// Execute the query, returning the first row or `None` otherwise.
+    ///
+    /// ### Note: for best performance, ensure the query returns at most one row.
+    /// Depending on the driver implementation, if your query can return more
+    /// than one row, it may lead to wasted CPU time and bandwidth on the
+    /// database server.
+    ///
+    /// Even when the driver implementation takes this into account, ensuring
+    /// the query returns at most one row can result in a more optimal query
+    /// plan.
+    ///
+    /// If your query has a `WHERE` clause filtering a unique column by a single
+    /// value, you're good.
+    ///
+    /// Otherwise, you might want to add `LIMIT 1` to your query.
+    pub fn fetch_optional<'e, 'c: 'e, E>(self, executor: E) -> Result<Option<O>>
+    where
+        'q: 'e,
+        E: sqlx::Executor<'c, Database = Durable> + 'e,
+        O: 'e,
+        A: 'e,
     {
         crate::util::block_on(self.0.fetch_optional(executor)).map_err(From::from)
     }

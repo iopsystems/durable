@@ -1,0 +1,23 @@
+[package]
+name = "durable-sqlx-macros"
+edition = "2021"
+version = "0.8.0"
+license.workspace = true
+publish.workspace = true
+repository.workspace = true
+homepage.workspace = true
+
+[lib]
+proc-macro = true
+
+[dependencies]
+proc-macro2 = "1.0.86"
+quote = "1.0.36"
+
+[dependencies.syn]
+version = "2.0.75"
+features = ["full", "parsing", "proc-macro", "visit-mut"]
+
+[dependencies.sqlx-macros-core]
+version = "0.8.0"
+features = ["macros", "postgres", "_rt-tokio"]

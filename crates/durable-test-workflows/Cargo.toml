@@ -9,6 +9,7 @@ publish = false
 test = false
 
 [dependencies]
-anyhow = "1.0"
+durable = { workspace = true, features = ["http", "sqlx", "sqlx-macros"] }
 
-durable = { workspace = true, features = ["http", "sqlx"] }
+anyhow = "1.0"
+serde = { version = "1.0", features = ["derive"] }
