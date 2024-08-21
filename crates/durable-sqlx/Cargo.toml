@@ -9,10 +9,13 @@ repository = { workspace = true }
 description = "SQLx bindings for durable guests"
 
 [features]
+default = ["uuid"]
+
 bindgen = ["dep:durable-bindgen", "durable-core/bindgen"]
 macros = ["durable-sqlx-macros", "sqlx/macros"]
 
 chrono = ["sqlx/chrono", "durable-sqlx-macros?/chrono", "dep:chrono"]
+uuid = ["sqlx/uuid", "durable-sqlx-macros?/uuid", "dep:uuid"]
 
 [dependencies]
 durable-core = { workspace = true }
@@ -30,6 +33,7 @@ sqlx-core = { version = "0.8.0", default-features = false }
 url = "2.5.2"
 wit-bindgen-rt = { workspace = true }
 thiserror = "1.0.63"
+uuid = { version = "1.10.0", features = ["serde"], optional = true }
 
 [build-dependencies]
 durable-bindgen = { workspace = true, optional = true }

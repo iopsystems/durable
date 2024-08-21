@@ -8,6 +8,8 @@ mod bytea;
 mod float;
 mod int;
 mod text;
+#[cfg(feature = "uuid")]
+mod uuid;
 
 fn unexpected_nullable_type(expected: &str, value: &Value) -> BoxDynError {
     format!("expected {expected}, got {} instead", value.type_info()).into()
