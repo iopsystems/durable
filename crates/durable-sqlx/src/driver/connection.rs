@@ -78,7 +78,7 @@ impl Connection {
     }
 
     fn run(&mut self, sql: &str, arguments: Arguments, options: sql::Options) -> QueryIterator {
-        let params = arguments.raw_args();
+        let params = arguments.into_raw_args();
         sql::query(sql, params, options);
 
         QueryIterator

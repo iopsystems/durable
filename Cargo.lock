@@ -1005,10 +1005,12 @@ dependencies = [
  "sha2",
  "slab",
  "sqlx",
+ "sqlx-postgres",
  "tokio",
  "tracing",
  "tracing-subscriber",
  "uluru",
+ "uuid",
  "wasmtime",
  "wasmtime-wit-bindgen",
  "wit-parser 0.212.0",
@@ -1019,6 +1021,7 @@ name = "durable-sqlx"
 version = "0.2.1"
 dependencies = [
  "async-stream",
+ "chrono",
  "durable",
  "durable-bindgen",
  "durable-core",
@@ -1027,6 +1030,7 @@ dependencies = [
  "futures-util",
  "log",
  "serde",
+ "serde_json",
  "sqlx",
  "sqlx-core",
  "thiserror",
@@ -1797,6 +1801,15 @@ name = "ipnet"
 version = "2.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8f518f335dce6725a761382244631d86cf0ccb2863413590b31338feb467f9c3"
+
+[[package]]
+name = "ipnetwork"
+version = "0.20.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bf466541e9d546596ee94f9f69590f89473455f88372423e0008fc1a7daf100e"
+dependencies = [
+ "serde",
+]
 
 [[package]]
 name = "is_terminal_polyfill"
@@ -3062,6 +3075,7 @@ dependencies = [
  "hashlink",
  "hex",
  "indexmap 2.4.0",
+ "ipnetwork",
  "log",
  "memchr",
  "once_cell",
@@ -3079,6 +3093,7 @@ dependencies = [
  "tokio-stream",
  "tracing",
  "url",
+ "uuid",
  "webpki-roots",
 ]
 
@@ -3161,6 +3176,7 @@ dependencies = [
  "stringprep",
  "thiserror",
  "tracing",
+ "uuid",
  "whoami",
 ]
 
@@ -3186,6 +3202,7 @@ dependencies = [
  "hkdf",
  "hmac",
  "home",
+ "ipnetwork",
  "itoa",
  "log",
  "md-5",
@@ -3200,6 +3217,7 @@ dependencies = [
  "stringprep",
  "thiserror",
  "tracing",
+ "uuid",
  "whoami",
 ]
 
@@ -3225,6 +3243,7 @@ dependencies = [
  "sqlx-core",
  "tracing",
  "url",
+ "uuid",
 ]
 
 [[package]]
@@ -3720,6 +3739,9 @@ name = "uuid"
 version = "1.10.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "81dfa00651efa65069b0b6b651f4aaa31ba9e3c3ce0137aaad053604ee7e0314"
+dependencies = [
+ "serde",
+]
 
 [[package]]
 name = "valuable"

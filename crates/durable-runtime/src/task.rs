@@ -16,6 +16,7 @@ use tokio::sync::broadcast::Receiver;
 
 use crate::error::TaskStatus;
 use crate::event::Notification;
+use crate::resource::Resources;
 use crate::util::AsyncFnOnce;
 use crate::worker::{SharedState, TaskData};
 use crate::Config;
@@ -187,9 +188,11 @@ impl Transaction {
     }
 }
 
+#[non_exhaustive]
 pub struct Task {
     pub state: TaskState,
     pub plugins: anymap3::Map<dyn Any + Send>,
+    pub resources: Resources,
 }
 
 pub struct TaskState {

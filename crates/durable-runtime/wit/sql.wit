@@ -1,27 +1,188 @@
 interface sql {
-    enum primitive-type {
-        boolean,
-        float4,
-        float8,
-        int1,
-        int2,
-        int4,
-        int8,
-        text,
-        bytea
+    /// Information about a SQL type as used by the underlying database driver.
+    /// 
+    /// These map fairly closely to the underlying SQLx implementation in the
+    /// runtime.
+    resource type-info {
+        /// The database system name of this type.
+        /// 
+        /// This will not include length specifiers. The type name returned
+        /// is a rough approximation of how it would be written in SQL for the
+        /// database.
+        name: func() -> string;
+
+        /// Whether `self` and `other` represent mutually compatible types.
+        compatible: func(other: borrow<type-info>) -> bool;
+
+        /// Whether `self` and `other` represent exactly the same type.
+        equal: func(other: borrow<type-info>) -> bool;
+
+        /// Create a clone of this type-info.
+        clone: func() -> type-info;
+
+        /// Serialize this type-info to json.
+        /// 
+        /// The actual json returned by this function is not meant to be introspected.
+        serialize: func() -> result<string, string>;
+
+        /// Deserialize the type-info from json.
+        deserialize: static func(json: string) -> result<type-info, string>;
+
+        /// Attempt to create a type directly from a name.
+        /// 
+        /// This provides no guarantee that there is actually a type with that
+        /// name within the database. Attempting to use a type that doesn't
+        /// exist will result in a failure when making a query.
+        /// 
+        /// This returns an error if there is no type with the provided name
+        /// within the database.
+        // with-name: static func(name: string) -> result<type-info>;
+
+        /// Attempt to create an array of the named type.
+        /// 
+        /// This provides no guarantee that there is actually a type with that
+        /// name within the database. Attempting to use a type that doesn't
+        /// exist will result in a failure when making a query.
+        // with-array-of: static func(name: string) -> result<type-info>;
+
+        boolean: static func() -> type-info;
+        float4: static func() -> type-info;
+        float8: static func() -> type-info;
+        int1: static func() -> type-info;
+        int2: static func() -> type-info;
+        int4: static func() -> type-info;
+        int8: static func() -> type-info;
+        text: static func() -> type-info;
+        bytea: static func() -> type-info;
+        timestamptz: static func() -> type-info;
+        timestamp: static func() -> type-info;
+        uuid: static func() -> type-info;
+        jsonb: static func() -> type-info;
+        
+        boolean-array: static func() -> type-info;
+        float4-array: static func() -> type-info;
+        float8-array: static func() -> type-info;
+        int1-array: static func() -> type-info;
+        int2-array: static func() -> type-info;
+        int4-array: static func() -> type-info;
+        int8-array: static func() -> type-info;
+        text-array: static func() -> type-info;
+        bytea-array: static func() -> type-info;
+        timestamptz-array: static func() -> type-info;
+        timestamp-array: static func() -> type-info;
+        uuid-array: static func() -> type-info;
+        jsonb-array: static func() -> type-info;
+    }
+    
+
+    /// A timestamp recording a point in time without a timezone.
+    record timestamp {
+        seconds: s64,
+        subsec-nanos: u32,
     }
 
-    variant value {
-        null(primitive-type),
-        boolean(bool),
-        float4(f32),
-        float8(f64),
-        int1(s8),
-        int2(s16),
-        int4(s32),
-        int8(s64),
-        text(string),
-        bytea(list<u8>),
+    /// A timestamp combined with a utc offset representing a timezone.
+    record timestamptz {
+        seconds: s64,
+        subsec-nanos: u32,
+
+        /// Positive values are on the eastern hemisphere while negative
+        /// values are on the western hemisphere.
+        offset: s32,
+    }
+
+    /// A UUID.
+    /// 
+    /// This should be the bytes of the UUID, in little-endian order.
+    /// 
+    /// This is currently the only way to represent a fixed-size array in WIT. 
+    type uuid = tuple<tuple<u8, u8, u8, u8, u8, u8, u8, u8>, u8, u8, u8, u8, u8, u8, u8, u8>;
+
+    /// A database value.
+    /// 
+    /// This is opaque so that new value types can be added in the future
+    /// without having to bump make breaking changes to the API here.
+    resource value {
+        /// Whether this value is NULL.
+        /// 
+        /// If this is true then all of the `as-*` methods will return none.
+        is-null: func() -> bool;
+
+        /// The type of this value.
+        type-info: func() -> type-info;
+        
+        /// Create a clone of this value.
+        clone: func() -> value;
+        
+        /// Serialize this type-info to json.
+        /// 
+        /// The actual json returned by this function is not meant to be introspected.
+        serialize: func() -> result<string, string>;
+
+        /// Deserialize the type-info from json.
+        deserialize: static func(json: string) -> result<value, string>;
+
+
+        as-boolean:     func() -> option<bool>;
+        as-float4:      func() -> option<f32>;
+        as-float8:      func() -> option<f64>;
+        as-int1:        func() -> option<s8>;
+        as-int2:        func() -> option<s16>;
+        as-int4:        func() -> option<s32>;
+        as-int8:        func() -> option<s64>;
+        as-text:        func() -> option<string>;
+        as-bytea:       func() -> option<list<u8>>;
+        as-timestamptz: func() -> option<timestamptz>;
+        as-timestamp:   func() -> option<timestamp>;
+        as-uuid:        func() -> option<uuid>;
+
+        /// Note that this function works for both json and jsonb types.
+        as-json:    func() -> option<string>;
+
+        as-boolean-array:       func() -> option<list<bool>>;
+        as-float4-array:        func() -> option<list<f32>>;
+        as-float8-array:        func() -> option<list<f64>>;
+        as-int1-array:          func() -> option<list<s8>>;
+        as-int2-array:          func() -> option<list<s16>>;
+        as-int4-array:          func() -> option<list<s32>>;
+        as-int8-array:          func() -> option<list<s64>>;
+        as-text-array:          func() -> option<list<string>>;
+        as-bytea-array:         func() -> option<list<list<u8>>>;
+        as-timestamptz-array:   func() -> option<list<timestamptz>>;
+        as-timestamp-array:     func() -> option<list<timestamp>>;
+        as-uuid-array:          func() -> option<list<uuid>>;
+        as-json-array:          func() -> option<list<string>>;
+
+        /// Create a null value with the provided type info.
+        null: static func(tyinfo: type-info) -> value;
+
+        boolean:        static func(value: bool) -> value;
+        float4:         static func(value: f32) -> value;
+        float8:         static func(value: f64) -> value;
+        int1:           static func(value: s8) -> value;
+        int2:           static func(value: s16) -> value;
+        int4:           static func(value: s32) -> value;
+        int8:           static func(value: s64) -> value;
+        text:           static func(value: string) -> value;
+        bytea:          static func(value: list<u8>) -> value;
+        timestamptz:    static func(value: timestamptz) -> value;
+        timestamp:      static func(value: timestamp) -> value;
+        uuid:           static func(value: uuid) -> value;
+        jsonb:          static func(value: string) -> value;
+
+        boolean-array:  static func(value: list<bool>) -> value;
+        float4-array:   static func(value: list<f32>) -> value;
+        float8-array:   static func(value: list<f64>) -> value;
+        int1-array:     static func(value: list<s8>) -> value;
+        int2-array:     static func(value: list<s16>) -> value;
+        int4-array:     static func(value: list<s32>) -> value;
+        int8-array:     static func(value: list<s64>) -> value;
+        text-array:     static func(value: list<string>) -> value;
+        bytea-array:    static func(value: list<list<u8>>) -> value;
+        timestamptz-array: static func(value: list<timestamptz>) -> value;
+        timestamp-array:static func(value: list<timestamp>) -> value;
+        uuid-array:     static func(value: list<uuid>) -> value;
+        jsonb-array:    static func(value: list<string>) -> value;
     }
 
     record column {
@@ -86,13 +247,13 @@ interface sql {
         other(string)
     }
 
-    // Make a query to the database.
-    // 
-    // This function will start the query. Then rows and results can be
-    // fetched by calling `fetch` until it returns none.
-    // 
-    // Calling query again while there are still results from a previous query
-    // result in the remaining unconsumed rows being discarded.
+    /// Make a query to the database.
+    /// 
+    /// This function will start the query. Then rows and results can be
+    /// fetched by calling `fetch` until it returns none.
+    /// 
+    /// Calling query again while there are still results from a previous query
+    /// results in the remaining unconsumed rows being discarded.
     query: func(
         sql: string,
         params: list<value>,
@@ -100,5 +261,5 @@ interface sql {
     );
 
     /// Fetch either a query result or a single row from the query.
-    fetch: func() -> option <result<query-result, error>>;
+    fetch: func() -> option<result<query-result, error>>;
 }

@@ -13,10 +13,7 @@ description = "Runtime for durable workflows"
 # Enable the use of tokio-console with the runtime CLI.
 #
 # This doesn't do much unless --cfg tokio_unstable is included in rustflags.
-tokio-console = [
-    "dep:console-subscriber",
-    "tokio/tracing"
-]
+tokio-console = ["dep:console-subscriber", "tokio/tracing"]
 
 [dependencies]
 durable-migrate = { workspace = true, features = ["migrate"] }
@@ -50,10 +47,21 @@ uluru = "3.1.0"
 wasmtime = "23.0.1"
 cfg-if = "1.0.0"
 derive_setters = "0.1.6"
+uuid = { version = "1.10.0", features = ["serde"] }
 
 [dependencies.sqlx]
 version = "0.8.0"
-features = ["postgres", "runtime-tokio", "tls-rustls", "chrono"]
+features = [
+    "postgres",
+    "runtime-tokio",
+    "tls-rustls",
+    "chrono",
+    "uuid",
+]
+
+[dependencies.sqlx-postgres]
+version = "0.8.0"
+features = ["offline"]
 
 [dependencies.tracing-subscriber]
 version = "0.3"

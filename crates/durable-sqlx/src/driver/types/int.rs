@@ -11,7 +11,7 @@ impl Encode<'_, Durable> for i8 {
         &self,
         buf: &mut <Durable as sqlx::Database>::ArgumentBuffer<'_>,
     ) -> Result<IsNull, sqlx::error::BoxDynError> {
-        buf.push(Value(sql::Value::Int1(*self)));
+        buf.push(Value::new(sql::Value::int1(*self)));
         Ok(IsNull::No)
     }
 }
@@ -21,7 +21,7 @@ impl Encode<'_, Durable> for i16 {
         &self,
         buf: &mut <Durable as sqlx::Database>::ArgumentBuffer<'_>,
     ) -> Result<IsNull, sqlx::error::BoxDynError> {
-        buf.push(Value(sql::Value::Int2(*self)));
+        buf.push(Value::new(sql::Value::int2(*self)));
         Ok(IsNull::No)
     }
 }
@@ -31,7 +31,7 @@ impl Encode<'_, Durable> for i32 {
         &self,
         buf: &mut <Durable as sqlx::Database>::ArgumentBuffer<'_>,
     ) -> Result<IsNull, sqlx::error::BoxDynError> {
-        buf.push(Value(sql::Value::Int4(*self)));
+        buf.push(Value::new(sql::Value::int4(*self)));
         Ok(IsNull::No)
     }
 }
@@ -41,19 +41,29 @@ impl Encode<'_, Durable> for i64 {
         &self,
         buf: &mut <Durable as sqlx::Database>::ArgumentBuffer<'_>,
     ) -> Result<IsNull, sqlx::error::BoxDynError> {
-        buf.push(Value(sql::Value::Int8(*self)));
+        buf.push(Value::new(sql::Value::int8(*self)));
         Ok(IsNull::No)
     }
 }
 
 fn decode_int(value: &Value) -> Result<i64, BoxDynError> {
-    match &value.0 {
-        &sql::Value::Int1(v) => Ok(v.into()),
-        &sql::Value::Int2(v) => Ok(v.into()),
-        &sql::Value::Int4(v) => Ok(v.into()),
-        &sql::Value::Int8(v) => Ok(v),
-        _ => Err(unexpected_nonnull_type("integer", value)),
+    if let Some(v) = value.0.as_int1() {
+        return Ok(v.into());
     }
+
+    if let Some(v) = value.0.as_int2() {
+        return Ok(v.into());
+    }
+
+    if let Some(v) = value.0.as_int4() {
+        return Ok(v.into());
+    }
+
+    if let Some(v) = value.0.as_int8() {
+        return Ok(v);
+    }
+
+    Err(unexpected_nonnull_type("integer", value))
 }
 
 impl Decode<'_, Durable> for i8 {
@@ -88,64 +98,24 @@ impl Decode<'_, Durable> for i64 {
 
 impl sqlx::Type<Durable> for i8 {
     fn type_info() -> <Durable as sqlx::Database>::TypeInfo {
-        TypeInfo(sql::PrimitiveType::Int1)
-    }
-
-    fn compatible(ty: &<Durable as sqlx::Database>::TypeInfo) -> bool {
-        matches!(
-            ty.0,
-            sql::PrimitiveType::Int1
-                | sql::PrimitiveType::Int2
-                | sql::PrimitiveType::Int4
-                | sql::PrimitiveType::Int8
-        )
+        TypeInfo::int1()
     }
 }
 
 impl sqlx::Type<Durable> for i16 {
     fn type_info() -> <Durable as sqlx::Database>::TypeInfo {
-        TypeInfo(sql::PrimitiveType::Int2)
-    }
-
-    fn compatible(ty: &<Durable as sqlx::Database>::TypeInfo) -> bool {
-        matches!(
-            ty.0,
-            sql::PrimitiveType::Int1
-                | sql::PrimitiveType::Int2
-                | sql::PrimitiveType::Int4
-                | sql::PrimitiveType::Int8
-        )
+        TypeInfo::int2()
     }
 }
 
 impl sqlx::Type<Durable> for i32 {
     fn type_info() -> <Durable as sqlx::Database>::TypeInfo {
-        TypeInfo(sql::PrimitiveType::Int4)
-    }
-
-    fn compatible(ty: &<Durable as sqlx::Database>::TypeInfo) -> bool {
-        matches!(
-            ty.0,
-            sql::PrimitiveType::Int1
-                | sql::PrimitiveType::Int2
-                | sql::PrimitiveType::Int4
-                | sql::PrimitiveType::Int8
-        )
+        TypeInfo::int4()
     }
 }
 
 impl sqlx::Type<Durable> for i64 {
     fn type_info() -> <Durable as sqlx::Database>::TypeInfo {
-        TypeInfo(sql::PrimitiveType::Int8)
-    }
-
-    fn compatible(ty: &<Durable as sqlx::Database>::TypeInfo) -> bool {
-        matches!(
-            ty.0,
-            sql::PrimitiveType::Int1
-                | sql::PrimitiveType::Int2
-                | sql::PrimitiveType::Int4
-                | sql::PrimitiveType::Int8
-        )
+        TypeInfo::int8()
     }
 }

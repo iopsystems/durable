@@ -829,6 +829,7 @@ impl Worker {
         let mut task = Task {
             state: TaskState::new(shared.clone(), task, worker_id),
             plugins: Default::default(),
+            resources: crate::Resources::default(),
         };
 
         let mut linker = Linker::new(&engine);

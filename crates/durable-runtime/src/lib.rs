@@ -9,6 +9,7 @@ pub mod event;
 mod flag;
 pub mod migrate;
 pub mod plugin;
+mod resource;
 pub mod task;
 pub mod util;
 mod worker;
@@ -20,5 +21,6 @@ pub mod bindings {
 
 pub use self::config::Config;
 pub use self::error::TaskStatus;
+pub use self::resource::{Resourceable, Resources};
 pub use self::task::Task;
 pub use self::worker::{Worker, WorkerBuilder, WorkerHandle};

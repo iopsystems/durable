@@ -125,14 +125,25 @@ where
         let json = serde_json::to_string(&TransactionResult::<_, String>::Value(&data))
             .expect("failed to serialize the transaction result to json");
 
-        (data, json)
+        json
     }));
 
     match result {
-        Ok((data, json)) => {
+        Ok(json) => {
             crate::bindings::transaction_exit(&json);
 
-            data
+            // We need to roundtrip the result through json so that the resulting type is
+            // consistent if the workflow is restarted.
+            //
+            // This is also relevant for the seralization wrappers of some resources that
+            // track the transaction they were created in.
+            let result = serde_json::from_str::<TransactionResult<T>>(&json)
+                .expect("failed to deserialize the transaction result from json");
+
+            match result {
+                TransactionResult::Value(data) => data,
+                TransactionResult::Panic(_) => unreachable!(),
+            }
         }
         Err(payload) => {
             let message: Box<String> = match payload.downcast::<String>() {

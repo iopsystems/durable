@@ -27,6 +27,9 @@ impl Host for Task {
         let data: Option<Box<RawValue>> = self.state.enter(options).await?;
         let data = data.map(|v| v.get().to_owned());
 
+        let txn = self.state.transaction().map(|txn| txn.index());
+        self.resources.set_txn(txn);
+
         Ok(data)
     }
 
@@ -34,6 +37,9 @@ impl Host for Task {
         let data: &RawValue = serde_json::from_str(&data) //
             .context("provided data was not valid json")?;
         self.state.exit(data).await?;
+
+        let txn = self.state.transaction().map(|txn| txn.index());
+        self.resources.set_txn(txn);
 
         Ok(())
     }
