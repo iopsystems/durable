@@ -11,10 +11,7 @@ impl sqlx::Encode<'_, Durable> for Uuid {
         &self,
         buf: &mut <Durable as sqlx::Database>::ArgumentBuffer<'_>,
     ) -> Result<IsNull, BoxDynError> {
-        let uuid: [u8; 16] = self.to_bytes_le();
-        let uuid: sql::Uuid = unsafe { std::mem::transmute(uuid) };
-
-        buf.push(Value::new(sql::Value::uuid(uuid)));
+        buf.push(Value::new(sql::Value::uuid((*self).into())));
         Ok(IsNull::No)
     }
 }
@@ -22,9 +19,7 @@ impl sqlx::Encode<'_, Durable> for Uuid {
 impl sqlx::Decode<'_, Durable> for Uuid {
     fn decode(value: <Durable as sqlx::Database>::ValueRef<'_>) -> Result<Self, BoxDynError> {
         if let Some(value) = value.0.as_uuid() {
-            let uuid: [u8; 16] = unsafe { std::mem::transmute(value) };
-
-            return Ok(Uuid::from_bytes_le(uuid));
+            return Ok(value.into());
         }
 
         Err(unexpected_nonnull_type("uuid", value))
@@ -42,14 +37,7 @@ impl sqlx::Encode<'_, Durable> for &'_ [Uuid] {
         &self,
         buf: &mut <Durable as sqlx::Database>::ArgumentBuffer<'_>,
     ) -> Result<IsNull, BoxDynError> {
-        let array: Vec<sql::Uuid> = self
-            .iter()
-            .map(|uuid| {
-                let uuid: [u8; 16] = uuid.to_bytes_le();
-                let uuid: sql::Uuid = unsafe { std::mem::transmute(uuid) };
-                uuid
-            })
-            .collect();
+        let array: Vec<sql::Uuid> = self.iter().copied().map(From::from).collect();
 
         buf.push(Value(sql::Value::uuid_array(&array)));
         Ok(IsNull::No)
@@ -68,14 +56,7 @@ impl sqlx::Encode<'_, Durable> for Vec<Uuid> {
         self,
         buf: &mut <Durable as sqlx::Database>::ArgumentBuffer<'_>,
     ) -> Result<IsNull, BoxDynError> {
-        let array: Vec<sql::Uuid> = self
-            .into_iter()
-            .map(|uuid| {
-                let uuid: [u8; 16] = uuid.to_bytes_le();
-                let uuid: sql::Uuid = unsafe { std::mem::transmute(uuid) };
-                uuid
-            })
-            .collect();
+        let array: Vec<sql::Uuid> = self.into_iter().map(From::from).collect();
 
         buf.push(Value(sql::Value::uuid_array(&array)));
         Ok(IsNull::No)
@@ -85,13 +66,7 @@ impl sqlx::Encode<'_, Durable> for Vec<Uuid> {
 impl sqlx::Decode<'_, Durable> for Vec<Uuid> {
     fn decode(value: <Durable as sqlx::Database>::ValueRef<'_>) -> Result<Self, BoxDynError> {
         if let Some(value) = value.0.as_uuid_array() {
-            let array: Vec<Uuid> = value
-                .into_iter()
-                .map(|uuid| {
-                    let uuid: [u8; 16] = unsafe { std::mem::transmute(uuid) };
-                    Uuid::from_bytes_le(uuid)
-                })
-                .collect();
+            let array: Vec<Uuid> = value.into_iter().map(From::from).collect();
 
             return Ok(array);
         }
@@ -109,5 +84,18 @@ impl sqlx::Type<Durable> for &'_ [Uuid] {
 impl sqlx::Type<Durable> for Vec<Uuid> {
     fn type_info() -> <Durable as sqlx::Database>::TypeInfo {
         TypeInfo::uuid_array()
+    }
+}
+
+impl From<sql::Uuid> for Uuid {
+    fn from(value: sql::Uuid) -> Self {
+        Uuid::from_u64_pair(value.hi, value.lo)
+    }
+}
+
+impl From<Uuid> for sql::Uuid {
+    fn from(value: Uuid) -> Self {
+        let (hi, lo) = value.as_u64_pair();
+        sql::Uuid { hi, lo }
     }
 }

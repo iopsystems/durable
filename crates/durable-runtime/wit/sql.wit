@@ -96,7 +96,10 @@ interface sql {
     /// This should be the bytes of the UUID, in little-endian order.
     /// 
     /// This is currently the only way to represent a fixed-size array in WIT. 
-    type uuid = tuple<tuple<u8, u8, u8, u8, u8, u8, u8, u8>, u8, u8, u8, u8, u8, u8, u8, u8>;
+    record uuid {
+        hi: u64,
+        lo: u64
+    }
 
     /// A database value.
     /// 

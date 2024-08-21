@@ -389,7 +389,7 @@ impl sql::HostValue for Task {
         let value = self.resources.get(res)?;
 
         Ok(match &value.value {
-            &Value::Uuid(uuid) => Some(to_sql_uuid(uuid)),
+            &Value::Uuid(uuid) => Some(uuid.into()),
             _ => None,
         })
     }
@@ -542,7 +542,7 @@ impl sql::HostValue for Task {
         let value = self.resources.get(res)?;
 
         Ok(match &value.value {
-            Value::UuidArray(arr) => Some(arr.iter().copied().map(to_sql_uuid).collect()),
+            Value::UuidArray(arr) => Some(arr.iter().copied().map(From::from).collect()),
             _ => None,
         })
     }
@@ -677,7 +677,7 @@ impl sql::HostValue for Task {
     }
 
     async fn uuid(&mut self, value: sql::Uuid) -> wasmtime::Result<Resource<sql::Value>> {
-        let value = from_sql_uuid(value);
+        let value = value.into();
         let value = ValueResource {
             type_info: type_info(&value),
             value: Value::Uuid(value),
@@ -808,7 +808,7 @@ impl sql::HostValue for Task {
         &mut self,
         value: Vec<sql::Uuid>,
     ) -> wasmtime::Result<Resource<sql::Value>> {
-        let value = value.into_iter().map(from_sql_uuid).collect();
+        let value = value.into_iter().map(From::from).collect();
         let value = ValueResource {
             type_info: type_info(&value),
             value: Value::UuidArray(value),
@@ -1026,23 +1026,24 @@ impl From<sql::Timestamptz> for DateTime<FixedOffset> {
 impl From<DateTime<FixedOffset>> for sql::Timestamptz {
     fn from(ts: DateTime<FixedOffset>) -> Self {
         let offset = ts.timezone();
-        let naive = ts.naive_local();
 
-        #[allow(deprecated)]
         sql::Timestamptz {
-            seconds: naive.timestamp(),
-            subsec_nanos: naive.timestamp_subsec_nanos(),
+            seconds: ts.timestamp(),
+            subsec_nanos: ts.timestamp_subsec_nanos(),
             offset: offset.local_minus_utc(),
         }
     }
 }
 
-fn to_sql_uuid(uuid: Uuid) -> sql::Uuid {
-    let bytes: [u8; 16] = uuid.to_bytes_le();
-    unsafe { std::mem::transmute(bytes) }
+impl From<sql::Uuid> for Uuid {
+    fn from(value: sql::Uuid) -> Self {
+        Uuid::from_u64_pair(value.hi, value.lo)
+    }
 }
 
-fn from_sql_uuid(uuid: sql::Uuid) -> Uuid {
-    let bytes: [u8; 16] = unsafe { std::mem::transmute(uuid) };
-    Uuid::from_bytes_le(bytes)
+impl From<Uuid> for sql::Uuid {
+    fn from(value: Uuid) -> Self {
+        let (hi, lo) = value.as_u64_pair();
+        sql::Uuid { hi, lo }
+    }
 }

@@ -94,17 +94,23 @@ pub mod durable {
             /// This should be the bytes of the UUID, in little-endian order.
             ///
             /// This is currently the only way to represent a fixed-size array in WIT.
-            pub type Uuid = (
-                (u8, u8, u8, u8, u8, u8, u8, u8),
-                u8,
-                u8,
-                u8,
-                u8,
-                u8,
-                u8,
-                u8,
-                u8,
-            );
+            #[repr(C)]
+            #[derive(Clone, Copy, serde::Deserialize, serde::Serialize)]
+            pub struct Uuid {
+                pub hi: u64,
+                pub lo: u64,
+            }
+            impl ::core::fmt::Debug for Uuid {
+                fn fmt(
+                    &self,
+                    f: &mut ::core::fmt::Formatter<'_>,
+                ) -> ::core::fmt::Result {
+                    f.debug_struct("Uuid")
+                        .field("hi", &self.hi)
+                        .field("lo", &self.lo)
+                        .finish()
+                }
+            }
             /// A database value.
             ///
             /// This is opaque so that new value types can be added in the future
@@ -1660,10 +1666,10 @@ pub mod durable {
                 #[allow(unused_unsafe, clippy::all)]
                 pub fn as_uuid(&self) -> Option<Uuid> {
                     unsafe {
-                        #[repr(align(1))]
-                        struct RetArea([::core::mem::MaybeUninit<u8>; 17]);
+                        #[repr(align(8))]
+                        struct RetArea([::core::mem::MaybeUninit<u8>; 24]);
                         let mut ret_area = RetArea(
-                            [::core::mem::MaybeUninit::uninit(); 17],
+                            [::core::mem::MaybeUninit::uninit(); 24],
                         );
                         let ptr0 = ret_area.0.as_mut_ptr().cast::<u8>();
                         #[cfg(target_arch = "wasm32")]
@@ -1682,42 +1688,12 @@ pub mod durable {
                             0 => None,
                             1 => {
                                 let e = {
-                                    let l2 = i32::from(*ptr0.add(1).cast::<u8>());
-                                    let l3 = i32::from(*ptr0.add(2).cast::<u8>());
-                                    let l4 = i32::from(*ptr0.add(3).cast::<u8>());
-                                    let l5 = i32::from(*ptr0.add(4).cast::<u8>());
-                                    let l6 = i32::from(*ptr0.add(5).cast::<u8>());
-                                    let l7 = i32::from(*ptr0.add(6).cast::<u8>());
-                                    let l8 = i32::from(*ptr0.add(7).cast::<u8>());
-                                    let l9 = i32::from(*ptr0.add(8).cast::<u8>());
-                                    let l10 = i32::from(*ptr0.add(9).cast::<u8>());
-                                    let l11 = i32::from(*ptr0.add(10).cast::<u8>());
-                                    let l12 = i32::from(*ptr0.add(11).cast::<u8>());
-                                    let l13 = i32::from(*ptr0.add(12).cast::<u8>());
-                                    let l14 = i32::from(*ptr0.add(13).cast::<u8>());
-                                    let l15 = i32::from(*ptr0.add(14).cast::<u8>());
-                                    let l16 = i32::from(*ptr0.add(15).cast::<u8>());
-                                    let l17 = i32::from(*ptr0.add(16).cast::<u8>());
-                                    (
-                                        (
-                                            l2 as u8,
-                                            l3 as u8,
-                                            l4 as u8,
-                                            l5 as u8,
-                                            l6 as u8,
-                                            l7 as u8,
-                                            l8 as u8,
-                                            l9 as u8,
-                                        ),
-                                        l10 as u8,
-                                        l11 as u8,
-                                        l12 as u8,
-                                        l13 as u8,
-                                        l14 as u8,
-                                        l15 as u8,
-                                        l16 as u8,
-                                        l17 as u8,
-                                    )
+                                    let l2 = *ptr0.add(8).cast::<i64>();
+                                    let l3 = *ptr0.add(16).cast::<i64>();
+                                    Uuid {
+                                        hi: l2 as u64,
+                                        lo: l3 as u64,
+                                    }
                                 };
                                 Some(e)
                             }
@@ -2584,70 +2560,18 @@ pub mod durable {
                 #[allow(unused_unsafe, clippy::all)]
                 pub fn uuid(value: Uuid) -> Value {
                     unsafe {
-                        let (t0_0, t0_1, t0_2, t0_3, t0_4, t0_5, t0_6, t0_7, t0_8) = value;
-                        let (t1_0, t1_1, t1_2, t1_3, t1_4, t1_5, t1_6, t1_7) = t0_0;
+                        let Uuid { hi: hi0, lo: lo0 } = value;
                         #[cfg(target_arch = "wasm32")]
                         #[link(wasm_import_module = "durable:core/sql@2.0.0")]
                         extern "C" {
                             #[link_name = "[static]value.uuid"]
-                            fn wit_import(
-                                _: i32,
-                                _: i32,
-                                _: i32,
-                                _: i32,
-                                _: i32,
-                                _: i32,
-                                _: i32,
-                                _: i32,
-                                _: i32,
-                                _: i32,
-                                _: i32,
-                                _: i32,
-                                _: i32,
-                                _: i32,
-                                _: i32,
-                                _: i32,
-                            ) -> i32;
+                            fn wit_import(_: i64, _: i64) -> i32;
                         }
                         #[cfg(not(target_arch = "wasm32"))]
-                        fn wit_import(
-                            _: i32,
-                            _: i32,
-                            _: i32,
-                            _: i32,
-                            _: i32,
-                            _: i32,
-                            _: i32,
-                            _: i32,
-                            _: i32,
-                            _: i32,
-                            _: i32,
-                            _: i32,
-                            _: i32,
-                            _: i32,
-                            _: i32,
-                            _: i32,
-                        ) -> i32 {
+                        fn wit_import(_: i64, _: i64) -> i32 {
                             unreachable!()
                         }
-                        let ret = wit_import(
-                            _rt::as_i32(t1_0),
-                            _rt::as_i32(t1_1),
-                            _rt::as_i32(t1_2),
-                            _rt::as_i32(t1_3),
-                            _rt::as_i32(t1_4),
-                            _rt::as_i32(t1_5),
-                            _rt::as_i32(t1_6),
-                            _rt::as_i32(t1_7),
-                            _rt::as_i32(t0_1),
-                            _rt::as_i32(t0_2),
-                            _rt::as_i32(t0_3),
-                            _rt::as_i32(t0_4),
-                            _rt::as_i32(t0_5),
-                            _rt::as_i32(t0_6),
-                            _rt::as_i32(t0_7),
-                            _rt::as_i32(t0_8),
-                        );
+                        let ret = wit_import(_rt::as_i64(hi0), _rt::as_i64(lo0));
                         Value::from_handle(ret as u32)
                     }
                 }
@@ -3617,94 +3541,94 @@ mod _rt {
 #[cfg(target_arch = "wasm32")]
 #[link_section = "component-type:wit-bindgen:0.30.0:import-sql:encoded world"]
 #[doc(hidden)]
-pub static __WIT_BINDGEN_COMPONENT_TYPE: [u8; 4389] = *b"\
-\0asm\x0d\0\x01\0\0\x19\x16wit-component-encoding\x04\0\x07\xa4!\x01A\x02\x01A\x02\
-\x01B\xe3\x01\x04\0\x09type-info\x03\x01\x01r\x02\x07secondsx\x0csubsec-nanosy\x04\
+pub static __WIT_BINDGEN_COMPONENT_TYPE: [u8; 4376] = *b"\
+\0asm\x0d\0\x01\0\0\x19\x16wit-component-encoding\x04\0\x07\x97!\x01A\x02\x01A\x02\
+\x01B\xe2\x01\x04\0\x09type-info\x03\x01\x01r\x02\x07secondsx\x0csubsec-nanosy\x04\
 \0\x09timestamp\x03\0\x01\x01r\x03\x07secondsx\x0csubsec-nanosy\x06offsetz\x04\0\
-\x0btimestamptz\x03\0\x03\x01o\x08}}}}}}}}\x01o\x09\x05}}}}}}}}\x04\0\x04uuid\x03\
-\0\x06\x04\0\x05value\x03\x01\x01i\x08\x01r\x02\x04names\x05value\x09\x04\0\x06c\
-olumn\x03\0\x0a\x01p\x0b\x01r\x01\x07columns\x0c\x04\0\x03row\x03\0\x0d\x01q\x02\
-\x05count\x01w\0\x03row\x01\x0e\0\x04\0\x0cquery-result\x03\0\x0f\x01r\x02\x05li\
-mit}\x0apersistent\x7f\x04\0\x07options\x03\0\x11\x01r\x02\x05indexs\x06sources\x04\
-\0\x13column-decode-error\x03\0\x13\x01m\x05\x10unique-violation\x15foreign-key-\
-violation\x12not-null-violation\x0fcheck-violation\x05other\x04\0\x13database-er\
-ror-kind\x03\0\x15\x01ks\x01r\x05\x07messages\x04kind\x16\x04code\x17\x0aconstra\
-int\x17\x05table\x17\x04\0\x0edatabase-error\x03\0\x18\x01q\x06\x0dcolumn-decode\
-\x01\x14\0\x0etype-not-found\x01s\0\x06encode\x01s\0\x06decode\x01s\0\x08databas\
-e\x01\x19\0\x05other\x01s\0\x04\0\x05error\x03\0\x1a\x01h\0\x01@\x01\x04self\x1c\
-\0s\x04\0\x16[method]type-info.name\x01\x1d\x01@\x02\x04self\x1c\x05other\x1c\0\x7f\
-\x04\0\x1c[method]type-info.compatible\x01\x1e\x04\0\x17[method]type-info.equal\x01\
-\x1e\x01i\0\x01@\x01\x04self\x1c\0\x1f\x04\0\x17[method]type-info.clone\x01\x20\x01\
-j\x01s\x01s\x01@\x01\x04self\x1c\0!\x04\0\x1b[method]type-info.serialize\x01\"\x01\
-j\x01\x1f\x01s\x01@\x01\x04jsons\0#\x04\0\x1d[static]type-info.deserialize\x01$\x01\
-@\0\0\x1f\x04\0\x19[static]type-info.boolean\x01%\x04\0\x18[static]type-info.flo\
-at4\x01%\x04\0\x18[static]type-info.float8\x01%\x04\0\x16[static]type-info.int1\x01\
-%\x04\0\x16[static]type-info.int2\x01%\x04\0\x16[static]type-info.int4\x01%\x04\0\
-\x16[static]type-info.int8\x01%\x04\0\x16[static]type-info.text\x01%\x04\0\x17[s\
-tatic]type-info.bytea\x01%\x04\0\x1d[static]type-info.timestamptz\x01%\x04\0\x1b\
-[static]type-info.timestamp\x01%\x04\0\x16[static]type-info.uuid\x01%\x04\0\x17[\
-static]type-info.jsonb\x01%\x04\0\x1f[static]type-info.boolean-array\x01%\x04\0\x1e\
-[static]type-info.float4-array\x01%\x04\0\x1e[static]type-info.float8-array\x01%\
-\x04\0\x1c[static]type-info.int1-array\x01%\x04\0\x1c[static]type-info.int2-arra\
-y\x01%\x04\0\x1c[static]type-info.int4-array\x01%\x04\0\x1c[static]type-info.int\
-8-array\x01%\x04\0\x1c[static]type-info.text-array\x01%\x04\0\x1d[static]type-in\
-fo.bytea-array\x01%\x04\0#[static]type-info.timestamptz-array\x01%\x04\0![static\
-]type-info.timestamp-array\x01%\x04\0\x1c[static]type-info.uuid-array\x01%\x04\0\
-\x1d[static]type-info.jsonb-array\x01%\x01h\x08\x01@\x01\x04self&\0\x7f\x04\0\x15\
-[method]value.is-null\x01'\x01@\x01\x04self&\0\x1f\x04\0\x17[method]value.type-i\
-nfo\x01(\x01@\x01\x04self&\0\x09\x04\0\x13[method]value.clone\x01)\x01@\x01\x04s\
-elf&\0!\x04\0\x17[method]value.serialize\x01*\x01j\x01\x09\x01s\x01@\x01\x04json\
-s\0+\x04\0\x19[static]value.deserialize\x01,\x01k\x7f\x01@\x01\x04self&\0-\x04\0\
-\x18[method]value.as-boolean\x01.\x01kv\x01@\x01\x04self&\0/\x04\0\x17[method]va\
-lue.as-float4\x010\x01ku\x01@\x01\x04self&\01\x04\0\x17[method]value.as-float8\x01\
-2\x01k~\x01@\x01\x04self&\03\x04\0\x15[method]value.as-int1\x014\x01k|\x01@\x01\x04\
-self&\05\x04\0\x15[method]value.as-int2\x016\x01kz\x01@\x01\x04self&\07\x04\0\x15\
-[method]value.as-int4\x018\x01kx\x01@\x01\x04self&\09\x04\0\x15[method]value.as-\
-int8\x01:\x01@\x01\x04self&\0\x17\x04\0\x15[method]value.as-text\x01;\x01p}\x01k\
-<\x01@\x01\x04self&\0=\x04\0\x16[method]value.as-bytea\x01>\x01k\x04\x01@\x01\x04\
-self&\0?\x04\0\x1c[method]value.as-timestamptz\x01@\x01k\x02\x01@\x01\x04self&\0\
-\xc1\0\x04\0\x1a[method]value.as-timestamp\x01B\x01k\x07\x01@\x01\x04self&\0\xc3\
-\0\x04\0\x15[method]value.as-uuid\x01D\x04\0\x15[method]value.as-json\x01;\x01p\x7f\
-\x01k\xc5\0\x01@\x01\x04self&\0\xc6\0\x04\0\x1e[method]value.as-boolean-array\x01\
-G\x01pv\x01k\xc8\0\x01@\x01\x04self&\0\xc9\0\x04\0\x1d[method]value.as-float4-ar\
-ray\x01J\x01pu\x01k\xcb\0\x01@\x01\x04self&\0\xcc\0\x04\0\x1d[method]value.as-fl\
-oat8-array\x01M\x01p~\x01k\xce\0\x01@\x01\x04self&\0\xcf\0\x04\0\x1b[method]valu\
-e.as-int1-array\x01P\x01p|\x01k\xd1\0\x01@\x01\x04self&\0\xd2\0\x04\0\x1b[method\
-]value.as-int2-array\x01S\x01pz\x01k\xd4\0\x01@\x01\x04self&\0\xd5\0\x04\0\x1b[m\
-ethod]value.as-int4-array\x01V\x01px\x01k\xd7\0\x01@\x01\x04self&\0\xd8\0\x04\0\x1b\
-[method]value.as-int8-array\x01Y\x01ps\x01k\xda\0\x01@\x01\x04self&\0\xdb\0\x04\0\
-\x1b[method]value.as-text-array\x01\\\x01p<\x01k\xdd\0\x01@\x01\x04self&\0\xde\0\
-\x04\0\x1c[method]value.as-bytea-array\x01_\x01p\x04\x01k\xe0\0\x01@\x01\x04self\
-&\0\xe1\0\x04\0\"[method]value.as-timestamptz-array\x01b\x01p\x02\x01k\xe3\0\x01\
-@\x01\x04self&\0\xe4\0\x04\0\x20[method]value.as-timestamp-array\x01e\x01p\x07\x01\
-k\xe6\0\x01@\x01\x04self&\0\xe7\0\x04\0\x1b[method]value.as-uuid-array\x01h\x04\0\
-\x1b[method]value.as-json-array\x01\\\x01@\x01\x06tyinfo\x1f\0\x09\x04\0\x12[sta\
-tic]value.null\x01i\x01@\x01\x05value\x7f\0\x09\x04\0\x15[static]value.boolean\x01\
-j\x01@\x01\x05valuev\0\x09\x04\0\x14[static]value.float4\x01k\x01@\x01\x05valueu\
-\0\x09\x04\0\x14[static]value.float8\x01l\x01@\x01\x05value~\0\x09\x04\0\x12[sta\
-tic]value.int1\x01m\x01@\x01\x05value|\0\x09\x04\0\x12[static]value.int2\x01n\x01\
-@\x01\x05valuez\0\x09\x04\0\x12[static]value.int4\x01o\x01@\x01\x05valuex\0\x09\x04\
-\0\x12[static]value.int8\x01p\x01@\x01\x05values\0\x09\x04\0\x12[static]value.te\
-xt\x01q\x01@\x01\x05value<\0\x09\x04\0\x13[static]value.bytea\x01r\x01@\x01\x05v\
-alue\x04\0\x09\x04\0\x19[static]value.timestamptz\x01s\x01@\x01\x05value\x02\0\x09\
-\x04\0\x17[static]value.timestamp\x01t\x01@\x01\x05value\x07\0\x09\x04\0\x12[sta\
-tic]value.uuid\x01u\x04\0\x13[static]value.jsonb\x01q\x01@\x01\x05value\xc5\0\0\x09\
-\x04\0\x1b[static]value.boolean-array\x01v\x01@\x01\x05value\xc8\0\0\x09\x04\0\x1a\
-[static]value.float4-array\x01w\x01@\x01\x05value\xcb\0\0\x09\x04\0\x1a[static]v\
-alue.float8-array\x01x\x01@\x01\x05value\xce\0\0\x09\x04\0\x18[static]value.int1\
--array\x01y\x01@\x01\x05value\xd1\0\0\x09\x04\0\x18[static]value.int2-array\x01z\
-\x01@\x01\x05value\xd4\0\0\x09\x04\0\x18[static]value.int4-array\x01{\x01@\x01\x05\
-value\xd7\0\0\x09\x04\0\x18[static]value.int8-array\x01|\x01@\x01\x05value\xda\0\
-\0\x09\x04\0\x18[static]value.text-array\x01}\x01@\x01\x05value\xdd\0\0\x09\x04\0\
-\x19[static]value.bytea-array\x01~\x01@\x01\x05value\xe0\0\0\x09\x04\0\x1f[stati\
-c]value.timestamptz-array\x01\x7f\x01@\x01\x05value\xe3\0\0\x09\x04\0\x1d[static\
-]value.timestamp-array\x01\x80\x01\x01@\x01\x05value\xe6\0\0\x09\x04\0\x18[stati\
-c]value.uuid-array\x01\x81\x01\x04\0\x19[static]value.jsonb-array\x01}\x01p\x09\x01\
-@\x03\x03sqls\x06params\x82\x01\x07options\x12\x01\0\x04\0\x05query\x01\x83\x01\x01\
-j\x01\x10\x01\x1b\x01k\x84\x01\x01@\0\0\x85\x01\x04\0\x05fetch\x01\x86\x01\x03\x01\
-\x16durable:core/sql@2.0.0\x05\0\x04\x01\x1ddurable:core/import-sql@2.0.0\x04\0\x0b\
-\x10\x01\0\x0aimport-sql\x03\0\0\0G\x09producers\x01\x0cprocessed-by\x02\x0dwit-\
-component\x070.215.0\x10wit-bindgen-rust\x060.30.0";
+\x0btimestamptz\x03\0\x03\x01r\x02\x02hiw\x02low\x04\0\x04uuid\x03\0\x05\x04\0\x05\
+value\x03\x01\x01i\x07\x01r\x02\x04names\x05value\x08\x04\0\x06column\x03\0\x09\x01\
+p\x0a\x01r\x01\x07columns\x0b\x04\0\x03row\x03\0\x0c\x01q\x02\x05count\x01w\0\x03\
+row\x01\x0d\0\x04\0\x0cquery-result\x03\0\x0e\x01r\x02\x05limit}\x0apersistent\x7f\
+\x04\0\x07options\x03\0\x10\x01r\x02\x05indexs\x06sources\x04\0\x13column-decode\
+-error\x03\0\x12\x01m\x05\x10unique-violation\x15foreign-key-violation\x12not-nu\
+ll-violation\x0fcheck-violation\x05other\x04\0\x13database-error-kind\x03\0\x14\x01\
+ks\x01r\x05\x07messages\x04kind\x15\x04code\x16\x0aconstraint\x16\x05table\x16\x04\
+\0\x0edatabase-error\x03\0\x17\x01q\x06\x0dcolumn-decode\x01\x13\0\x0etype-not-f\
+ound\x01s\0\x06encode\x01s\0\x06decode\x01s\0\x08database\x01\x18\0\x05other\x01\
+s\0\x04\0\x05error\x03\0\x19\x01h\0\x01@\x01\x04self\x1b\0s\x04\0\x16[method]typ\
+e-info.name\x01\x1c\x01@\x02\x04self\x1b\x05other\x1b\0\x7f\x04\0\x1c[method]typ\
+e-info.compatible\x01\x1d\x04\0\x17[method]type-info.equal\x01\x1d\x01i\0\x01@\x01\
+\x04self\x1b\0\x1e\x04\0\x17[method]type-info.clone\x01\x1f\x01j\x01s\x01s\x01@\x01\
+\x04self\x1b\0\x20\x04\0\x1b[method]type-info.serialize\x01!\x01j\x01\x1e\x01s\x01\
+@\x01\x04jsons\0\"\x04\0\x1d[static]type-info.deserialize\x01#\x01@\0\0\x1e\x04\0\
+\x19[static]type-info.boolean\x01$\x04\0\x18[static]type-info.float4\x01$\x04\0\x18\
+[static]type-info.float8\x01$\x04\0\x16[static]type-info.int1\x01$\x04\0\x16[sta\
+tic]type-info.int2\x01$\x04\0\x16[static]type-info.int4\x01$\x04\0\x16[static]ty\
+pe-info.int8\x01$\x04\0\x16[static]type-info.text\x01$\x04\0\x17[static]type-inf\
+o.bytea\x01$\x04\0\x1d[static]type-info.timestamptz\x01$\x04\0\x1b[static]type-i\
+nfo.timestamp\x01$\x04\0\x16[static]type-info.uuid\x01$\x04\0\x17[static]type-in\
+fo.jsonb\x01$\x04\0\x1f[static]type-info.boolean-array\x01$\x04\0\x1e[static]typ\
+e-info.float4-array\x01$\x04\0\x1e[static]type-info.float8-array\x01$\x04\0\x1c[\
+static]type-info.int1-array\x01$\x04\0\x1c[static]type-info.int2-array\x01$\x04\0\
+\x1c[static]type-info.int4-array\x01$\x04\0\x1c[static]type-info.int8-array\x01$\
+\x04\0\x1c[static]type-info.text-array\x01$\x04\0\x1d[static]type-info.bytea-arr\
+ay\x01$\x04\0#[static]type-info.timestamptz-array\x01$\x04\0![static]type-info.t\
+imestamp-array\x01$\x04\0\x1c[static]type-info.uuid-array\x01$\x04\0\x1d[static]\
+type-info.jsonb-array\x01$\x01h\x07\x01@\x01\x04self%\0\x7f\x04\0\x15[method]val\
+ue.is-null\x01&\x01@\x01\x04self%\0\x1e\x04\0\x17[method]value.type-info\x01'\x01\
+@\x01\x04self%\0\x08\x04\0\x13[method]value.clone\x01(\x01@\x01\x04self%\0\x20\x04\
+\0\x17[method]value.serialize\x01)\x01j\x01\x08\x01s\x01@\x01\x04jsons\0*\x04\0\x19\
+[static]value.deserialize\x01+\x01k\x7f\x01@\x01\x04self%\0,\x04\0\x18[method]va\
+lue.as-boolean\x01-\x01kv\x01@\x01\x04self%\0.\x04\0\x17[method]value.as-float4\x01\
+/\x01ku\x01@\x01\x04self%\00\x04\0\x17[method]value.as-float8\x011\x01k~\x01@\x01\
+\x04self%\02\x04\0\x15[method]value.as-int1\x013\x01k|\x01@\x01\x04self%\04\x04\0\
+\x15[method]value.as-int2\x015\x01kz\x01@\x01\x04self%\06\x04\0\x15[method]value\
+.as-int4\x017\x01kx\x01@\x01\x04self%\08\x04\0\x15[method]value.as-int8\x019\x01\
+@\x01\x04self%\0\x16\x04\0\x15[method]value.as-text\x01:\x01p}\x01k;\x01@\x01\x04\
+self%\0<\x04\0\x16[method]value.as-bytea\x01=\x01k\x04\x01@\x01\x04self%\0>\x04\0\
+\x1c[method]value.as-timestamptz\x01?\x01k\x02\x01@\x01\x04self%\0\xc0\0\x04\0\x1a\
+[method]value.as-timestamp\x01A\x01k\x06\x01@\x01\x04self%\0\xc2\0\x04\0\x15[met\
+hod]value.as-uuid\x01C\x04\0\x15[method]value.as-json\x01:\x01p\x7f\x01k\xc4\0\x01\
+@\x01\x04self%\0\xc5\0\x04\0\x1e[method]value.as-boolean-array\x01F\x01pv\x01k\xc7\
+\0\x01@\x01\x04self%\0\xc8\0\x04\0\x1d[method]value.as-float4-array\x01I\x01pu\x01\
+k\xca\0\x01@\x01\x04self%\0\xcb\0\x04\0\x1d[method]value.as-float8-array\x01L\x01\
+p~\x01k\xcd\0\x01@\x01\x04self%\0\xce\0\x04\0\x1b[method]value.as-int1-array\x01\
+O\x01p|\x01k\xd0\0\x01@\x01\x04self%\0\xd1\0\x04\0\x1b[method]value.as-int2-arra\
+y\x01R\x01pz\x01k\xd3\0\x01@\x01\x04self%\0\xd4\0\x04\0\x1b[method]value.as-int4\
+-array\x01U\x01px\x01k\xd6\0\x01@\x01\x04self%\0\xd7\0\x04\0\x1b[method]value.as\
+-int8-array\x01X\x01ps\x01k\xd9\0\x01@\x01\x04self%\0\xda\0\x04\0\x1b[method]val\
+ue.as-text-array\x01[\x01p;\x01k\xdc\0\x01@\x01\x04self%\0\xdd\0\x04\0\x1c[metho\
+d]value.as-bytea-array\x01^\x01p\x04\x01k\xdf\0\x01@\x01\x04self%\0\xe0\0\x04\0\"\
+[method]value.as-timestamptz-array\x01a\x01p\x02\x01k\xe2\0\x01@\x01\x04self%\0\xe3\
+\0\x04\0\x20[method]value.as-timestamp-array\x01d\x01p\x06\x01k\xe5\0\x01@\x01\x04\
+self%\0\xe6\0\x04\0\x1b[method]value.as-uuid-array\x01g\x04\0\x1b[method]value.a\
+s-json-array\x01[\x01@\x01\x06tyinfo\x1e\0\x08\x04\0\x12[static]value.null\x01h\x01\
+@\x01\x05value\x7f\0\x08\x04\0\x15[static]value.boolean\x01i\x01@\x01\x05valuev\0\
+\x08\x04\0\x14[static]value.float4\x01j\x01@\x01\x05valueu\0\x08\x04\0\x14[stati\
+c]value.float8\x01k\x01@\x01\x05value~\0\x08\x04\0\x12[static]value.int1\x01l\x01\
+@\x01\x05value|\0\x08\x04\0\x12[static]value.int2\x01m\x01@\x01\x05valuez\0\x08\x04\
+\0\x12[static]value.int4\x01n\x01@\x01\x05valuex\0\x08\x04\0\x12[static]value.in\
+t8\x01o\x01@\x01\x05values\0\x08\x04\0\x12[static]value.text\x01p\x01@\x01\x05va\
+lue;\0\x08\x04\0\x13[static]value.bytea\x01q\x01@\x01\x05value\x04\0\x08\x04\0\x19\
+[static]value.timestamptz\x01r\x01@\x01\x05value\x02\0\x08\x04\0\x17[static]valu\
+e.timestamp\x01s\x01@\x01\x05value\x06\0\x08\x04\0\x12[static]value.uuid\x01t\x04\
+\0\x13[static]value.jsonb\x01p\x01@\x01\x05value\xc4\0\0\x08\x04\0\x1b[static]va\
+lue.boolean-array\x01u\x01@\x01\x05value\xc7\0\0\x08\x04\0\x1a[static]value.floa\
+t4-array\x01v\x01@\x01\x05value\xca\0\0\x08\x04\0\x1a[static]value.float8-array\x01\
+w\x01@\x01\x05value\xcd\0\0\x08\x04\0\x18[static]value.int1-array\x01x\x01@\x01\x05\
+value\xd0\0\0\x08\x04\0\x18[static]value.int2-array\x01y\x01@\x01\x05value\xd3\0\
+\0\x08\x04\0\x18[static]value.int4-array\x01z\x01@\x01\x05value\xd6\0\0\x08\x04\0\
+\x18[static]value.int8-array\x01{\x01@\x01\x05value\xd9\0\0\x08\x04\0\x18[static\
+]value.text-array\x01|\x01@\x01\x05value\xdc\0\0\x08\x04\0\x19[static]value.byte\
+a-array\x01}\x01@\x01\x05value\xdf\0\0\x08\x04\0\x1f[static]value.timestamptz-ar\
+ray\x01~\x01@\x01\x05value\xe2\0\0\x08\x04\0\x1d[static]value.timestamp-array\x01\
+\x7f\x01@\x01\x05value\xe5\0\0\x08\x04\0\x18[static]value.uuid-array\x01\x80\x01\
+\x04\0\x19[static]value.jsonb-array\x01|\x01p\x08\x01@\x03\x03sqls\x06params\x81\
+\x01\x07options\x11\x01\0\x04\0\x05query\x01\x82\x01\x01j\x01\x0f\x01\x1a\x01k\x83\
+\x01\x01@\0\0\x84\x01\x04\0\x05fetch\x01\x85\x01\x03\x01\x16durable:core/sql@2.0\
+.0\x05\0\x04\x01\x1ddurable:core/import-sql@2.0.0\x04\0\x0b\x10\x01\0\x0aimport-\
+sql\x03\0\0\0G\x09producers\x01\x0cprocessed-by\x02\x0dwit-component\x070.215.0\x10\
+wit-bindgen-rust\x060.30.0";
 #[inline(never)]
 #[doc(hidden)]
 pub fn __link_custom_section_describing_imports() {
