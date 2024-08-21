@@ -13,7 +13,8 @@ default = []
 
 http = ["dep:durable-http"]
 sqlx = ["dep:durable-sqlx"]
-sqlx-macros = ["durable-sqlx?/macros"]
+sqlx-macros = ["sqlx", "durable-sqlx/macros"]
+sqlx-uuid = ["sqlx", "durable-sqlx/uuid"]
 
 bindgen = ["durable-core/bindgen", "durable-http?/bindgen", "durable-sqlx?/bindgen"]
 

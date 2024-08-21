@@ -1,29 +1,22 @@
 use std::borrow::Cow;
 
+use serde::{Deserialize, Serialize};
+use serde_json::value::RawValue;
+
 use crate::bindings as sql;
 use crate::driver::{Durable, TypeInfo};
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[repr(transparent)]
-#[serde(transparent)]
 pub struct Value(pub(crate) sql::Value);
 
 impl Value {
-    pub(crate) fn type_info(&self) -> TypeInfo {
-        let ty = match &self.0 {
-            sql::Value::Null(ty) => *ty,
-            sql::Value::Boolean(_) => sql::PrimitiveType::Boolean,
-            sql::Value::Float4(_) => sql::PrimitiveType::Float4,
-            sql::Value::Float8(_) => sql::PrimitiveType::Float8,
-            sql::Value::Int1(_) => sql::PrimitiveType::Int1,
-            sql::Value::Int2(_) => sql::PrimitiveType::Int2,
-            sql::Value::Int4(_) => sql::PrimitiveType::Int4,
-            sql::Value::Int8(_) => sql::PrimitiveType::Int8,
-            sql::Value::Text(_) => sql::PrimitiveType::Text,
-            sql::Value::Bytea(_) => sql::PrimitiveType::Bytea,
-        };
+    pub(crate) fn new(value: sql::Value) -> Self {
+        Self(value)
+    }
 
-        TypeInfo(ty)
+    pub fn type_info(&self) -> TypeInfo {
+        TypeInfo::new(self.0.type_info())
     }
 }
 
@@ -35,11 +28,11 @@ impl sqlx::Value for Value {
     }
 
     fn type_info(&self) -> Cow<'_, <Self::Database as sqlx::Database>::TypeInfo> {
-        Cow::Owned(self.type_info())
+        Cow::Owned(TypeInfo::new(self.0.type_info()))
     }
 
     fn is_null(&self) -> bool {
-        matches!(self.0, sql::Value::Null(_))
+        self.0.is_null()
     }
 }
 
@@ -56,5 +49,39 @@ impl<'r> sqlx::ValueRef<'r> for &'r Value {
 
     fn is_null(&self) -> bool {
         <Value as sqlx::Value>::is_null(self)
+    }
+}
+
+impl Serialize for sql::Value {
+    fn serialize<S>(&self, ser: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        use serde::ser::Error;
+
+        let json = self.serialize().map_err(|e| Error::custom(e))?;
+        let json: Box<str> = json.into_boxed_str();
+        let json: Box<RawValue> = unsafe { std::mem::transmute(json) };
+
+        json.serialize(ser)
+    }
+}
+
+impl<'de> Deserialize<'de> for sql::Value {
+    fn deserialize<D>(de: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        use serde::de::Error;
+        let json: Box<RawValue> = Deserialize::deserialize(de)?;
+        let value = sql::Value::deserialize(json.get()).map_err(Error::custom)?;
+
+        Ok(value)
+    }
+}
+
+impl Clone for sql::Value {
+    fn clone(&self) -> Self {
+        self.clone()
     }
 }

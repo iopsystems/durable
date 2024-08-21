@@ -178,7 +178,7 @@ pub mod durable {
                     };
                     let ptr10 = ret_area.0.as_mut_ptr().cast::<u8>();
                     #[cfg(target_arch = "wasm32")]
-                    #[link(wasm_import_module = "durable:core/http@1.0.0")]
+                    #[link(wasm_import_module = "durable:core/http@2.0.0")]
                     extern "C" {
                         #[link_name = "fetch"]
                         fn wit_import(
@@ -383,8 +383,8 @@ timeout\x05\x04\0\x0chttp-request\x03\0\x06\x01r\x03\x06status{\x07headers\x03\x
 body\0\x04\0\x0dhttp-response\x03\0\x08\x01q\x06\x07timeout\0\0\x0einvalid-metho\
 d\0\0\x0binvalid-url\x01s\0\x13invalid-header-name\0\0\x14invalid-header-value\0\
 \0\x05other\x01s\0\x04\0\x0ahttp-error\x03\0\x0a\x01j\x01\x09\x01\x0b\x01@\x01\x07\
-request\x07\0\x0c\x04\0\x05fetch\x01\x0d\x03\x01\x17durable:core/http@1.0.0\x05\0\
-\x04\x01\x1edurable:core/import-http@1.0.0\x04\0\x0b\x11\x01\0\x0bimport-http\x03\
+request\x07\0\x0c\x04\0\x05fetch\x01\x0d\x03\x01\x17durable:core/http@2.0.0\x05\0\
+\x04\x01\x1edurable:core/import-http@2.0.0\x04\0\x0b\x11\x01\0\x0bimport-http\x03\
 \0\0\0G\x09producers\x01\x0cprocessed-by\x02\x0dwit-component\x070.215.0\x10wit-\
 bindgen-rust\x060.30.0";
 #[inline(never)]

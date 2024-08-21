@@ -5,9 +5,9 @@ use crate::driver::{Durable, Value};
 pub struct Arguments(Vec<Value>);
 
 impl Arguments {
-    pub(crate) fn raw_args(&self) -> &[sql::Value] {
+    pub(crate) fn into_raw_args(self) -> Vec<sql::Value> {
         // SAFETY: Value is a #[repr(transparent)] wrapper around sql::Value.
-        unsafe { self.0.as_slice().align_to().1 }
+        unsafe { std::mem::transmute(self.0) }
     }
 }
 
@@ -24,7 +24,7 @@ impl<'q> sqlx::Arguments<'q> for Arguments {
     {
         let ty = value.produces().unwrap_or_else(T::type_info);
         if value.encode(&mut self.0)?.is_null() {
-            self.0.push(Value(sql::Value::Null(ty.0)));
+            self.0.push(Value::new(sql::Value::null(ty.into_inner())));
         }
 
         Ok(())

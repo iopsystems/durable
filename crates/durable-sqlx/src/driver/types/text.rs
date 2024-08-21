@@ -12,7 +12,7 @@ impl sqlx::Encode<'_, Durable> for &str {
         &self,
         buf: &mut <Durable as sqlx::Database>::ArgumentBuffer<'_>,
     ) -> Result<IsNull, BoxDynError> {
-        buf.push(Value(sql::Value::Text(self.to_string())));
+        buf.push(Value::new(sql::Value::text(self)));
         Ok(IsNull::No)
     }
 }
@@ -42,46 +42,33 @@ impl sqlx::Encode<'_, Durable> for String {
     ) -> Result<IsNull, sqlx::error::BoxDynError> {
         <&str as sqlx::Encode<Durable>>::encode(self, buf)
     }
-
-    fn encode(
-        self,
-        buf: &mut <Durable as sqlx::Database>::ArgumentBuffer<'_>,
-    ) -> Result<IsNull, sqlx::error::BoxDynError> {
-        buf.push(Value(sql::Value::Text(self)));
-        Ok(IsNull::No)
-    }
-}
-
-impl<'r> sqlx::Decode<'r, Durable> for &'r str {
-    fn decode(value: <Durable as sqlx::Database>::ValueRef<'r>) -> Result<Self, BoxDynError> {
-        match &value.0 {
-            sql::Value::Text(v) => Ok(&v),
-            _ => Err(unexpected_nonnull_type("text", value)),
-        }
-    }
 }
 
 impl<'r> sqlx::Decode<'r, Durable> for Cow<'r, str> {
     fn decode(value: <Durable as sqlx::Database>::ValueRef<'r>) -> Result<Self, BoxDynError> {
-        <&str as sqlx::Decode<Durable>>::decode(value).map(Cow::Borrowed)
+        <String as sqlx::Decode<Durable>>::decode(value).map(Cow::Owned)
     }
 }
 
 impl sqlx::Decode<'_, Durable> for Box<str> {
     fn decode(value: <Durable as sqlx::Database>::ValueRef<'_>) -> Result<Self, BoxDynError> {
-        <&str as sqlx::Decode<Durable>>::decode(value).map(|s| s.into())
+        <String as sqlx::Decode<Durable>>::decode(value).map(|s| s.into_boxed_str())
     }
 }
 
 impl sqlx::Decode<'_, Durable> for String {
     fn decode(value: <Durable as sqlx::Database>::ValueRef<'_>) -> Result<Self, BoxDynError> {
-        <&str as sqlx::Decode<Durable>>::decode(value).map(|v| v.to_owned())
+        if let Some(text) = value.0.as_text() {
+            return Ok(text);
+        }
+
+        Err(unexpected_nonnull_type("text", value))
     }
 }
 
 impl sqlx::Type<Durable> for String {
     fn type_info() -> <Durable as sqlx::Database>::TypeInfo {
-        TypeInfo(sql::PrimitiveType::Text)
+        TypeInfo::text()
     }
 }
 
@@ -100,5 +87,64 @@ impl sqlx::Type<Durable> for Box<str> {
 impl sqlx::Type<Durable> for Cow<'_, str> {
     fn type_info() -> <Durable as sqlx::Database>::TypeInfo {
         <String as sqlx::Type<Durable>>::type_info()
+    }
+}
+
+impl sqlx::Encode<'_, Durable> for &'_ [String] {
+    fn encode_by_ref(
+        &self,
+        buf: &mut <Durable as sqlx::Database>::ArgumentBuffer<'_>,
+    ) -> Result<IsNull, BoxDynError>
+    where
+        Self: Sized,
+    {
+        buf.push(Value::new(sql::Value::text_array(self)));
+        Ok(IsNull::No)
+    }
+}
+
+impl sqlx::Encode<'_, Durable> for Vec<String> {
+    fn encode_by_ref(
+        &self,
+        buf: &mut <Durable as sqlx::Database>::ArgumentBuffer<'_>,
+    ) -> Result<IsNull, BoxDynError>
+    where
+        Self: Sized,
+    {
+        <&[String] as sqlx::Encode<Durable>>::encode(self, buf)
+    }
+}
+
+impl sqlx::Encode<'_, Durable> for Box<[String]> {
+    fn encode_by_ref(
+        &self,
+        buf: &mut <Durable as sqlx::Database>::ArgumentBuffer<'_>,
+    ) -> Result<IsNull, BoxDynError>
+    where
+        Self: Sized,
+    {
+        <&[String] as sqlx::Encode<Durable>>::encode(self, buf)
+    }
+}
+
+impl sqlx::Encode<'_, Durable> for Cow<'_, [String]> {
+    fn encode_by_ref(
+        &self,
+        buf: &mut <Durable as sqlx::Database>::ArgumentBuffer<'_>,
+    ) -> Result<IsNull, BoxDynError>
+    where
+        Self: Sized,
+    {
+        <&[String] as sqlx::Encode<Durable>>::encode(self, buf)
+    }
+}
+
+impl sqlx::Decode<'_, Durable> for Vec<String> {
+    fn decode(value: <Durable as sqlx::Database>::ValueRef<'_>) -> Result<Self, BoxDynError> {
+        if let Some(value) = value.0.as_text_array() {
+            return Ok(value);
+        }
+
+        Err(unexpected_nonnull_type("text[]", value))
     }
 }

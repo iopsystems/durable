@@ -7,6 +7,12 @@ publish.workspace = true
 repository.workspace = true
 homepage.workspace = true
 
+[features]
+chrono = ["sqlx-macros-core/chrono"]
+ipnetwork = ["sqlx-macros-core/ipnetwork"]
+uuid = ["sqlx-macros-core/uuid"]
+json = ["sqlx-macros-core/json"]
+
 [lib]
 proc-macro = true
 
