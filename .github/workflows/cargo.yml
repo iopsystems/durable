@@ -20,7 +20,7 @@ jobs:
           tool: cargo-nextest,cargo-component
 
       - name: create test database
-        run: cargo xtask dev -d
+        run: cargo run --bin xtask --profile dev-ci -- dev -d
 
       - name: cargo nextest run
         run: |
@@ -30,6 +30,7 @@ jobs:
             --all-features          \
             --no-fail-fast          \
             --success-output final  \
+            --cargo-profile dev-ci  \
             --final-status-level skip
         shell: bash
       
@@ -50,7 +51,7 @@ jobs:
       - uses: swlynch99/cargo-sweep-action@v1
 
       - name: cargo check
-        run: cargo check --all-features --all-targets
+        run: cargo check --all-features --all-targets --profile dev-ci
 
   rustfmt:
     runs-on: ubuntu-latest
