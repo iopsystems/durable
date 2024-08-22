@@ -9,8 +9,6 @@ repository = { workspace = true }
 description = "SQLx bindings for durable guests"
 
 [features]
-default = ["chrono", "uuid"]
-
 bindgen = ["dep:durable-bindgen", "durable-core/bindgen"]
 macros = ["durable-sqlx-macros", "sqlx/macros"]
 

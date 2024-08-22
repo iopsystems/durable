@@ -15,6 +15,7 @@ http = ["dep:durable-http"]
 sqlx = ["dep:durable-sqlx"]
 sqlx-macros = ["sqlx", "durable-sqlx/macros"]
 sqlx-uuid = ["sqlx", "durable-sqlx/uuid"]
+sqlx-chrono = ["sqlx", "durable-sqlx/chrono"]
 
 bindgen = ["durable-core/bindgen", "durable-http?/bindgen", "durable-sqlx?/bindgen"]
 
