@@ -90,8 +90,7 @@ impl Migrate {
                         .migrations()
                         .iter()
                         .rev()
-                        .skip_while(|migration| migration.version >= latest)
-                        .next()
+                        .find(|migration| migration.version < latest)
                         .map(|migration| migration.version)
                         .unwrap_or(0);
 
@@ -107,7 +106,6 @@ impl Migrate {
             dry_run: self.dry_run,
             migration_table: table,
             prefer_local_revert: true,
-            ..Default::default()
         };
 
         if matches!(self.command, Command::Reset) {

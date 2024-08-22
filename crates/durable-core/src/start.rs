@@ -45,9 +45,7 @@ fn durable_panic_hook(info: &PanicInfo) {
         let _ = write!(&mut message, "\n{msg}\n");
 
         let mut err = std::io::stderr();
-        if let Err(_) = err.write_all(message.as_bytes()) {
-            crate::abort(&message);
-        }
+        let _ = err.write_all(message.as_bytes());
     });
 
     std::process::abort()

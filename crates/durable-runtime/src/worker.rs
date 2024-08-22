@@ -497,7 +497,7 @@ impl Worker {
             };
 
             // Clean up any tasks that have completed already.
-            while let Some(_) = self.tasks.try_join_next() {}
+            while self.tasks.try_join_next().is_some() {}
 
             let event = match event {
                 Some(event) => event,
@@ -528,7 +528,7 @@ impl Worker {
                     let leader_id = self.shared.leader.get();
                     match leader_id {
                         id if id == worker_id => (),
-                        id if id == -1 => (),
+                        -1 => (),
                         _ => continue,
                     }
 
@@ -694,7 +694,7 @@ impl Worker {
                 }
                 Err(payload) => {
                     let message: &str = if let Some(message) = payload.downcast_ref::<String>() {
-                        &message
+                        message
                     } else if let Some(message) = payload.downcast_ref::<&str>() {
                         message
                     } else {
@@ -939,7 +939,7 @@ pub struct PgEventSource {
 
 impl PgEventSource {
     pub async fn new(pool: &sqlx::PgPool) -> sqlx::Result<Self> {
-        let mut listener = sqlx::postgres::PgListener::connect_with(&pool).await?;
+        let mut listener = sqlx::postgres::PgListener::connect_with(pool).await?;
 
         listener
             .listen_all([

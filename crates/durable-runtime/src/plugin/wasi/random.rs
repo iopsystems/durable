@@ -82,6 +82,6 @@ impl wasi::random::insecure_seed::Host for Task {
         let state = ahash::RandomState::with_seed(task_id as usize);
         let hash = state.hash_one(self.state.task_name());
 
-        Ok((hash, task_id as u64))
+        Ok((hash, task_id))
     }
 }

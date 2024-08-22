@@ -1,5 +1,3 @@
-//!
-
 use std::str::FromStr;
 
 use anyhow::Context;
@@ -66,6 +64,6 @@ impl CommonOptions {
                     .context("failed to connect to the database")
             })
             .await
-            .map(|pool| pool.clone())
+            .cloned()
     }
 }

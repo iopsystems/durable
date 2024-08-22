@@ -82,7 +82,7 @@ impl sqlx::Encode<'_, Durable> for Vec<f32> {
         &self,
         buf: &mut <Durable as sqlx::Database>::ArgumentBuffer<'_>,
     ) -> Result<IsNull, BoxDynError> {
-        <&[f32] as sqlx::Encode<Durable>>::encode(&self, buf)
+        <&[f32] as sqlx::Encode<Durable>>::encode(self, buf)
     }
 }
 
@@ -91,7 +91,7 @@ impl sqlx::Encode<'_, Durable> for Box<[f32]> {
         &self,
         buf: &mut <Durable as sqlx::Database>::ArgumentBuffer<'_>,
     ) -> Result<IsNull, BoxDynError> {
-        <&[f32] as sqlx::Encode<Durable>>::encode(&self, buf)
+        <&[f32] as sqlx::Encode<Durable>>::encode(self, buf)
     }
 }
 
@@ -100,7 +100,7 @@ impl sqlx::Encode<'_, Durable> for Cow<'_, [f32]> {
         &self,
         buf: &mut <Durable as sqlx::Database>::ArgumentBuffer<'_>,
     ) -> Result<IsNull, BoxDynError> {
-        <&[f32] as sqlx::Encode<Durable>>::encode(&self, buf)
+        <&[f32] as sqlx::Encode<Durable>>::encode(self, buf)
     }
 }
 
@@ -153,7 +153,7 @@ impl sqlx::Encode<'_, Durable> for Vec<f64> {
         &self,
         buf: &mut <Durable as sqlx::Database>::ArgumentBuffer<'_>,
     ) -> Result<IsNull, BoxDynError> {
-        <&[f64] as sqlx::Encode<Durable>>::encode(&self, buf)
+        <&[f64] as sqlx::Encode<Durable>>::encode(self, buf)
     }
 }
 
@@ -162,7 +162,7 @@ impl sqlx::Encode<'_, Durable> for Box<[f64]> {
         &self,
         buf: &mut <Durable as sqlx::Database>::ArgumentBuffer<'_>,
     ) -> Result<IsNull, BoxDynError> {
-        <&[f64] as sqlx::Encode<Durable>>::encode(&self, buf)
+        <&[f64] as sqlx::Encode<Durable>>::encode(self, buf)
     }
 }
 
@@ -171,7 +171,7 @@ impl sqlx::Encode<'_, Durable> for Cow<'_, [f64]> {
         &self,
         buf: &mut <Durable as sqlx::Database>::ArgumentBuffer<'_>,
     ) -> Result<IsNull, BoxDynError> {
-        <&[f64] as sqlx::Encode<Durable>>::encode(&self, buf)
+        <&[f64] as sqlx::Encode<Durable>>::encode(self, buf)
     }
 }
 

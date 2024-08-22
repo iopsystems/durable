@@ -62,7 +62,7 @@ fn _generate(source: &Path, out: &Path, world: &str, options: Options) -> anyhow
     let (_, src) = files.iter().next().unwrap();
     let src = std::str::from_utf8(src).unwrap();
 
-    let file = syn::parse_str(&src).context("wit-bindgen emitted unparseable rust code")?;
+    let file = syn::parse_str(src).context("wit-bindgen emitted unparseable rust code")?;
     let src = prettyplease::unparse(&file);
 
     std::fs::write(out, src)

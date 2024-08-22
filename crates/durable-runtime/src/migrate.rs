@@ -16,6 +16,12 @@ pub use durable_migrate::{
 /// A migrator that comes pre-loaded with migrations relevant to durable.
 pub struct Migrator(durable_migrate::Migrator);
 
+impl Default for Migrator {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Migrator {
     /// Create a migrator with migrations for durable.
     pub const fn new() -> Self {

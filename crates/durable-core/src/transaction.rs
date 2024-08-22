@@ -122,10 +122,9 @@ where
     let _guard = InTxnGuard::new();
     let result = std::panic::catch_unwind(AssertUnwindSafe(|| {
         let data = func();
-        let json = serde_json::to_string(&TransactionResult::<_, String>::Value(&data))
-            .expect("failed to serialize the transaction result to json");
 
-        json
+        serde_json::to_string(&TransactionResult::<_, String>::Value(&data))
+            .expect("failed to serialize the transaction result to json")
     }));
 
     match result {

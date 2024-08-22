@@ -1,5 +1,3 @@
-//!
-
 use std::time::{Duration, SystemTime};
 
 use serde::de::DeserializeOwned;

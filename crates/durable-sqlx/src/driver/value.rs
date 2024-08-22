@@ -59,7 +59,7 @@ impl Serialize for sql::Value {
     {
         use serde::ser::Error;
 
-        let json = self.serialize().map_err(|e| Error::custom(e))?;
+        let json = self.serialize().map_err(Error::custom)?;
         let json: Box<str> = json.into_boxed_str();
         let json: Box<RawValue> = unsafe { std::mem::transmute(json) };
 

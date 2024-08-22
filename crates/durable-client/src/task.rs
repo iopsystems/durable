@@ -80,8 +80,8 @@ impl Task {
     }
 
     /// Get a real-time stream of task events as they occur.
-    pub fn events<'a>(
-        &'a self,
+    pub fn events(
+        &self,
         client: &DurableClient,
     ) -> impl Stream<Item = Result<Event, DurableError>> + '_ {
         let pool = client.pool.clone();
@@ -159,8 +159,8 @@ impl Task {
     }
 
     /// Read the task logs that have occurred up to this point.
-    pub fn read_logs<'a>(
-        &'a self,
+    pub fn read_logs(
+        &self,
         client: &DurableClient,
     ) -> impl Stream<Item = Result<String, DurableError>> + '_ {
         let pool = client.pool.clone();
@@ -205,8 +205,8 @@ impl Task {
     ///
     /// Note that this holds on to a database connection for the whole time it
     /// is running (for the listener).
-    pub fn follow_logs<'a>(
-        &'a self,
+    pub fn follow_logs(
+        &self,
         client: &DurableClient,
     ) -> impl Stream<Item = Result<String, DurableError>> + '_ {
         let pool = client.pool.clone();
