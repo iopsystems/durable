@@ -5,7 +5,7 @@ use slab::Slab;
 use wasmtime::component::Resource;
 
 pub trait Resourceable: 'static {
-    const NAME: &str;
+    const NAME: &'static str;
 
     type Data: Send + Sync + 'static;
 }

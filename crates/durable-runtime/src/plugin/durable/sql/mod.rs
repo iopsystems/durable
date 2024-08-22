@@ -20,13 +20,13 @@ mod oids;
 mod value;
 
 impl Resourceable for sql::TypeInfo {
-    const NAME: &str = "durable:core/sql.type-info";
+    const NAME: &'static str = "durable:core/sql.type-info";
 
     type Data = PgTypeInfo;
 }
 
 impl Resourceable for sql::Value {
-    const NAME: &str = "durable:core/sql.value";
+    const NAME: &'static str = "durable:core/sql.value";
 
     type Data = ValueResource;
 }
