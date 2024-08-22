@@ -58,6 +58,11 @@ mod bindings {
     pub use self::durable::core::sql::*;
 }
 
+pub mod types {
+    #[cfg(feature = "json")]
+    pub use sqlx::types::{Json, JsonRawValue};
+}
+
 #[doc(inline)]
 pub use crate::driver::Connection;
 pub use crate::error::Error;

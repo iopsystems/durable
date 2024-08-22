@@ -12,6 +12,7 @@ description = "SQLx bindings for durable guests"
 bindgen = ["dep:durable-bindgen", "durable-core/bindgen"]
 macros = ["durable-sqlx-macros", "sqlx/macros"]
 
+json = ["sqlx/json", "sqlx-core/json", "durable-sqlx-macros?/json"]
 chrono = ["sqlx/chrono", "durable-sqlx-macros?/chrono", "dep:chrono"]
 uuid = ["sqlx/uuid", "durable-sqlx-macros?/uuid", "dep:uuid"]
 
