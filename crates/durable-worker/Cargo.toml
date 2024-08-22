@@ -21,7 +21,7 @@ sqlx = { version = "0.8.0", features = ["postgres"] }
 tokio = { version = "1.0", features = ["full"] }
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["fmt", "env-filter"] }
-wasmtime = "23.0"
+wasmtime = { workspace = true }
 
 [target.'cfg(unix)'.dependencies]
 backtrace-on-stack-overflow = "0.3"
