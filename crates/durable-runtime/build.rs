@@ -17,7 +17,7 @@ fn generate(
 fn _generate(path: &Path, out: &Path, world: &str, opts: &Opts) -> anyhow::Result<()> {
     let mut resolve = Resolve::new();
     let (packages, paths) = resolve.push_dir(path)?;
-    let world = resolve.select_world(&packages, Some(world))?;
+    let world = resolve.select_world(packages, Some(world))?;
     let bindings = opts.generate(&resolve, world)?;
 
     for path in paths.iter() {

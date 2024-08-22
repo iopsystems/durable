@@ -25,6 +25,11 @@ wit-bindgen-core = { version = "0.30.0" }
 wit-bindgen-rust = { version = "0.30.0" }
 wit-bindgen-rt   = { version = "0.30.0" }
 
+# These 3 need to be updated in sync.
+wasmtime             = { version = "24.0" }
+wasmtime-wit-bindgen = { version = "24.0" }
+wit-parser           = { version = "0.215.0" }
+
 [workspace.dependencies.durable-sqlx-macros]
 version = "0.8.1"
 registry = "iop-systems"
