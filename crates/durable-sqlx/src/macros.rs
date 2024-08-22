@@ -11,14 +11,46 @@ pub mod exports {
         }
     }
 
-    pub fn map<'q, F, A>(map: sqlx::query::Map<'q, Durable, F, A>) -> crate::Map<'q, F, A> {
-        crate::Map(map)
+    pub fn into_durable<T: IntoDurable>(value: T) -> T::Durable {
+        value.into_durable()
     }
 
-    pub fn scalar<'q, O, A>(
-        scalar: sqlx::query::QueryScalar<'q, Durable, O, A>,
-    ) -> crate::QueryScalar<'q, O, A> {
-        crate::QueryScalar(scalar)
+    pub trait IntoDurable {
+        type Durable;
+
+        fn into_durable(self) -> Self::Durable;
+    }
+
+    impl<'q, F, A> IntoDurable for sqlx::query::Map<'q, Durable, F, A> {
+        type Durable = crate::Map<'q, F, A>;
+
+        fn into_durable(self) -> Self::Durable {
+            crate::Map(self)
+        }
+    }
+
+    impl<'q, A> IntoDurable for sqlx::query::Query<'q, Durable, A> {
+        type Durable = crate::Query<'q, A>;
+
+        fn into_durable(self) -> Self::Durable {
+            crate::Query(self)
+        }
+    }
+
+    impl<'q, O, A> IntoDurable for sqlx::query::QueryAs<'q, Durable, O, A> {
+        type Durable = crate::QueryAs<'q, O, A>;
+
+        fn into_durable(self) -> Self::Durable {
+            crate::QueryAs(self)
+        }
+    }
+
+    impl<'q, O, A> IntoDurable for sqlx::query::QueryScalar<'q, Durable, O, A> {
+        type Durable = crate::QueryScalar<'q, O, A>;
+
+        fn into_durable(self) -> Self::Durable {
+            crate::QueryScalar(self)
+        }
     }
 }
 
@@ -31,7 +63,7 @@ macro_rules! query {
     ($query:expr $(, $($args:tt)*)?) => {{
         use $crate::exports::sqlx;
 
-        $crate::exports::map($crate::exports::expand_query!(
+        $crate::exports::into_durable($crate::exports::expand_query!(
             source = $query
             $(, args = [$($args)*])?
         ))
@@ -46,7 +78,7 @@ macro_rules! query_unchecked {
     ($query:expr $(, $($args:tt)*)?) => {{
         use $crate::exports::sqlx;
 
-        $crate::exports::map($crate::exports::expand_query!(
+        $crate::exports::into_durable($crate::exports::expand_query!(
             source = $query,
             $(args = [$($args)*],)?
             checked = false
@@ -69,7 +101,7 @@ macro_rules! query_file {
     ($path:literal $(, $($args:tt)*)?) => {{
         use $crate::exports::sqlx;
 
-        $crate::exports::map($crate::exports::expand_query!(
+        $crate::exports::into_durable($crate::exports::expand_query!(
             source_file = $path
             $(, args = [$($args)*])?
         ))
@@ -85,7 +117,7 @@ macro_rules! query_file_unchecked {
     ($path:literal $(, $($args:tt)*)?) => {{
         use $crate::exports::sqlx;
 
-        $crate::exports::map($crate::exports::expand_query!(
+        $crate::exports::into_durable($crate::exports::expand_query!(
             source_file = $path,
             $(args = [$($args)*],)?
             checked = false
@@ -102,7 +134,7 @@ macro_rules! query_as {
     ($out_struct:path, $query:expr $(, $($args:tt)*)?) => {{
         use $crate::exports::sqlx;
 
-        $crate::exports::map($crate::exports::expand_query!(
+        $crate::exports::into_durable($crate::exports::expand_query!(
             record = $out_struct,
             source = $query
             $(, args = [$($args)*])?
@@ -118,7 +150,7 @@ macro_rules! query_file_as {
     ($out_struct:path, $path:literal $(, $($args:tt)*)?) => {{
         use $crate::exports::sqlx;
 
-        $crate::exports::map($crate::exports::expand_query!(
+        $crate::exports::into_durable($crate::exports::expand_query!(
             record = $out_struct,
             source_file = $path
             $(, args = [$($args)*])?
@@ -135,7 +167,7 @@ macro_rules! query_as_unchecked {
     (out_struct:path, $query:expr $(, $($args:tt)*)?) => {{
         use $crate::exports::sqlx;
 
-        $crate::exports::map($crate::exports::expand_query!(
+        $crate::exports::into_durable($crate::exports::expand_query!(
             record = $out_struct,
             source = $query,
             $( args = [$($args)*],)?
@@ -154,7 +186,7 @@ macro_rules! query_file_as_unchecked {
     ($out_struct:path, $path:literal $(, $($args:tt)*)?) => {{
         use $crate::exports::sqlx;
 
-        $crate::exports::map($crate::exports::expand_query!(
+        $crate::exports::into_durable($crate::exports::expand_query!(
             record = $out_struct,
             source_file = $path,
             $(args = [$($args)*],)?
@@ -172,7 +204,7 @@ macro_rules! query_scalar {
     ($query:expr $(, $($args:tt)*)?) =>  {{
         use $crate::exports::sqlx;
 
-        $crate::exports::scalar($crate::exports::expand_query!(
+        $crate::exports::into_durable($crate::exports::expand_query!(
             scalar = _,
             source = $query
             $(, args = [$($args)*])?
@@ -186,7 +218,7 @@ macro_rules! query_file_scalar {
     ($path:literal $(,$($args:tt)*)?) => {{
         use $crate::exports::sqlx;
 
-        $crate::exports::scalar($crate::exports::expand_query!(
+        $crate::exports::into_durable($crate::exports::expand_query!(
             scalar = _,
             source_file = $path
             $(, args = [$($args)*])?
@@ -203,7 +235,7 @@ macro_rules! query_scalar_unchecked {
     ($query:expr $(,$($args:tt)*)?) => {{
         use $crate::exports::sqlx;
 
-        $crate::exports::scalar($crate::exports::expand_query!(
+        $crate::exports::into_durable($crate::exports::expand_query!(
             scalar = _,
             source = $query,
             $(args = [$($args)*],)?
@@ -221,7 +253,7 @@ macro_rules! query_file_scalar_unchecked {
     ($path:literal $(,$($args:tt)*)?) => {{
         use $crate::exports::sqlx;
 
-        $crate::exports::scalar($crate::exports::expand_query!(
+        $crate::exports::into_durable($crate::exports::expand_query!(
             scalar = _,
             source_file = $path,
             $(args = [$($args)*],)?
