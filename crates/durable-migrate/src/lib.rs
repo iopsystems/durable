@@ -147,6 +147,8 @@
 //! `durable-migrate` when using it as a build dependency so that you don't pull
 //! sqlx in as a build dependency.
 
+#![allow(clippy::needless_doctest_main)]
+
 use std::borrow::Cow;
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
@@ -432,7 +434,7 @@ impl Migrator {
                 path: entry.path(),
             };
 
-            let map = is_up.then_some(&mut up).unwrap_or(&mut down);
+            let map = if is_up { &mut up } else { &mut down };
             if let Some(prev) = map.get(&entry.version) {
                 return Err(Error::DuplicateMigrationVersion {
                     version: entry.version,
@@ -596,7 +598,7 @@ pub const {name}: {path}::Migrator = {path}::Migrator::from_static({{
                     let down = source
                         .filter(|_| options.use_includes)
                         .and_then(|source| source.down.as_deref())
-                        .map(|source| include_path(&source))
+                        .map(include_path)
                         .unwrap_or_else(|| format!("{:?}", revert));
 
                     format!("Some(Cow::Borrowed({down}))")
@@ -644,6 +646,6 @@ pub const {name}: {path}::Migrator = {path}::Migrator::from_static({{
             }
         }
 
-        return content;
+        content
     }
 }

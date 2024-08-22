@@ -172,6 +172,7 @@ mod database_error {
     use crate::bindings::durable::core::sql;
     use crate::driver::DatabaseError;
 
+    #[allow(clippy::borrowed_box)]
     pub(crate) fn serialize<S>(
         error: &Box<dyn SqlxDatabaseError>,
         ser: S,

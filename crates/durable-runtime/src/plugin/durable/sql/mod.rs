@@ -57,7 +57,7 @@ impl sql::HostTypeInfo for Task {
         let tya = self.resources.get(a)?;
         let tyb = self.resources.get(b)?;
 
-        Ok(tya.type_compatible(&tyb))
+        Ok(tya.type_compatible(tyb))
     }
 
     async fn equal(
@@ -68,7 +68,7 @@ impl sql::HostTypeInfo for Task {
         let tya = self.resources.get(a)?;
         let tyb = self.resources.get(b)?;
 
-        Ok(tya.type_eq(&tyb))
+        Ok(tya.type_eq(tyb))
     }
 
     async fn clone(

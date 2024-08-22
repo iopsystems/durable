@@ -113,13 +113,13 @@ impl Migrator {
 
             for m in applied.values().rev() {
                 operations.push(Operation::Revert {
-                    version: m.version as i64,
+                    version: m.version,
                     name: &m.name,
                     revert: if options.prefer_local_revert {
                         known
                             .get(&m.version)
                             .and_then(|m| m.revert.as_deref())
-                            .or_else(|| m.revert.as_deref())
+                            .or(m.revert.as_deref())
                     } else {
                         m.revert
                             .as_deref()
@@ -176,9 +176,7 @@ impl Migrator {
             }
             Target::Version(target) => target,
         };
-        let target: i64 = target
-            .try_into()
-            .map_err(|e| ErrorData::VersionOutOfRange(e))?;
+        let target: i64 = target.try_into().map_err(ErrorData::VersionOutOfRange)?;
 
         if applied.contains_key(&target) {
             let operations = applied
@@ -193,7 +191,7 @@ impl Migrator {
                             known
                                 .get(&m.version)
                                 .and_then(|m| m.revert.as_deref())
-                                .or_else(|| m.revert.as_deref())
+                                .or(m.revert.as_deref())
                         } else {
                             m.revert
                                 .as_deref()
@@ -251,8 +249,8 @@ impl Migrator {
             let mut tx = conn.begin().await?;
 
             let result = async {
-                match operation {
-                    &Operation::Apply {
+                match *operation {
+                    Operation::Apply {
                         version,
                         name,
                         sql,
@@ -273,7 +271,7 @@ impl Migrator {
                             .execute(&mut *tx)
                             .await?;
                     }
-                    &Operation::Revert {
+                    Operation::Revert {
                         version,
                         revert,
                         name,

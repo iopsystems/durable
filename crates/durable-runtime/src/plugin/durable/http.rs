@@ -26,7 +26,7 @@ impl Task {
         }
 
         for header in request.headers {
-            let name = HeaderName::from_bytes(&header.name.as_bytes())?;
+            let name = HeaderName::from_bytes(header.name.as_bytes())?;
             let value = HeaderValue::from_bytes(&header.value)?;
 
             builder = builder.header(name, value);

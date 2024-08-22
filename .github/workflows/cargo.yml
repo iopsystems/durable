@@ -65,6 +65,49 @@ jobs:
         run: |
           cargo fmt --all -- --check
 
+  clippy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+      - uses: Swatinem/rust-cache@v2
+      - uses: swlynch99/cargo-sweep-action@v1
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: clippy-sarif,sarif-fmt,cargo-deduplicate-warnings
+
+      - name: cargo clippy
+        run: |
+          cargo clippy --all-targets --all-features --message-format json \
+            | cargo deduplicate-warnings \
+            | clippy-sarif      \
+            | tee clippy.sarif  \
+            | sarif-fmt
+        continue-on-error: true
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: clippy-sarif
+          path: clippy.sarif
+
+  clippy-upload:
+    if: github.event_name == 'pull_request' || github.ref == 'reads/heads/main'
+    runs-on: ubuntu-latest
+    needs:
+      - clippy
+    permissions:
+      security-events: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: clippy-sarif
+      - uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: clippy.sarif
+
   check-success:
     name: verify all tests pass
     runs-on: ubuntu-latest
@@ -72,6 +115,7 @@ jobs:
     needs:
       - test
       - check
+      - clippy
       - rustfmt
 
     steps:

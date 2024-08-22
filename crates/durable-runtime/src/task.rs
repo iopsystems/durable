@@ -144,7 +144,7 @@ impl Transaction {
     }
 
     /// Take the output stream for the last query run within this transaction.
-    pub fn take_stream<'t>(&'t mut self) -> Option<QueryStream<'t>> {
+    pub fn take_stream(&mut self) -> Option<QueryStream<'_>> {
         self.stream.take()
     }
 
@@ -330,10 +330,10 @@ impl TaskState {
         let mut conn;
         let conn: &mut PgConnection = if is_db_txn {
             let tx = tx.insert(self.pool().begin().await?);
-            &mut **tx
+            tx
         } else {
             conn = self.pool().acquire().await?;
-            &mut *conn
+            &mut conn
         };
 
         if let Some(value) = self.enter_impl(options, &mut *conn).await? {
@@ -460,16 +460,16 @@ impl TaskState {
                 // Check if the transaction is not in an aborted state by running a query
                 if sqlx::query("SELECT 1").execute(&mut *txn).await.is_ok() {
                     let tx = tx.insert(txn);
-                    &mut **tx
+                    tx
                 } else {
                     txn.rollback().await?;
                     conn = self.shared.pool.acquire().await?;
-                    &mut *conn
+                    &mut conn
                 }
             }
             _ => {
                 conn = self.shared.pool.acquire().await?;
-                &mut *conn
+                &mut conn
             }
         };
 
@@ -629,13 +629,13 @@ impl TaskState {
         }
 
         let mut conn = self.pool().acquire().await?;
-        if let Some(data) = self.enter_impl(options, &mut *conn).await? {
+        if let Some(data) = self.enter_impl(options, &mut conn).await? {
             return Ok(data);
         }
 
         let data = func(self)?;
 
-        self.exit_impl(&data, &mut *conn).await?;
+        self.exit_impl(&data, &mut conn).await?;
 
         Ok(data)
     }
@@ -710,7 +710,7 @@ fn truncate_to_prev_char_boundary(s: &str, len: usize) -> &str {
     let new_index = bytes[lower_bound..=len]
         .iter()
         .copied()
-        .rposition(|b| b < 128 || b >= 192)
+        .rposition(|b| !(128..192).contains(&b))
         .unwrap();
 
     &s[..new_index]

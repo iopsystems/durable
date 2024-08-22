@@ -23,7 +23,7 @@ use serde::{Deserialize, Serialize};
 use url::Url;
 
 mod bindings {
-    #![allow(unused_braces)]
+    #![allow(unused_braces, clippy::all)]
 
     #[cfg(feature = "bindgen")]
     include!(concat!(env!("OUT_DIR"), "/bindings.rs"));
