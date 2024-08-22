@@ -14,10 +14,18 @@ default = []
 http = ["dep:durable-http"]
 sqlx = ["dep:durable-sqlx"]
 sqlx-macros = ["sqlx", "durable-sqlx/macros"]
-sqlx-uuid = ["sqlx", "durable-sqlx/uuid"]
 sqlx-chrono = ["sqlx", "durable-sqlx/chrono"]
+sqlx-json = ["sqlx", "durable-sqlx/json"]
+sqlx-uuid = ["sqlx", "durable-sqlx/uuid"]
 
-bindgen = ["durable-core/bindgen", "durable-http?/bindgen", "durable-sqlx?/bindgen"]
+# All sqlx features combined for convenience.
+sqlx-full = ["sqlx", "sqlx-macros", "sqlx-chrono", "sqlx-json", "sqlx-uuid"]
+
+bindgen = [
+    "durable-core/bindgen",
+    "durable-http?/bindgen",
+    "durable-sqlx?/bindgen",
+]
 
 [dependencies]
 durable-core = { workspace = true }

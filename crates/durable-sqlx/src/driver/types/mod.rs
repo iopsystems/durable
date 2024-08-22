@@ -9,6 +9,8 @@ mod bytea;
 mod chrono;
 mod float;
 mod int;
+#[cfg(feature = "json")]
+mod json;
 mod text;
 #[cfg(feature = "uuid")]
 mod uuid;
