@@ -10,18 +10,21 @@
 //! transaction. You do this by calling the [`transaction`] function:
 //!
 //! ```
-//! use durable::sqlx::transaction;
+//! # fn example() -> durable::Result<()> {
+//! use durable::sqlx;
 //!
-//! transaction(
+//! sqlx::transaction(
 //!     "do the thing with the database",
-//!     |conn| -> durable::Result<()> {
+//!     |mut conn| -> durable::Result<()> {
 //!         sqlx::query("INSERT INTO foo(id) VALUES ($1)")
 //!             .bind(7)
-//!             .execute(&mut *conn)?;
+//!             .execute(&mut conn)?;
 //!
 //!         Ok(())
 //!     },
-//! );
+//! )?;
+//! # Ok(())
+//! # }
 //! ```
 
 use driver::{Durable, QueryResult, Row};
@@ -164,6 +167,7 @@ where
 /// representing the bound value:
 ///
 /// ```rust,no_run
+/// # use durable::sqlx;
 /// # fn example2() -> sqlx::Result<()> {
 /// # let mut conn: durable::sqlx::Connection = unimplemented!();
 /// let user_input = "Alice's Apples";
