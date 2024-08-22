@@ -26,7 +26,7 @@ wit-bindgen-rust = { version = "0.30.0" }
 wit-bindgen-rt   = { version = "0.30.0" }
 
 [workspace.dependencies.durable-sqlx-macros]
-version = "0.8.0"
+version = "0.8.1"
 registry = "iop-systems"
 path = "crates/durable-sqlx-macros" 
 
