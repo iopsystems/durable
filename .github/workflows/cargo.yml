@@ -1,0 +1,80 @@
+name: cargo
+on:
+  push:
+    branches:
+      main
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-wasip1
+      - uses: Swatinem/rust-cache@v2
+      - uses: swlynch99/cargo-sweep-action@v1
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-nextest,cargo-component
+
+      - name: create test database
+        run: cargo xtask dev -d
+
+      - name: cargo nextest run
+        run: |
+          cargo nextest run         \
+            --locked                \
+            --all-targets           \
+            --all-features          \
+            --no-fail-fast          \
+            --success-output final  \
+            --final-status-level skip
+        shell: bash
+      
+      - name: doctests
+        run: |
+          cargo test --doc  \
+            --all-features  \
+            --locked
+        shell: bash
+
+  # Verify that the crate builds without the database being available.
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - uses: swlynch99/cargo-sweep-action@v1
+
+      - name: cargo check
+        run: cargo check --all-features --all-targets
+
+  rustfmt:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: rustfmt
+        run: |
+          cargo fmt --all -- --check
+
+  check-success:
+    name: verify all tests pass
+    runs-on: ubuntu-latest
+    if: always()
+    needs:
+      - test
+      - check
+      - rustfmt
+
+    steps:
+      - name: fail if any dependencies failed
+        if: contains(needs.*.result, 'failure')
+        shell: bash
+        run: exit 1
+      - name: no-op
+        run: echo "All checks passed!"
