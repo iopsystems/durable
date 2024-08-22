@@ -38,3 +38,8 @@ inherits = "release"
 opt-level = "z"
 lto = true
 debug = "line-tables-only"
+
+[profile.dev-ci]
+inherits = "dev"
+debug = "line-tables-only"
+opt-level = 1

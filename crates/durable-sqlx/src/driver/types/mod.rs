@@ -5,13 +5,13 @@ use crate::driver::Value;
 
 mod boolean;
 mod bytea;
+#[cfg(feature = "chrono")]
+mod chrono;
 mod float;
 mod int;
 mod text;
 #[cfg(feature = "uuid")]
 mod uuid;
-#[cfg(feature = "chrono")]
-mod chrono;
 
 fn unexpected_nullable_type(expected: &str, value: &Value) -> BoxDynError {
     format!("expected {expected}, got {} instead", value.type_info()).into()

@@ -1,7 +1,13 @@
 use std::io::Write;
-use std::panic::PanicHookInfo;
 
 use crate::bindings::exports::durable::core::setup::Guest;
+
+// PanicInfo has been deprecated and renamed to PanicHookInfo but only in 1.82
+// or newer.
+//
+// Use a type alias here to avoid the deprecation warning.
+#[allow(deprecated)]
+type PanicInfo<'a> = std::panic::PanicInfo<'a>;
 
 extern "C" {
     #[allow(dead_code)]
@@ -15,7 +21,7 @@ extern "C" fn durable_ctor() {
     }
 }
 
-fn durable_panic_hook(info: &PanicHookInfo) {
+fn durable_panic_hook(info: &PanicInfo) {
     let payload = info.payload();
     let msg: &str = if let Some(msg) = payload.downcast_ref::<String>() {
         msg
