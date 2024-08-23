@@ -4,6 +4,7 @@ use futures_util::{StreamExt, TryStreamExt};
 use serde_json::value::RawValue;
 use sqlx::postgres::PgTypeInfo;
 use sqlx::types::chrono::FixedOffset;
+use sqlx::types::ipnetwork::IpNetwork;
 use sqlx::types::Json;
 use sqlx::{Column, Row};
 use uuid::Uuid;
@@ -166,6 +167,11 @@ impl sql::HostTypeInfo for Task {
             .insert(<Json<()> as sqlx::Type<sqlx::Postgres>>::type_info())
     }
 
+    async fn inet(&mut self) -> wasmtime::Result<Resource<sql::TypeInfo>> {
+        self.resources
+            .insert(<IpNetwork as sqlx::Type<sqlx::Postgres>>::type_info())
+    }
+
     async fn boolean_array(&mut self) -> wasmtime::Result<Resource<sql::TypeInfo>> {
         self.resources
             .insert(<Vec<bool> as sqlx::Type<sqlx::Postgres>>::type_info())
@@ -229,6 +235,11 @@ impl sql::HostTypeInfo for Task {
     async fn jsonb_array(&mut self) -> wasmtime::Result<Resource<sql::TypeInfo>> {
         self.resources
             .insert(<Vec<Json<()>> as sqlx::Type<sqlx::Postgres>>::type_info())
+    }
+
+    async fn inet_array(&mut self) -> wasmtime::Result<Resource<sql::TypeInfo>> {
+        self.resources
+            .insert(<Vec<IpNetwork> as sqlx::Type<sqlx::Postgres>>::type_info())
     }
 
     fn drop(&mut self, rep: Resource<sql::TypeInfo>) -> wasmtime::Result<()> {
@@ -403,6 +414,18 @@ impl sql::HostValue for Task {
         })
     }
 
+    async fn as_inet(
+        &mut self,
+        res: Resource<sql::Value>,
+    ) -> wasmtime::Result<Option<sql::IpNetwork>> {
+        let value = self.resources.get(res)?;
+
+        Ok(match value.value {
+            Value::Inet(inet) => Some(inet.into()),
+            _ => None,
+        })
+    }
+
     async fn as_boolean_array(
         &mut self,
         res: Resource<sql::Value>,
@@ -559,6 +582,18 @@ impl sql::HostValue for Task {
         })
     }
 
+    async fn as_inet_array(
+        &mut self,
+        res: Resource<sql::Value>,
+    ) -> wasmtime::Result<Option<Vec<sql::IpNetwork>>> {
+        let value = self.resources.get(res)?;
+
+        Ok(match &value.value {
+            Value::InetArray(arr) => Some(arr.iter().copied().map(From::from).collect()),
+            _ => None,
+        })
+    }
+
     async fn null(
         &mut self,
         tyinfo: Resource<sql::TypeInfo>,
@@ -697,6 +732,22 @@ impl sql::HostValue for Task {
         self.resources.insert(value)
     }
 
+    async fn inet(
+        &mut self,
+        value: sql::IpNetwork,
+    ) -> wasmtime::Result<Result<Resource<sql::Value>, String>> {
+        let value: IpNetwork = match value.try_into() {
+            Ok(value) => value,
+            Err(e) => return Ok(Err(e.to_string())),
+        };
+        let value = ValueResource {
+            type_info: type_info(&value),
+            value: Value::Inet(value),
+        };
+
+        self.resources.insert(value).map(Ok)
+    }
+
     async fn boolean_array(&mut self, value: Vec<bool>) -> wasmtime::Result<Resource<sql::Value>> {
         let value = ValueResource {
             type_info: type_info(&value),
@@ -833,6 +884,22 @@ impl sql::HostValue for Task {
         };
 
         self.resources.insert(value)
+    }
+
+    async fn inet_array(
+        &mut self,
+        values: Vec<sql::IpNetwork>,
+    ) -> wasmtime::Result<Result<Resource<sql::Value>, String>> {
+        let values: Vec<IpNetwork> = match values.into_iter().map(TryFrom::try_from).collect() {
+            Ok(values) => values,
+            Err(e) => return Ok(Err(e.to_string())),
+        };
+        let value = ValueResource {
+            type_info: type_info(&values),
+            value: Value::InetArray(values),
+        };
+
+        self.resources.insert(value).map(Ok)
     }
 
     fn drop(&mut self, res: Resource<sql::Value>) -> wasmtime::Result<()> {
@@ -1045,5 +1112,47 @@ impl From<Uuid> for sql::Uuid {
     fn from(value: Uuid) -> Self {
         let (hi, lo) = value.as_u64_pair();
         sql::Uuid { hi, lo }
+    }
+}
+
+impl From<IpNetwork> for sql::IpNetwork {
+    fn from(value: IpNetwork) -> Self {
+        match value {
+            IpNetwork::V4(v4) => sql::IpNetwork::V4(sql::Ipv4Network {
+                addr: v4.ip().to_bits(),
+                prefix: v4.prefix(),
+            }),
+            IpNetwork::V6(v6) => {
+                let bits = v6.ip().to_bits();
+                let lo = bits as u64;
+                let hi = (bits >> 64) as u64;
+
+                sql::IpNetwork::V6(sql::Ipv6Network {
+                    addr: (lo, hi),
+                    prefix: v6.prefix(),
+                })
+            }
+        }
+    }
+}
+
+impl TryFrom<sql::IpNetwork> for IpNetwork {
+    type Error = ipnetwork::IpNetworkError;
+
+    fn try_from(value: sql::IpNetwork) -> Result<Self, Self::Error> {
+        use std::net::{Ipv4Addr, Ipv6Addr};
+
+        use ipnetwork::{Ipv4Network, Ipv6Network};
+
+        Ok(match value {
+            sql::IpNetwork::V4(v4) => {
+                Self::V4(Ipv4Network::new(Ipv4Addr::from_bits(v4.addr), v4.prefix)?)
+            }
+            sql::IpNetwork::V6(v6) => {
+                let addr = (v6.addr.0 as u128) | (v6.addr.1 as u128) << 64;
+
+                Self::V6(Ipv6Network::new(Ipv6Addr::from_bits(addr), v6.prefix)?)
+            }
+        })
     }
 }

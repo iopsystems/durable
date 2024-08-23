@@ -5,6 +5,7 @@ use serde_json::value::RawValue;
 use sqlx::encode::IsNull;
 use sqlx::error::BoxDynError;
 use sqlx::postgres::PgTypeInfo;
+use sqlx::types::ipnetwork::IpNetwork;
 use sqlx::types::Json;
 use uuid::Uuid;
 
@@ -39,6 +40,7 @@ pub(crate) enum Value {
     Timestamp(NaiveDateTime),
     Uuid(Uuid),
     Json(Json<Box<RawValue>>),
+    Inet(IpNetwork),
 
     BooleanArray(Vec<bool>),
     Float4Array(Vec<f32>),
@@ -53,6 +55,7 @@ pub(crate) enum Value {
     TimestampArray(Vec<NaiveDateTime>),
     UuidArray(Vec<Uuid>),
     JsonArray(Vec<Json<Box<RawValue>>>),
+    InetArray(Vec<IpNetwork>),
 }
 
 macro_rules! for_each_value {
@@ -77,6 +80,8 @@ macro_rules! for_each_value {
             Value::Timestamp($var) => $result,
             Value::Uuid($var) => $result,
             Value::Json($var) => $result,
+            Value::Inet($var) => $result,
+
             Value::BooleanArray($var) => $result,
             Value::Float4Array($var) => $result,
             Value::Float8Array($var) => $result,
@@ -90,6 +95,7 @@ macro_rules! for_each_value {
             Value::TimestampArray($var) => $result,
             Value::UuidArray($var) => $result,
             Value::JsonArray($var) => $result,
+            Value::InetArray($var) => $result,
         }
     }
 }
