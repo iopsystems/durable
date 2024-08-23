@@ -30,6 +30,8 @@ mod bindings {
     pub use self::durable::core::http::*;
 }
 
+pub type Result<T, E = Error> = std::result::Result<T, E>;
+
 fn send(request: &Request) -> Result<Response, Error> {
     use crate::bindings::*;
 
