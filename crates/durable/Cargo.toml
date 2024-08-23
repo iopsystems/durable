@@ -29,12 +29,6 @@ sqlx-full = [
     "sqlx-ipnetwork",
 ]
 
-bindgen = [
-    "durable-core/bindgen",
-    "durable-http?/bindgen",
-    "durable-sqlx?/bindgen",
-]
-
 [dependencies]
 durable-core = { workspace = true }
 durable-http = { workspace = true, optional = true }

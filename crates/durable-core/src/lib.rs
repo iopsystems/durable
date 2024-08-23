@@ -12,9 +12,6 @@ pub mod transaction;
 
 #[allow(unused_imports, unused_braces)]
 mod bindings {
-    #[cfg(feature = "bindgen")]
-    include!(concat!(env!("OUT_DIR"), "/bindings.rs"));
-    #[cfg(not(feature = "bindgen"))]
     include!("bindings.rs");
 
     pub use self::durable::core::core::*;

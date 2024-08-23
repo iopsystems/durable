@@ -8,9 +8,6 @@ homepage = { workspace = true }
 repository = { workspace = true }
 description = "HTTP client for durable workflows"
 
-[features]
-bindgen = ["dep:durable-bindgen", "durable-core/bindgen"]
-
 [dependencies]
 durable-core = { workspace = true }
 
@@ -22,9 +19,6 @@ serde_json = "1.0"
 serde_urlencoded = "0.7"
 url = { version = "2.5.2", features = ["serde"] }
 wit-bindgen-rt = { workspace = true }
-
-[build-dependencies]
-durable-bindgen = { workspace = true, optional = true }
 
 [dev-dependencies]
 durable = { workspace = true, features = ["http"] }
