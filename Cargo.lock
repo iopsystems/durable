@@ -929,7 +929,6 @@ name = "durable-core"
 version = "0.3.4"
 dependencies = [
  "cc",
- "durable-bindgen",
  "serde",
  "serde_json",
  "wit-bindgen-rt",

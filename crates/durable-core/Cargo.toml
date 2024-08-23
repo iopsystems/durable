@@ -8,16 +8,11 @@ homepage = { workspace = true }
 repository = { workspace = true }
 description = "core bindings for durable guest APIs"
 
-[features]
-bindgen = ["dep:durable-bindgen"]
-
 [dependencies]
 serde = { version = "1.0", features = ["derive"] }
 serde_json = { version = "1.0", features = ["raw_value"] }
 wit-bindgen-rt = { workspace = true }
 
 [build-dependencies]
-durable-bindgen = { workspace = true, optional = true }
-
 cc = "1.0"
 
