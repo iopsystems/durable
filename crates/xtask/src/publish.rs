@@ -101,6 +101,9 @@ impl Publish {
             xshell::cmd!(sh, "margo add {path} --registry {repository}").run()?;
         }
 
+        println!("Generating HTML index");
+        xshell::cmd!(sh, "margo generate-html --registry {repository}").run()?;
+
         Ok(())
     }
 }
