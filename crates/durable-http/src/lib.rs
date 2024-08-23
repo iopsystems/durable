@@ -40,12 +40,12 @@ fn send(request: &Request) -> Result<Response, Error> {
     crate::transaction::maybe_txn(&label, || {
         let method = request.method.as_str().to_owned();
         let url = request.url.to_string();
-        let headers = request
+        let headers: Vec<_> = request
             .headers
             .iter()
-            .map(|(name, value)| HttpHeader {
-                name: name.as_str().to_owned(),
-                value: value.as_bytes().to_owned(),
+            .map(|(name, value)| HttpHeaderParam {
+                name: name.as_str(),
+                value: value.as_bytes(),
             })
             .collect();
         let timeout = request
@@ -53,14 +53,14 @@ fn send(request: &Request) -> Result<Response, Error> {
             .map(|t| t.as_nanos().try_into().unwrap_or(u64::MAX));
 
         let request = HttpRequest {
-            method,
-            url,
-            headers,
-            body: request.body.clone(),
+            method: &method,
+            url: &url,
+            headers: &headers,
+            body: request.body.as_deref(),
             timeout,
         };
 
-        match fetch(&request) {
+        match fetch(request) {
             Ok(response) => {
                 let status = StatusCode::from_u16(response.status)
                     .map_err(|_| ErrorKind::InvalidStatus(response.status))?;

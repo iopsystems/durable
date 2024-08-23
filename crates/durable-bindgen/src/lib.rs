@@ -13,7 +13,9 @@ impl Options {
         Self(Opts {
             format: true,
             runtime_path: Some("wit_bindgen_rt".into()),
-            ownership: Ownership::Owning,
+            ownership: Ownership::Borrowing {
+                duplicate_if_necessary: true,
+            },
             ..Default::default()
         })
     }

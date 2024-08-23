@@ -63,7 +63,7 @@ fn decode_int(value: &Value) -> Result<i64, BoxDynError> {
         return Ok(v);
     }
 
-    Err(unexpected_nonnull_type("integer", value))
+    Err(unexpected_nonnull_type(&TypeInfo::int8(), value))
 }
 
 impl Decode<'_, Durable> for i8 {
@@ -119,3 +119,8 @@ impl sqlx::Type<Durable> for i64 {
         TypeInfo::int8()
     }
 }
+
+generic_slice_decl!(i8  => int1_array int1_array as_int1_array);
+generic_slice_decl!(i16 => int2_array int2_array as_int2_array);
+generic_slice_decl!(i32 => int4_array int4_array as_int4_array);
+generic_slice_decl!(i64 => int8_array int8_array as_int8_array);

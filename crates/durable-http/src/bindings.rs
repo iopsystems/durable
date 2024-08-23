@@ -9,30 +9,46 @@ pub mod durable {
             static __FORCE_SECTION_REF: fn() = super::super::super::__link_custom_section_describing_imports;
             use super::super::super::_rt;
             #[derive(Clone)]
-            pub struct HttpHeader {
+            pub struct HttpHeaderResult {
                 pub name: _rt::String,
                 pub value: _rt::Vec<u8>,
             }
-            impl ::core::fmt::Debug for HttpHeader {
+            impl ::core::fmt::Debug for HttpHeaderResult {
                 fn fmt(
                     &self,
                     f: &mut ::core::fmt::Formatter<'_>,
                 ) -> ::core::fmt::Result {
-                    f.debug_struct("HttpHeader")
+                    f.debug_struct("HttpHeaderResult")
                         .field("name", &self.name)
                         .field("value", &self.value)
                         .finish()
                 }
             }
             #[derive(Clone)]
-            pub struct HttpRequest {
-                pub method: _rt::String,
-                pub url: _rt::String,
-                pub headers: _rt::Vec<HttpHeader>,
-                pub body: Option<_rt::Vec<u8>>,
+            pub struct HttpHeaderParam<'a> {
+                pub name: &'a str,
+                pub value: &'a [u8],
+            }
+            impl<'a> ::core::fmt::Debug for HttpHeaderParam<'a> {
+                fn fmt(
+                    &self,
+                    f: &mut ::core::fmt::Formatter<'_>,
+                ) -> ::core::fmt::Result {
+                    f.debug_struct("HttpHeaderParam")
+                        .field("name", &self.name)
+                        .field("value", &self.value)
+                        .finish()
+                }
+            }
+            #[derive(Clone)]
+            pub struct HttpRequest<'a> {
+                pub method: &'a str,
+                pub url: &'a str,
+                pub headers: &'a [HttpHeaderParam<'a>],
+                pub body: Option<&'a [u8]>,
                 pub timeout: Option<u64>,
             }
-            impl ::core::fmt::Debug for HttpRequest {
+            impl<'a> ::core::fmt::Debug for HttpRequest<'a> {
                 fn fmt(
                     &self,
                     f: &mut ::core::fmt::Formatter<'_>,
@@ -49,7 +65,7 @@ pub mod durable {
             #[derive(Clone)]
             pub struct HttpResponse {
                 pub status: u16,
-                pub headers: _rt::Vec<HttpHeader>,
+                pub headers: _rt::Vec<HttpHeaderResult>,
                 pub body: _rt::Vec<u8>,
             }
             impl ::core::fmt::Debug for HttpResponse {
@@ -114,7 +130,7 @@ pub mod durable {
             ///
             /// # Parameters
             /// - `request` - A description of the HTTP request to make.
-            pub fn fetch(request: &HttpRequest) -> Result<HttpResponse, HttpError> {
+            pub fn fetch(request: HttpRequest<'_>) -> Result<HttpResponse, HttpError> {
                 unsafe {
                     #[repr(align(4))]
                     struct RetArea([::core::mem::MaybeUninit<u8>; 24]);
@@ -150,7 +166,7 @@ pub mod durable {
                     for (i, e) in vec6.into_iter().enumerate() {
                         let base = result6.add(i * 16);
                         {
-                            let HttpHeader { name: name3, value: value3 } = e;
+                            let HttpHeaderParam { name: name3, value: value3 } = e;
                             let vec4 = name3;
                             let ptr4 = vec4.as_ptr().cast::<u8>();
                             let len4 = vec4.len();
@@ -254,7 +270,7 @@ pub mod durable {
                                         let l18 = *base.add(8).cast::<*mut u8>();
                                         let l19 = *base.add(12).cast::<usize>();
                                         let len20 = l19;
-                                        HttpHeader {
+                                        HttpHeaderResult {
                                             name: _rt::string_lift(bytes17),
                                             value: _rt::Vec::from_raw_parts(l18.cast(), len20, len20),
                                         }

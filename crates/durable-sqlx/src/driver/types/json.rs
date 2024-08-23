@@ -4,7 +4,7 @@ use sqlx::encode::IsNull;
 use sqlx::error::BoxDynError;
 use sqlx::types::{Json, JsonRawValue};
 
-use super::unexpected_nonnull_type;
+use super::{encode_by_ref, unexpected_nonnull_type};
 use crate::bindings::durable::core::sql;
 use crate::driver::{Durable, TypeInfo, Value};
 
@@ -33,7 +33,7 @@ where
             return Ok(Json(value));
         }
 
-        Err(unexpected_nonnull_type("jsonb", value))
+        Err(unexpected_nonnull_type(&TypeInfo::jsonb(), value))
     }
 }
 
@@ -43,10 +43,7 @@ impl<T> sqlx::Type<Durable> for Json<T> {
     }
 }
 
-impl<T> sqlx::Encode<'_, Durable> for &'_ [Json<T>]
-where
-    T: Serialize,
-{
+impl<T: Serialize> sqlx::Encode<'_, Durable> for [Json<T>] {
     fn encode_by_ref(
         &self,
         buf: &mut <Durable as sqlx::Database>::ArgumentBuffer<'_>,
@@ -57,8 +54,18 @@ where
             json.push(serde_json::to_string(value)?);
         }
 
+        let json: Vec<&str> = json.iter().map(|x| x.as_str()).collect();
         buf.push(Value(sql::Value::jsonb_array(&json)));
         Ok(IsNull::No)
+    }
+}
+
+impl<T: Serialize> sqlx::Encode<'_, Durable> for &'_ [Json<T>] {
+    fn encode_by_ref(
+        &self,
+        buf: &mut <Durable as sqlx::Database>::ArgumentBuffer<'_>,
+    ) -> Result<IsNull, BoxDynError> {
+        encode_by_ref::<[Json<T>]>(self, buf)
     }
 }
 
@@ -89,11 +96,11 @@ where
             return Ok(json);
         }
 
-        Err(unexpected_nonnull_type("jsonb[]", value))
+        Err(unexpected_nonnull_type(&TypeInfo::jsonb(), value))
     }
 }
 
-impl<T> sqlx::Type<Durable> for &'_ [Json<T>] {
+impl<T> sqlx::Type<Durable> for [Json<T>] {
     fn type_info() -> <Durable as sqlx::Database>::TypeInfo {
         TypeInfo::jsonb_array()
     }
@@ -110,7 +117,8 @@ impl sqlx::Encode<'_, Durable> for JsonRawValue {
         &self,
         buf: &mut <Durable as sqlx::Database>::ArgumentBuffer<'_>,
     ) -> Result<IsNull, BoxDynError> {
-        <Json<_> as sqlx::Encode<Durable>>::encode(Json(self), buf)
+        buf.push(Value(sql::Value::jsonb(self.get())));
+        Ok(IsNull::No)
     }
 }
 
@@ -119,7 +127,7 @@ impl sqlx::Encode<'_, Durable> for Box<JsonRawValue> {
         &self,
         buf: &mut <Durable as sqlx::Database>::ArgumentBuffer<'_>,
     ) -> Result<IsNull, BoxDynError> {
-        <Json<_> as sqlx::Encode<Durable>>::encode(Json(&**self), buf)
+        encode_by_ref::<JsonRawValue>(self, buf)
     }
 }
 
@@ -138,6 +146,6 @@ impl sqlx::Decode<'_, Durable> for Box<JsonRawValue> {
             return Ok(json);
         }
 
-        Err(unexpected_nonnull_type("jsonb", value))
+        Err(unexpected_nonnull_type(&TypeInfo::jsonb(), value))
     }
 }

@@ -3093,7 +3093,7 @@ pub mod durable {
             }
             impl Value {
                 #[allow(unused_unsafe, clippy::all)]
-                pub fn text_array(value: &[_rt::String]) -> Value {
+                pub fn text_array(value: &[&str]) -> Value {
                     unsafe {
                         let vec1 = value;
                         let len1 = vec1.len();
@@ -3140,7 +3140,7 @@ pub mod durable {
             }
             impl Value {
                 #[allow(unused_unsafe, clippy::all)]
-                pub fn bytea_array(value: &[_rt::Vec<u8>]) -> Value {
+                pub fn bytea_array(value: &[&[u8]]) -> Value {
                     unsafe {
                         let vec1 = value;
                         let len1 = vec1.len();
@@ -3253,7 +3253,7 @@ pub mod durable {
             }
             impl Value {
                 #[allow(unused_unsafe, clippy::all)]
-                pub fn jsonb_array(value: &[_rt::String]) -> Value {
+                pub fn jsonb_array(value: &[&str]) -> Value {
                     unsafe {
                         let vec1 = value;
                         let len1 = vec1.len();
