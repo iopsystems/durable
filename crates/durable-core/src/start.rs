@@ -1,7 +1,5 @@
 use std::io::Write;
 
-use crate::bindings::exports::durable::core::setup::Guest;
-
 // PanicInfo has been deprecated and renamed to PanicHookInfo but only in 1.82
 // or newer.
 //
@@ -22,6 +20,9 @@ extern "C" fn durable_ctor() {
 }
 
 fn durable_panic_hook(info: &PanicInfo) {
+    #[used]
+    static __UNUSED_LINK_HACK: unsafe extern "C" fn() = durable_ctor_wrapper;
+
     let payload = info.payload();
     let msg: &str = if let Some(msg) = payload.downcast_ref::<String>() {
         msg
@@ -50,17 +51,3 @@ fn durable_panic_hook(info: &PanicInfo) {
 
     std::process::abort()
 }
-
-struct Setup;
-
-impl Guest for Setup {
-    fn durable_setup_hack() {
-        #[used]
-        static __UNUSED_LINK_HACK: unsafe extern "C" fn() = durable_ctor_wrapper;
-
-        println!("HERE IS A TEST STRING THAT SHOULD BE CALLED");
-        unsafe { durable_ctor_wrapper() };
-    }
-}
-
-crate::bindings::export!(Setup with_types_in crate::bindings);

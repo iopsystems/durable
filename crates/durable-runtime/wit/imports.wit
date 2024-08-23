@@ -22,7 +22,6 @@ world imports {
 world import-core {
     import core;
     import notify;
-    export setup;
 }
 
 world import-http {
