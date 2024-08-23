@@ -111,10 +111,10 @@ impl sqlx::Decode<'_, Durable> for IpAddr {
         };
 
         if !has_maximal_prefix {
-            return Err(format!(
+            return Err(
                 "attempted to decode an IpAddr from a ip network containing multiple addresses"
-            )
-            .into());
+                    .into(),
+            );
         }
 
         Ok(addr)

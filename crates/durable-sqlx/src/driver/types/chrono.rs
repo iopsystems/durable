@@ -87,7 +87,7 @@ impl<Tz: TimeZone> sqlx::Encode<'_, Durable> for Vec<DateTime<Tz>> {
         &self,
         buf: &mut <Durable as sqlx::Database>::ArgumentBuffer<'_>,
     ) -> Result<IsNull, BoxDynError> {
-        <&[DateTime<Tz>] as sqlx::Encode<Durable>>::encode(&self, buf)
+        <&[DateTime<Tz>] as sqlx::Encode<Durable>>::encode(self, buf)
     }
 }
 
