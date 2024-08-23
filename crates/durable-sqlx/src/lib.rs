@@ -50,9 +50,6 @@ pub use crate::macros::exports;
 mod bindings {
     #![allow(unused_braces, clippy::all)]
 
-    #[cfg(feature = "bindgen")]
-    include!(concat!(env!("OUT_DIR"), "/bindings.rs"));
-    #[cfg(not(feature = "bindgen"))]
     include!("bindings.rs");
 
     pub use self::durable::core::sql::*;

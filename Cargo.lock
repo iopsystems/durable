@@ -949,7 +949,6 @@ version = "0.3.4"
 dependencies = [
  "chrono",
  "durable",
- "durable-bindgen",
  "durable-core",
  "http",
  "http-serde-ext",
@@ -1021,7 +1020,6 @@ dependencies = [
  "async-stream",
  "chrono",
  "durable",
- "durable-bindgen",
  "durable-core",
  "durable-sqlx-macros",
  "futures-core",
