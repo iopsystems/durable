@@ -63,6 +63,11 @@ impl Publish {
                 ),
             };
 
+            // Skip incomplete temporary files.
+            if filename.starts_with(".") {
+                continue;
+            }
+
             let basename = filename
                 .strip_suffix(".crate")
                 .expect("filename did not end with `.crate`?");
