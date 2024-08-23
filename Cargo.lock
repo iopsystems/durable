@@ -1019,6 +1019,7 @@ dependencies = [
  "durable-sqlx-macros",
  "futures-core",
  "futures-util",
+ "ipnetwork",
  "log",
  "serde",
  "serde_json",

@@ -58,6 +58,7 @@ interface sql {
         timestamp: static func() -> type-info;
         uuid: static func() -> type-info;
         jsonb: static func() -> type-info;
+        inet: static func() -> type-info;
         
         boolean-array: static func() -> type-info;
         float4-array: static func() -> type-info;
@@ -72,6 +73,7 @@ interface sql {
         timestamp-array: static func() -> type-info;
         uuid-array: static func() -> type-info;
         jsonb-array: static func() -> type-info;
+        inet-array: static func() -> type-info;
     }
     
 
@@ -93,12 +95,45 @@ interface sql {
 
     /// A UUID.
     /// 
-    /// This should be the bytes of the UUID, in little-endian order.
-    /// 
-    /// This is currently the only way to represent a fixed-size array in WIT. 
+    /// Since WIT does not support 128-bit integers the uuid is split into the
+    /// hi and lo 64 bits here.
     record uuid {
         hi: u64,
         lo: u64
+    }
+
+    /// An IPv4 network range.
+    record ipv4-network {
+        /// The IP representation in little-endian byte order.
+        addr: u32,
+
+        /// The network prefix.
+        /// 
+        /// Constructing values with a IPv4 prefix larger than 32 will result in
+        /// an error when constructing a value.
+        prefix: u8
+    }
+
+    /// An IPv6 network range.
+    record ipv6-network {
+        /// The 128-bit IPv6 address, split into the low-128 bits followed by
+        /// high-128 bits.
+        /// 
+        /// This ensures that the representation in memory is in little-endian
+        /// byte order.
+        addr: tuple<u64, u64>,
+
+        /// The network prefix.
+        /// 
+        /// Constructing values with a IPv6 prefix larger than 128 will result
+        /// in an error when constructing a value.
+        prefix: u8,
+    }
+
+    /// An IP network range, either v4 or v6.
+    variant ip-network {
+        v4(ipv4-network),
+        v6(ipv6-network)
     }
 
     /// A database value.
@@ -140,7 +175,9 @@ interface sql {
         as-uuid:        func() -> option<uuid>;
 
         /// Note that this function works for both json and jsonb types.
-        as-json:    func() -> option<string>;
+        as-json:        func() -> option<string>;
+        as-inet:        func() -> option<ip-network>;
+
 
         as-boolean-array:       func() -> option<list<bool>>;
         as-float4-array:        func() -> option<list<f32>>;
@@ -155,6 +192,7 @@ interface sql {
         as-timestamp-array:     func() -> option<list<timestamp>>;
         as-uuid-array:          func() -> option<list<uuid>>;
         as-json-array:          func() -> option<list<string>>;
+        as-inet-array:          func() -> option<list<ip-network>>;
 
         /// Create a null value with the provided type info.
         null: static func(tyinfo: type-info) -> value;
@@ -172,6 +210,7 @@ interface sql {
         timestamp:      static func(value: timestamp) -> value;
         uuid:           static func(value: uuid) -> value;
         jsonb:          static func(value: string) -> value;
+        inet:           static func(value: ip-network) -> result<value, string>;
 
         boolean-array:  static func(value: list<bool>) -> value;
         float4-array:   static func(value: list<f32>) -> value;
@@ -186,6 +225,7 @@ interface sql {
         timestamp-array:static func(value: list<timestamp>) -> value;
         uuid-array:     static func(value: list<uuid>) -> value;
         jsonb-array:    static func(value: list<string>) -> value;
+        inet-array:     static func(value: list<ip-network>) -> result<value, string>;
     }
 
     record column {

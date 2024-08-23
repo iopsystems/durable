@@ -9,6 +9,8 @@ mod bytea;
 mod chrono;
 mod float;
 mod int;
+#[cfg(feature = "ipnetwork")]
+mod ipnetwork;
 #[cfg(feature = "json")]
 mod json;
 mod text;

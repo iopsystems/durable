@@ -17,9 +17,17 @@ sqlx-macros = ["sqlx", "durable-sqlx/macros"]
 sqlx-chrono = ["sqlx", "durable-sqlx/chrono"]
 sqlx-json = ["sqlx", "durable-sqlx/json"]
 sqlx-uuid = ["sqlx", "durable-sqlx/uuid"]
+sqlx-ipnetwork = ["sqlx", "durable-sqlx/ipnetwork"]
 
 # All sqlx features combined for convenience.
-sqlx-full = ["sqlx", "sqlx-macros", "sqlx-chrono", "sqlx-json", "sqlx-uuid"]
+sqlx-full = [
+    "sqlx",
+    "sqlx-macros",
+    "sqlx-chrono",
+    "sqlx-json",
+    "sqlx-uuid",
+    "sqlx-ipnetwork",
+]
 
 bindgen = [
     "durable-core/bindgen",
