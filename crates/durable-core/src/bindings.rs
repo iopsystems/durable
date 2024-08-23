@@ -13,7 +13,7 @@ pub mod durable {
             pub fn task_id() -> i64 {
                 unsafe {
                     #[cfg(target_arch = "wasm32")]
-                    #[link(wasm_import_module = "durable:core/core@2.0.0")]
+                    #[link(wasm_import_module = "durable:core/core@2.1.0")]
                     extern "C" {
                         #[link_name = "task-id"]
                         fn wit_import() -> i64;
@@ -35,7 +35,7 @@ pub mod durable {
                     let mut ret_area = RetArea([::core::mem::MaybeUninit::uninit(); 8]);
                     let ptr0 = ret_area.0.as_mut_ptr().cast::<u8>();
                     #[cfg(target_arch = "wasm32")]
-                    #[link(wasm_import_module = "durable:core/core@2.0.0")]
+                    #[link(wasm_import_module = "durable:core/core@2.1.0")]
                     extern "C" {
                         #[link_name = "task-name"]
                         fn wit_import(_: *mut u8);
@@ -61,7 +61,7 @@ pub mod durable {
                     let mut ret_area = RetArea([::core::mem::MaybeUninit::uninit(); 8]);
                     let ptr0 = ret_area.0.as_mut_ptr().cast::<u8>();
                     #[cfg(target_arch = "wasm32")]
-                    #[link(wasm_import_module = "durable:core/core@2.0.0")]
+                    #[link(wasm_import_module = "durable:core/core@2.1.0")]
                     extern "C" {
                         #[link_name = "task-data"]
                         fn wit_import(_: *mut u8);
@@ -98,7 +98,7 @@ pub mod durable {
                     let len0 = vec0.len();
                     let ptr1 = ret_area.0.as_mut_ptr().cast::<u8>();
                     #[cfg(target_arch = "wasm32")]
-                    #[link(wasm_import_module = "durable:core/core@2.0.0")]
+                    #[link(wasm_import_module = "durable:core/core@2.1.0")]
                     extern "C" {
                         #[link_name = "transaction-enter"]
                         fn wit_import(_: *mut u8, _: usize, _: i32, _: *mut u8);
@@ -148,7 +148,7 @@ pub mod durable {
                     let ptr0 = vec0.as_ptr().cast::<u8>();
                     let len0 = vec0.len();
                     #[cfg(target_arch = "wasm32")]
-                    #[link(wasm_import_module = "durable:core/core@2.0.0")]
+                    #[link(wasm_import_module = "durable:core/core@2.1.0")]
                     extern "C" {
                         #[link_name = "transaction-exit"]
                         fn wit_import(_: *mut u8, _: usize);
@@ -201,7 +201,7 @@ pub mod durable {
                     let mut ret_area = RetArea([::core::mem::MaybeUninit::uninit(); 32]);
                     let ptr0 = ret_area.0.as_mut_ptr().cast::<u8>();
                     #[cfg(target_arch = "wasm32")]
-                    #[link(wasm_import_module = "durable:core/notify@2.0.0")]
+                    #[link(wasm_import_module = "durable:core/notify@2.1.0")]
                     extern "C" {
                         #[link_name = "notification-blocking"]
                         fn wit_import(_: *mut u8);
@@ -355,16 +355,16 @@ pub mod exports {
                     fn durable_setup_hack();
                 }
                 #[doc(hidden)]
-                macro_rules! __export_durable_core_setup_2_0_0_cabi {
+                macro_rules! __export_durable_core_setup_2_1_0_cabi {
                     ($ty:ident with_types_in $($path_to_types:tt)*) => {
                         const _ : () = { #[export_name =
-                        "durable:core/setup@2.0.0#durable-setup-hack"] unsafe extern "C"
+                        "durable:core/setup@2.1.0#durable-setup-hack"] unsafe extern "C"
                         fn export_durable_setup_hack() { $($path_to_types)*::
                         _export_durable_setup_hack_cabi::<$ty > () } };
                     };
                 }
                 #[doc(hidden)]
-                pub(crate) use __export_durable_core_setup_2_0_0_cabi;
+                pub(crate) use __export_durable_core_setup_2_1_0_cabi;
             }
         }
     }
@@ -416,7 +416,7 @@ macro_rules! __export_import_core_impl {
     };
     ($ty:ident with_types_in $($path_to_types_root:tt)*) => {
         $($path_to_types_root)*::
-        exports::durable::core::setup::__export_durable_core_setup_2_0_0_cabi!($ty
+        exports::durable::core::setup::__export_durable_core_setup_2_1_0_cabi!($ty
         with_types_in $($path_to_types_root)*:: exports::durable::core::setup);
     };
 }
@@ -430,14 +430,14 @@ pub static __WIT_BINDGEN_COMPONENT_TYPE: [u8; 626] = *b"\
 A\x09\x01B\x0a\x01@\0\0x\x04\0\x07task-id\x01\0\x01@\0\0s\x04\0\x09task-name\x01\
 \x01\x04\0\x09task-data\x01\x01\x01ks\x01@\x02\x05labels\x05is-db\x7f\0\x02\x04\0\
 \x11transaction-enter\x01\x03\x01@\x01\x04datas\x01\0\x04\0\x10transaction-exit\x01\
-\x04\x03\x01\x17durable:core/core@2.0.0\x05\0\x01B\x05\x01r\x02\x07secondsw\x0bn\
+\x04\x03\x01\x17durable:core/core@2.1.0\x05\0\x01B\x05\x01r\x02\x07secondsw\x0bn\
 anosecondsy\x04\0\x08datetime\x03\0\0\x01@\0\0\x01\x04\0\x03now\x01\x02\x04\0\x0a\
 resolution\x01\x02\x03\x01\x1cwasi:clocks/wall-clock@0.2.0\x05\x01\x02\x03\0\x01\
 \x08datetime\x01B\x06\x02\x03\x02\x01\x02\x04\0\x08datetime\x03\0\0\x01r\x03\x0a\
 created-at\x01\x05events\x04datas\x04\0\x05event\x03\0\x02\x01@\0\0\x03\x04\0\x15\
-notification-blocking\x01\x04\x03\x01\x19durable:core/notify@2.0.0\x05\x03\x01B\x02\
+notification-blocking\x01\x04\x03\x01\x19durable:core/notify@2.1.0\x05\x03\x01B\x02\
 \x01@\0\x01\0\x04\0\x12durable-setup-hack\x01\0\x04\x01\x18durable:core/setup@2.\
-0.0\x05\x04\x04\x01\x1edurable:core/import-core@2.0.0\x04\0\x0b\x11\x01\0\x0bimp\
+1.0\x05\x04\x04\x01\x1edurable:core/import-core@2.1.0\x04\0\x0b\x11\x01\0\x0bimp\
 ort-core\x03\0\0\0G\x09producers\x01\x0cprocessed-by\x02\x0dwit-component\x070.2\
 15.0\x10wit-bindgen-rust\x060.30.0";
 #[inline(never)]

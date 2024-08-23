@@ -40,7 +40,7 @@ pub mod durable {
                     unreachable!();
                     #[cfg(target_arch = "wasm32")]
                     {
-                        #[link(wasm_import_module = "durable:core/sql@2.0.0")]
+                        #[link(wasm_import_module = "durable:core/sql@2.1.0")]
                         extern "C" {
                             #[link_name = "[resource-drop]type-info"]
                             fn drop(_: u32);
@@ -91,9 +91,8 @@ pub mod durable {
             }
             /// A UUID.
             ///
-            /// This should be the bytes of the UUID, in little-endian order.
-            ///
-            /// This is currently the only way to represent a fixed-size array in WIT.
+            /// Since WIT does not support 128-bit integers the uuid is split into the
+            /// hi and lo 64 bits here.
             #[repr(C)]
             #[derive(Clone, Copy, serde::Deserialize, serde::Serialize)]
             pub struct Uuid {
@@ -109,6 +108,77 @@ pub mod durable {
                         .field("hi", &self.hi)
                         .field("lo", &self.lo)
                         .finish()
+                }
+            }
+            /// An IPv4 network range.
+            #[repr(C)]
+            #[derive(Clone, Copy, serde::Deserialize, serde::Serialize)]
+            pub struct Ipv4Network {
+                /// The IP representation in little-endian byte order.
+                pub addr: u32,
+                /// The network prefix.
+                ///
+                /// Constructing values with a IPv4 prefix larger than 32 will result in
+                /// an error when constructing a value.
+                pub prefix: u8,
+            }
+            impl ::core::fmt::Debug for Ipv4Network {
+                fn fmt(
+                    &self,
+                    f: &mut ::core::fmt::Formatter<'_>,
+                ) -> ::core::fmt::Result {
+                    f.debug_struct("Ipv4Network")
+                        .field("addr", &self.addr)
+                        .field("prefix", &self.prefix)
+                        .finish()
+                }
+            }
+            /// An IPv6 network range.
+            #[repr(C)]
+            #[derive(Clone, Copy, serde::Deserialize, serde::Serialize)]
+            pub struct Ipv6Network {
+                /// The 128-bit IPv6 address, split into the low-128 bits followed by
+                /// high-128 bits.
+                ///
+                /// This ensures that the representation in memory is in little-endian
+                /// byte order.
+                pub addr: (u64, u64),
+                /// The network prefix.
+                ///
+                /// Constructing values with a IPv6 prefix larger than 128 will result
+                /// in an error when constructing a value.
+                pub prefix: u8,
+            }
+            impl ::core::fmt::Debug for Ipv6Network {
+                fn fmt(
+                    &self,
+                    f: &mut ::core::fmt::Formatter<'_>,
+                ) -> ::core::fmt::Result {
+                    f.debug_struct("Ipv6Network")
+                        .field("addr", &self.addr)
+                        .field("prefix", &self.prefix)
+                        .finish()
+                }
+            }
+            /// An IP network range, either v4 or v6.
+            #[derive(Clone, Copy, serde::Deserialize, serde::Serialize)]
+            pub enum IpNetwork {
+                V4(Ipv4Network),
+                V6(Ipv6Network),
+            }
+            impl ::core::fmt::Debug for IpNetwork {
+                fn fmt(
+                    &self,
+                    f: &mut ::core::fmt::Formatter<'_>,
+                ) -> ::core::fmt::Result {
+                    match self {
+                        IpNetwork::V4(e) => {
+                            f.debug_tuple("IpNetwork::V4").field(e).finish()
+                        }
+                        IpNetwork::V6(e) => {
+                            f.debug_tuple("IpNetwork::V6").field(e).finish()
+                        }
+                    }
                 }
             }
             /// A database value.
@@ -143,7 +213,7 @@ pub mod durable {
                     unreachable!();
                     #[cfg(target_arch = "wasm32")]
                     {
-                        #[link(wasm_import_module = "durable:core/sql@2.0.0")]
+                        #[link(wasm_import_module = "durable:core/sql@2.1.0")]
                         extern "C" {
                             #[link_name = "[resource-drop]value"]
                             fn drop(_: u32);
@@ -368,7 +438,7 @@ pub mod durable {
                         );
                         let ptr0 = ret_area.0.as_mut_ptr().cast::<u8>();
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.0.0")]
+                        #[link(wasm_import_module = "durable:core/sql@2.1.0")]
                         extern "C" {
                             #[link_name = "[method]type-info.name"]
                             fn wit_import(_: i32, _: *mut u8);
@@ -392,7 +462,7 @@ pub mod durable {
                 pub fn compatible(&self, other: &TypeInfo) -> bool {
                     unsafe {
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.0.0")]
+                        #[link(wasm_import_module = "durable:core/sql@2.1.0")]
                         extern "C" {
                             #[link_name = "[method]type-info.compatible"]
                             fn wit_import(_: i32, _: i32) -> i32;
@@ -415,7 +485,7 @@ pub mod durable {
                 pub fn equal(&self, other: &TypeInfo) -> bool {
                     unsafe {
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.0.0")]
+                        #[link(wasm_import_module = "durable:core/sql@2.1.0")]
                         extern "C" {
                             #[link_name = "[method]type-info.equal"]
                             fn wit_import(_: i32, _: i32) -> i32;
@@ -438,7 +508,7 @@ pub mod durable {
                 pub fn clone(&self) -> TypeInfo {
                     unsafe {
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.0.0")]
+                        #[link(wasm_import_module = "durable:core/sql@2.1.0")]
                         extern "C" {
                             #[link_name = "[method]type-info.clone"]
                             fn wit_import(_: i32) -> i32;
@@ -466,7 +536,7 @@ pub mod durable {
                         );
                         let ptr0 = ret_area.0.as_mut_ptr().cast::<u8>();
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.0.0")]
+                        #[link(wasm_import_module = "durable:core/sql@2.1.0")]
                         extern "C" {
                             #[link_name = "[method]type-info.serialize"]
                             fn wit_import(_: i32, _: *mut u8);
@@ -526,7 +596,7 @@ pub mod durable {
                         let len0 = vec0.len();
                         let ptr1 = ret_area.0.as_mut_ptr().cast::<u8>();
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.0.0")]
+                        #[link(wasm_import_module = "durable:core/sql@2.1.0")]
                         extern "C" {
                             #[link_name = "[static]type-info.deserialize"]
                             fn wit_import(_: *mut u8, _: usize, _: *mut u8);
@@ -584,7 +654,7 @@ pub mod durable {
                 pub fn boolean() -> TypeInfo {
                     unsafe {
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.0.0")]
+                        #[link(wasm_import_module = "durable:core/sql@2.1.0")]
                         extern "C" {
                             #[link_name = "[static]type-info.boolean"]
                             fn wit_import() -> i32;
@@ -603,7 +673,7 @@ pub mod durable {
                 pub fn float4() -> TypeInfo {
                     unsafe {
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.0.0")]
+                        #[link(wasm_import_module = "durable:core/sql@2.1.0")]
                         extern "C" {
                             #[link_name = "[static]type-info.float4"]
                             fn wit_import() -> i32;
@@ -622,7 +692,7 @@ pub mod durable {
                 pub fn float8() -> TypeInfo {
                     unsafe {
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.0.0")]
+                        #[link(wasm_import_module = "durable:core/sql@2.1.0")]
                         extern "C" {
                             #[link_name = "[static]type-info.float8"]
                             fn wit_import() -> i32;
@@ -641,7 +711,7 @@ pub mod durable {
                 pub fn int1() -> TypeInfo {
                     unsafe {
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.0.0")]
+                        #[link(wasm_import_module = "durable:core/sql@2.1.0")]
                         extern "C" {
                             #[link_name = "[static]type-info.int1"]
                             fn wit_import() -> i32;
@@ -660,7 +730,7 @@ pub mod durable {
                 pub fn int2() -> TypeInfo {
                     unsafe {
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.0.0")]
+                        #[link(wasm_import_module = "durable:core/sql@2.1.0")]
                         extern "C" {
                             #[link_name = "[static]type-info.int2"]
                             fn wit_import() -> i32;
@@ -679,7 +749,7 @@ pub mod durable {
                 pub fn int4() -> TypeInfo {
                     unsafe {
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.0.0")]
+                        #[link(wasm_import_module = "durable:core/sql@2.1.0")]
                         extern "C" {
                             #[link_name = "[static]type-info.int4"]
                             fn wit_import() -> i32;
@@ -698,7 +768,7 @@ pub mod durable {
                 pub fn int8() -> TypeInfo {
                     unsafe {
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.0.0")]
+                        #[link(wasm_import_module = "durable:core/sql@2.1.0")]
                         extern "C" {
                             #[link_name = "[static]type-info.int8"]
                             fn wit_import() -> i32;
@@ -717,7 +787,7 @@ pub mod durable {
                 pub fn text() -> TypeInfo {
                     unsafe {
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.0.0")]
+                        #[link(wasm_import_module = "durable:core/sql@2.1.0")]
                         extern "C" {
                             #[link_name = "[static]type-info.text"]
                             fn wit_import() -> i32;
@@ -736,7 +806,7 @@ pub mod durable {
                 pub fn bytea() -> TypeInfo {
                     unsafe {
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.0.0")]
+                        #[link(wasm_import_module = "durable:core/sql@2.1.0")]
                         extern "C" {
                             #[link_name = "[static]type-info.bytea"]
                             fn wit_import() -> i32;
@@ -755,7 +825,7 @@ pub mod durable {
                 pub fn timestamptz() -> TypeInfo {
                     unsafe {
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.0.0")]
+                        #[link(wasm_import_module = "durable:core/sql@2.1.0")]
                         extern "C" {
                             #[link_name = "[static]type-info.timestamptz"]
                             fn wit_import() -> i32;
@@ -774,7 +844,7 @@ pub mod durable {
                 pub fn timestamp() -> TypeInfo {
                     unsafe {
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.0.0")]
+                        #[link(wasm_import_module = "durable:core/sql@2.1.0")]
                         extern "C" {
                             #[link_name = "[static]type-info.timestamp"]
                             fn wit_import() -> i32;
@@ -793,7 +863,7 @@ pub mod durable {
                 pub fn uuid() -> TypeInfo {
                     unsafe {
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.0.0")]
+                        #[link(wasm_import_module = "durable:core/sql@2.1.0")]
                         extern "C" {
                             #[link_name = "[static]type-info.uuid"]
                             fn wit_import() -> i32;
@@ -812,9 +882,28 @@ pub mod durable {
                 pub fn jsonb() -> TypeInfo {
                     unsafe {
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.0.0")]
+                        #[link(wasm_import_module = "durable:core/sql@2.1.0")]
                         extern "C" {
                             #[link_name = "[static]type-info.jsonb"]
+                            fn wit_import() -> i32;
+                        }
+                        #[cfg(not(target_arch = "wasm32"))]
+                        fn wit_import() -> i32 {
+                            unreachable!()
+                        }
+                        let ret = wit_import();
+                        TypeInfo::from_handle(ret as u32)
+                    }
+                }
+            }
+            impl TypeInfo {
+                #[allow(unused_unsafe, clippy::all)]
+                pub fn inet() -> TypeInfo {
+                    unsafe {
+                        #[cfg(target_arch = "wasm32")]
+                        #[link(wasm_import_module = "durable:core/sql@2.1.0")]
+                        extern "C" {
+                            #[link_name = "[static]type-info.inet"]
                             fn wit_import() -> i32;
                         }
                         #[cfg(not(target_arch = "wasm32"))]
@@ -831,7 +920,7 @@ pub mod durable {
                 pub fn boolean_array() -> TypeInfo {
                     unsafe {
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.0.0")]
+                        #[link(wasm_import_module = "durable:core/sql@2.1.0")]
                         extern "C" {
                             #[link_name = "[static]type-info.boolean-array"]
                             fn wit_import() -> i32;
@@ -850,7 +939,7 @@ pub mod durable {
                 pub fn float4_array() -> TypeInfo {
                     unsafe {
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.0.0")]
+                        #[link(wasm_import_module = "durable:core/sql@2.1.0")]
                         extern "C" {
                             #[link_name = "[static]type-info.float4-array"]
                             fn wit_import() -> i32;
@@ -869,7 +958,7 @@ pub mod durable {
                 pub fn float8_array() -> TypeInfo {
                     unsafe {
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.0.0")]
+                        #[link(wasm_import_module = "durable:core/sql@2.1.0")]
                         extern "C" {
                             #[link_name = "[static]type-info.float8-array"]
                             fn wit_import() -> i32;
@@ -888,7 +977,7 @@ pub mod durable {
                 pub fn int1_array() -> TypeInfo {
                     unsafe {
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.0.0")]
+                        #[link(wasm_import_module = "durable:core/sql@2.1.0")]
                         extern "C" {
                             #[link_name = "[static]type-info.int1-array"]
                             fn wit_import() -> i32;
@@ -907,7 +996,7 @@ pub mod durable {
                 pub fn int2_array() -> TypeInfo {
                     unsafe {
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.0.0")]
+                        #[link(wasm_import_module = "durable:core/sql@2.1.0")]
                         extern "C" {
                             #[link_name = "[static]type-info.int2-array"]
                             fn wit_import() -> i32;
@@ -926,7 +1015,7 @@ pub mod durable {
                 pub fn int4_array() -> TypeInfo {
                     unsafe {
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.0.0")]
+                        #[link(wasm_import_module = "durable:core/sql@2.1.0")]
                         extern "C" {
                             #[link_name = "[static]type-info.int4-array"]
                             fn wit_import() -> i32;
@@ -945,7 +1034,7 @@ pub mod durable {
                 pub fn int8_array() -> TypeInfo {
                     unsafe {
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.0.0")]
+                        #[link(wasm_import_module = "durable:core/sql@2.1.0")]
                         extern "C" {
                             #[link_name = "[static]type-info.int8-array"]
                             fn wit_import() -> i32;
@@ -964,7 +1053,7 @@ pub mod durable {
                 pub fn text_array() -> TypeInfo {
                     unsafe {
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.0.0")]
+                        #[link(wasm_import_module = "durable:core/sql@2.1.0")]
                         extern "C" {
                             #[link_name = "[static]type-info.text-array"]
                             fn wit_import() -> i32;
@@ -983,7 +1072,7 @@ pub mod durable {
                 pub fn bytea_array() -> TypeInfo {
                     unsafe {
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.0.0")]
+                        #[link(wasm_import_module = "durable:core/sql@2.1.0")]
                         extern "C" {
                             #[link_name = "[static]type-info.bytea-array"]
                             fn wit_import() -> i32;
@@ -1002,7 +1091,7 @@ pub mod durable {
                 pub fn timestamptz_array() -> TypeInfo {
                     unsafe {
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.0.0")]
+                        #[link(wasm_import_module = "durable:core/sql@2.1.0")]
                         extern "C" {
                             #[link_name = "[static]type-info.timestamptz-array"]
                             fn wit_import() -> i32;
@@ -1021,7 +1110,7 @@ pub mod durable {
                 pub fn timestamp_array() -> TypeInfo {
                     unsafe {
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.0.0")]
+                        #[link(wasm_import_module = "durable:core/sql@2.1.0")]
                         extern "C" {
                             #[link_name = "[static]type-info.timestamp-array"]
                             fn wit_import() -> i32;
@@ -1040,7 +1129,7 @@ pub mod durable {
                 pub fn uuid_array() -> TypeInfo {
                     unsafe {
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.0.0")]
+                        #[link(wasm_import_module = "durable:core/sql@2.1.0")]
                         extern "C" {
                             #[link_name = "[static]type-info.uuid-array"]
                             fn wit_import() -> i32;
@@ -1059,9 +1148,28 @@ pub mod durable {
                 pub fn jsonb_array() -> TypeInfo {
                     unsafe {
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.0.0")]
+                        #[link(wasm_import_module = "durable:core/sql@2.1.0")]
                         extern "C" {
                             #[link_name = "[static]type-info.jsonb-array"]
+                            fn wit_import() -> i32;
+                        }
+                        #[cfg(not(target_arch = "wasm32"))]
+                        fn wit_import() -> i32 {
+                            unreachable!()
+                        }
+                        let ret = wit_import();
+                        TypeInfo::from_handle(ret as u32)
+                    }
+                }
+            }
+            impl TypeInfo {
+                #[allow(unused_unsafe, clippy::all)]
+                pub fn inet_array() -> TypeInfo {
+                    unsafe {
+                        #[cfg(target_arch = "wasm32")]
+                        #[link(wasm_import_module = "durable:core/sql@2.1.0")]
+                        extern "C" {
+                            #[link_name = "[static]type-info.inet-array"]
                             fn wit_import() -> i32;
                         }
                         #[cfg(not(target_arch = "wasm32"))]
@@ -1081,7 +1189,7 @@ pub mod durable {
                 pub fn is_null(&self) -> bool {
                     unsafe {
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.0.0")]
+                        #[link(wasm_import_module = "durable:core/sql@2.1.0")]
                         extern "C" {
                             #[link_name = "[method]value.is-null"]
                             fn wit_import(_: i32) -> i32;
@@ -1101,7 +1209,7 @@ pub mod durable {
                 pub fn type_info(&self) -> TypeInfo {
                     unsafe {
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.0.0")]
+                        #[link(wasm_import_module = "durable:core/sql@2.1.0")]
                         extern "C" {
                             #[link_name = "[method]value.type-info"]
                             fn wit_import(_: i32) -> i32;
@@ -1121,7 +1229,7 @@ pub mod durable {
                 pub fn clone(&self) -> Value {
                     unsafe {
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.0.0")]
+                        #[link(wasm_import_module = "durable:core/sql@2.1.0")]
                         extern "C" {
                             #[link_name = "[method]value.clone"]
                             fn wit_import(_: i32) -> i32;
@@ -1149,7 +1257,7 @@ pub mod durable {
                         );
                         let ptr0 = ret_area.0.as_mut_ptr().cast::<u8>();
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.0.0")]
+                        #[link(wasm_import_module = "durable:core/sql@2.1.0")]
                         extern "C" {
                             #[link_name = "[method]value.serialize"]
                             fn wit_import(_: i32, _: *mut u8);
@@ -1209,7 +1317,7 @@ pub mod durable {
                         let len0 = vec0.len();
                         let ptr1 = ret_area.0.as_mut_ptr().cast::<u8>();
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.0.0")]
+                        #[link(wasm_import_module = "durable:core/sql@2.1.0")]
                         extern "C" {
                             #[link_name = "[static]value.deserialize"]
                             fn wit_import(_: *mut u8, _: usize, _: *mut u8);
@@ -1258,7 +1366,7 @@ pub mod durable {
                         );
                         let ptr0 = ret_area.0.as_mut_ptr().cast::<u8>();
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.0.0")]
+                        #[link(wasm_import_module = "durable:core/sql@2.1.0")]
                         extern "C" {
                             #[link_name = "[method]value.as-boolean"]
                             fn wit_import(_: i32, _: *mut u8);
@@ -1294,7 +1402,7 @@ pub mod durable {
                         );
                         let ptr0 = ret_area.0.as_mut_ptr().cast::<u8>();
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.0.0")]
+                        #[link(wasm_import_module = "durable:core/sql@2.1.0")]
                         extern "C" {
                             #[link_name = "[method]value.as-float4"]
                             fn wit_import(_: i32, _: *mut u8);
@@ -1330,7 +1438,7 @@ pub mod durable {
                         );
                         let ptr0 = ret_area.0.as_mut_ptr().cast::<u8>();
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.0.0")]
+                        #[link(wasm_import_module = "durable:core/sql@2.1.0")]
                         extern "C" {
                             #[link_name = "[method]value.as-float8"]
                             fn wit_import(_: i32, _: *mut u8);
@@ -1366,7 +1474,7 @@ pub mod durable {
                         );
                         let ptr0 = ret_area.0.as_mut_ptr().cast::<u8>();
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.0.0")]
+                        #[link(wasm_import_module = "durable:core/sql@2.1.0")]
                         extern "C" {
                             #[link_name = "[method]value.as-int1"]
                             fn wit_import(_: i32, _: *mut u8);
@@ -1402,7 +1510,7 @@ pub mod durable {
                         );
                         let ptr0 = ret_area.0.as_mut_ptr().cast::<u8>();
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.0.0")]
+                        #[link(wasm_import_module = "durable:core/sql@2.1.0")]
                         extern "C" {
                             #[link_name = "[method]value.as-int2"]
                             fn wit_import(_: i32, _: *mut u8);
@@ -1438,7 +1546,7 @@ pub mod durable {
                         );
                         let ptr0 = ret_area.0.as_mut_ptr().cast::<u8>();
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.0.0")]
+                        #[link(wasm_import_module = "durable:core/sql@2.1.0")]
                         extern "C" {
                             #[link_name = "[method]value.as-int4"]
                             fn wit_import(_: i32, _: *mut u8);
@@ -1474,7 +1582,7 @@ pub mod durable {
                         );
                         let ptr0 = ret_area.0.as_mut_ptr().cast::<u8>();
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.0.0")]
+                        #[link(wasm_import_module = "durable:core/sql@2.1.0")]
                         extern "C" {
                             #[link_name = "[method]value.as-int8"]
                             fn wit_import(_: i32, _: *mut u8);
@@ -1510,7 +1618,7 @@ pub mod durable {
                         );
                         let ptr0 = ret_area.0.as_mut_ptr().cast::<u8>();
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.0.0")]
+                        #[link(wasm_import_module = "durable:core/sql@2.1.0")]
                         extern "C" {
                             #[link_name = "[method]value.as-text"]
                             fn wit_import(_: i32, _: *mut u8);
@@ -1553,7 +1661,7 @@ pub mod durable {
                         );
                         let ptr0 = ret_area.0.as_mut_ptr().cast::<u8>();
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.0.0")]
+                        #[link(wasm_import_module = "durable:core/sql@2.1.0")]
                         extern "C" {
                             #[link_name = "[method]value.as-bytea"]
                             fn wit_import(_: i32, _: *mut u8);
@@ -1591,7 +1699,7 @@ pub mod durable {
                         );
                         let ptr0 = ret_area.0.as_mut_ptr().cast::<u8>();
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.0.0")]
+                        #[link(wasm_import_module = "durable:core/sql@2.1.0")]
                         extern "C" {
                             #[link_name = "[method]value.as-timestamptz"]
                             fn wit_import(_: i32, _: *mut u8);
@@ -1633,7 +1741,7 @@ pub mod durable {
                         );
                         let ptr0 = ret_area.0.as_mut_ptr().cast::<u8>();
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.0.0")]
+                        #[link(wasm_import_module = "durable:core/sql@2.1.0")]
                         extern "C" {
                             #[link_name = "[method]value.as-timestamp"]
                             fn wit_import(_: i32, _: *mut u8);
@@ -1673,7 +1781,7 @@ pub mod durable {
                         );
                         let ptr0 = ret_area.0.as_mut_ptr().cast::<u8>();
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.0.0")]
+                        #[link(wasm_import_module = "durable:core/sql@2.1.0")]
                         extern "C" {
                             #[link_name = "[method]value.as-uuid"]
                             fn wit_import(_: i32, _: *mut u8);
@@ -1714,7 +1822,7 @@ pub mod durable {
                         );
                         let ptr0 = ret_area.0.as_mut_ptr().cast::<u8>();
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.0.0")]
+                        #[link(wasm_import_module = "durable:core/sql@2.1.0")]
                         extern "C" {
                             #[link_name = "[method]value.as-json"]
                             fn wit_import(_: i32, _: *mut u8);
@@ -1748,6 +1856,68 @@ pub mod durable {
             }
             impl Value {
                 #[allow(unused_unsafe, clippy::all)]
+                pub fn as_inet(&self) -> Option<IpNetwork> {
+                    unsafe {
+                        #[repr(align(8))]
+                        struct RetArea([::core::mem::MaybeUninit<u8>; 40]);
+                        let mut ret_area = RetArea(
+                            [::core::mem::MaybeUninit::uninit(); 40],
+                        );
+                        let ptr0 = ret_area.0.as_mut_ptr().cast::<u8>();
+                        #[cfg(target_arch = "wasm32")]
+                        #[link(wasm_import_module = "durable:core/sql@2.1.0")]
+                        extern "C" {
+                            #[link_name = "[method]value.as-inet"]
+                            fn wit_import(_: i32, _: *mut u8);
+                        }
+                        #[cfg(not(target_arch = "wasm32"))]
+                        fn wit_import(_: i32, _: *mut u8) {
+                            unreachable!()
+                        }
+                        wit_import((self).handle() as i32, ptr0);
+                        let l1 = i32::from(*ptr0.add(0).cast::<u8>());
+                        match l1 {
+                            0 => None,
+                            1 => {
+                                let e = {
+                                    let l2 = i32::from(*ptr0.add(8).cast::<u8>());
+                                    let v8 = match l2 {
+                                        0 => {
+                                            let e8 = {
+                                                let l3 = *ptr0.add(16).cast::<i32>();
+                                                let l4 = i32::from(*ptr0.add(20).cast::<u8>());
+                                                Ipv4Network {
+                                                    addr: l3 as u32,
+                                                    prefix: l4 as u8,
+                                                }
+                                            };
+                                            IpNetwork::V4(e8)
+                                        }
+                                        n => {
+                                            debug_assert_eq!(n, 1, "invalid enum discriminant");
+                                            let e8 = {
+                                                let l5 = *ptr0.add(16).cast::<i64>();
+                                                let l6 = *ptr0.add(24).cast::<i64>();
+                                                let l7 = i32::from(*ptr0.add(32).cast::<u8>());
+                                                Ipv6Network {
+                                                    addr: (l5 as u64, l6 as u64),
+                                                    prefix: l7 as u8,
+                                                }
+                                            };
+                                            IpNetwork::V6(e8)
+                                        }
+                                    };
+                                    v8
+                                };
+                                Some(e)
+                            }
+                            _ => _rt::invalid_enum_discriminant(),
+                        }
+                    }
+                }
+            }
+            impl Value {
+                #[allow(unused_unsafe, clippy::all)]
                 pub fn as_boolean_array(&self) -> Option<_rt::Vec<bool>> {
                     unsafe {
                         #[repr(align(4))]
@@ -1757,7 +1927,7 @@ pub mod durable {
                         );
                         let ptr0 = ret_area.0.as_mut_ptr().cast::<u8>();
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.0.0")]
+                        #[link(wasm_import_module = "durable:core/sql@2.1.0")]
                         extern "C" {
                             #[link_name = "[method]value.as-boolean-array"]
                             fn wit_import(_: i32, _: *mut u8);
@@ -1806,7 +1976,7 @@ pub mod durable {
                         );
                         let ptr0 = ret_area.0.as_mut_ptr().cast::<u8>();
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.0.0")]
+                        #[link(wasm_import_module = "durable:core/sql@2.1.0")]
                         extern "C" {
                             #[link_name = "[method]value.as-float4-array"]
                             fn wit_import(_: i32, _: *mut u8);
@@ -1844,7 +2014,7 @@ pub mod durable {
                         );
                         let ptr0 = ret_area.0.as_mut_ptr().cast::<u8>();
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.0.0")]
+                        #[link(wasm_import_module = "durable:core/sql@2.1.0")]
                         extern "C" {
                             #[link_name = "[method]value.as-float8-array"]
                             fn wit_import(_: i32, _: *mut u8);
@@ -1882,7 +2052,7 @@ pub mod durable {
                         );
                         let ptr0 = ret_area.0.as_mut_ptr().cast::<u8>();
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.0.0")]
+                        #[link(wasm_import_module = "durable:core/sql@2.1.0")]
                         extern "C" {
                             #[link_name = "[method]value.as-int1-array"]
                             fn wit_import(_: i32, _: *mut u8);
@@ -1920,7 +2090,7 @@ pub mod durable {
                         );
                         let ptr0 = ret_area.0.as_mut_ptr().cast::<u8>();
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.0.0")]
+                        #[link(wasm_import_module = "durable:core/sql@2.1.0")]
                         extern "C" {
                             #[link_name = "[method]value.as-int2-array"]
                             fn wit_import(_: i32, _: *mut u8);
@@ -1958,7 +2128,7 @@ pub mod durable {
                         );
                         let ptr0 = ret_area.0.as_mut_ptr().cast::<u8>();
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.0.0")]
+                        #[link(wasm_import_module = "durable:core/sql@2.1.0")]
                         extern "C" {
                             #[link_name = "[method]value.as-int4-array"]
                             fn wit_import(_: i32, _: *mut u8);
@@ -1996,7 +2166,7 @@ pub mod durable {
                         );
                         let ptr0 = ret_area.0.as_mut_ptr().cast::<u8>();
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.0.0")]
+                        #[link(wasm_import_module = "durable:core/sql@2.1.0")]
                         extern "C" {
                             #[link_name = "[method]value.as-int8-array"]
                             fn wit_import(_: i32, _: *mut u8);
@@ -2034,7 +2204,7 @@ pub mod durable {
                         );
                         let ptr0 = ret_area.0.as_mut_ptr().cast::<u8>();
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.0.0")]
+                        #[link(wasm_import_module = "durable:core/sql@2.1.0")]
                         extern "C" {
                             #[link_name = "[method]value.as-text-array"]
                             fn wit_import(_: i32, _: *mut u8);
@@ -2090,7 +2260,7 @@ pub mod durable {
                         );
                         let ptr0 = ret_area.0.as_mut_ptr().cast::<u8>();
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.0.0")]
+                        #[link(wasm_import_module = "durable:core/sql@2.1.0")]
                         extern "C" {
                             #[link_name = "[method]value.as-bytea-array"]
                             fn wit_import(_: i32, _: *mut u8);
@@ -2141,7 +2311,7 @@ pub mod durable {
                         );
                         let ptr0 = ret_area.0.as_mut_ptr().cast::<u8>();
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.0.0")]
+                        #[link(wasm_import_module = "durable:core/sql@2.1.0")]
                         extern "C" {
                             #[link_name = "[method]value.as-timestamptz-array"]
                             fn wit_import(_: i32, _: *mut u8);
@@ -2179,7 +2349,7 @@ pub mod durable {
                         );
                         let ptr0 = ret_area.0.as_mut_ptr().cast::<u8>();
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.0.0")]
+                        #[link(wasm_import_module = "durable:core/sql@2.1.0")]
                         extern "C" {
                             #[link_name = "[method]value.as-timestamp-array"]
                             fn wit_import(_: i32, _: *mut u8);
@@ -2217,7 +2387,7 @@ pub mod durable {
                         );
                         let ptr0 = ret_area.0.as_mut_ptr().cast::<u8>();
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.0.0")]
+                        #[link(wasm_import_module = "durable:core/sql@2.1.0")]
                         extern "C" {
                             #[link_name = "[method]value.as-uuid-array"]
                             fn wit_import(_: i32, _: *mut u8);
@@ -2255,7 +2425,7 @@ pub mod durable {
                         );
                         let ptr0 = ret_area.0.as_mut_ptr().cast::<u8>();
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.0.0")]
+                        #[link(wasm_import_module = "durable:core/sql@2.1.0")]
                         extern "C" {
                             #[link_name = "[method]value.as-json-array"]
                             fn wit_import(_: i32, _: *mut u8);
@@ -2302,11 +2472,86 @@ pub mod durable {
             }
             impl Value {
                 #[allow(unused_unsafe, clippy::all)]
+                pub fn as_inet_array(&self) -> Option<_rt::Vec<IpNetwork>> {
+                    unsafe {
+                        #[repr(align(4))]
+                        struct RetArea([::core::mem::MaybeUninit<u8>; 12]);
+                        let mut ret_area = RetArea(
+                            [::core::mem::MaybeUninit::uninit(); 12],
+                        );
+                        let ptr0 = ret_area.0.as_mut_ptr().cast::<u8>();
+                        #[cfg(target_arch = "wasm32")]
+                        #[link(wasm_import_module = "durable:core/sql@2.1.0")]
+                        extern "C" {
+                            #[link_name = "[method]value.as-inet-array"]
+                            fn wit_import(_: i32, _: *mut u8);
+                        }
+                        #[cfg(not(target_arch = "wasm32"))]
+                        fn wit_import(_: i32, _: *mut u8) {
+                            unreachable!()
+                        }
+                        wit_import((self).handle() as i32, ptr0);
+                        let l1 = i32::from(*ptr0.add(0).cast::<u8>());
+                        match l1 {
+                            0 => None,
+                            1 => {
+                                let e = {
+                                    let l2 = *ptr0.add(4).cast::<*mut u8>();
+                                    let l3 = *ptr0.add(8).cast::<usize>();
+                                    let base11 = l2;
+                                    let len11 = l3;
+                                    let mut result11 = _rt::Vec::with_capacity(len11);
+                                    for i in 0..len11 {
+                                        let base = base11.add(i * 32);
+                                        let e11 = {
+                                            let l4 = i32::from(*base.add(0).cast::<u8>());
+                                            let v10 = match l4 {
+                                                0 => {
+                                                    let e10 = {
+                                                        let l5 = *base.add(8).cast::<i32>();
+                                                        let l6 = i32::from(*base.add(12).cast::<u8>());
+                                                        Ipv4Network {
+                                                            addr: l5 as u32,
+                                                            prefix: l6 as u8,
+                                                        }
+                                                    };
+                                                    IpNetwork::V4(e10)
+                                                }
+                                                n => {
+                                                    debug_assert_eq!(n, 1, "invalid enum discriminant");
+                                                    let e10 = {
+                                                        let l7 = *base.add(8).cast::<i64>();
+                                                        let l8 = *base.add(16).cast::<i64>();
+                                                        let l9 = i32::from(*base.add(24).cast::<u8>());
+                                                        Ipv6Network {
+                                                            addr: (l7 as u64, l8 as u64),
+                                                            prefix: l9 as u8,
+                                                        }
+                                                    };
+                                                    IpNetwork::V6(e10)
+                                                }
+                                            };
+                                            v10
+                                        };
+                                        result11.push(e11);
+                                    }
+                                    _rt::cabi_dealloc(base11, len11 * 32, 8);
+                                    result11
+                                };
+                                Some(e)
+                            }
+                            _ => _rt::invalid_enum_discriminant(),
+                        }
+                    }
+                }
+            }
+            impl Value {
+                #[allow(unused_unsafe, clippy::all)]
                 /// Create a null value with the provided type info.
                 pub fn null(tyinfo: TypeInfo) -> Value {
                     unsafe {
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.0.0")]
+                        #[link(wasm_import_module = "durable:core/sql@2.1.0")]
                         extern "C" {
                             #[link_name = "[static]value.null"]
                             fn wit_import(_: i32) -> i32;
@@ -2325,7 +2570,7 @@ pub mod durable {
                 pub fn boolean(value: bool) -> Value {
                     unsafe {
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.0.0")]
+                        #[link(wasm_import_module = "durable:core/sql@2.1.0")]
                         extern "C" {
                             #[link_name = "[static]value.boolean"]
                             fn wit_import(_: i32) -> i32;
@@ -2349,7 +2594,7 @@ pub mod durable {
                 pub fn float4(value: f32) -> Value {
                     unsafe {
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.0.0")]
+                        #[link(wasm_import_module = "durable:core/sql@2.1.0")]
                         extern "C" {
                             #[link_name = "[static]value.float4"]
                             fn wit_import(_: f32) -> i32;
@@ -2368,7 +2613,7 @@ pub mod durable {
                 pub fn float8(value: f64) -> Value {
                     unsafe {
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.0.0")]
+                        #[link(wasm_import_module = "durable:core/sql@2.1.0")]
                         extern "C" {
                             #[link_name = "[static]value.float8"]
                             fn wit_import(_: f64) -> i32;
@@ -2387,7 +2632,7 @@ pub mod durable {
                 pub fn int1(value: i8) -> Value {
                     unsafe {
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.0.0")]
+                        #[link(wasm_import_module = "durable:core/sql@2.1.0")]
                         extern "C" {
                             #[link_name = "[static]value.int1"]
                             fn wit_import(_: i32) -> i32;
@@ -2406,7 +2651,7 @@ pub mod durable {
                 pub fn int2(value: i16) -> Value {
                     unsafe {
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.0.0")]
+                        #[link(wasm_import_module = "durable:core/sql@2.1.0")]
                         extern "C" {
                             #[link_name = "[static]value.int2"]
                             fn wit_import(_: i32) -> i32;
@@ -2425,7 +2670,7 @@ pub mod durable {
                 pub fn int4(value: i32) -> Value {
                     unsafe {
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.0.0")]
+                        #[link(wasm_import_module = "durable:core/sql@2.1.0")]
                         extern "C" {
                             #[link_name = "[static]value.int4"]
                             fn wit_import(_: i32) -> i32;
@@ -2444,7 +2689,7 @@ pub mod durable {
                 pub fn int8(value: i64) -> Value {
                     unsafe {
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.0.0")]
+                        #[link(wasm_import_module = "durable:core/sql@2.1.0")]
                         extern "C" {
                             #[link_name = "[static]value.int8"]
                             fn wit_import(_: i64) -> i32;
@@ -2466,7 +2711,7 @@ pub mod durable {
                         let ptr0 = vec0.as_ptr().cast::<u8>();
                         let len0 = vec0.len();
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.0.0")]
+                        #[link(wasm_import_module = "durable:core/sql@2.1.0")]
                         extern "C" {
                             #[link_name = "[static]value.text"]
                             fn wit_import(_: *mut u8, _: usize) -> i32;
@@ -2488,7 +2733,7 @@ pub mod durable {
                         let ptr0 = vec0.as_ptr().cast::<u8>();
                         let len0 = vec0.len();
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.0.0")]
+                        #[link(wasm_import_module = "durable:core/sql@2.1.0")]
                         extern "C" {
                             #[link_name = "[static]value.bytea"]
                             fn wit_import(_: *mut u8, _: usize) -> i32;
@@ -2512,7 +2757,7 @@ pub mod durable {
                             offset: offset0,
                         } = value;
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.0.0")]
+                        #[link(wasm_import_module = "durable:core/sql@2.1.0")]
                         extern "C" {
                             #[link_name = "[static]value.timestamptz"]
                             fn wit_import(_: i64, _: i32, _: i32) -> i32;
@@ -2539,7 +2784,7 @@ pub mod durable {
                             subsec_nanos: subsec_nanos0,
                         } = value;
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.0.0")]
+                        #[link(wasm_import_module = "durable:core/sql@2.1.0")]
                         extern "C" {
                             #[link_name = "[static]value.timestamp"]
                             fn wit_import(_: i64, _: i32) -> i32;
@@ -2562,7 +2807,7 @@ pub mod durable {
                     unsafe {
                         let Uuid { hi: hi0, lo: lo0 } = value;
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.0.0")]
+                        #[link(wasm_import_module = "durable:core/sql@2.1.0")]
                         extern "C" {
                             #[link_name = "[static]value.uuid"]
                             fn wit_import(_: i64, _: i64) -> i32;
@@ -2584,7 +2829,7 @@ pub mod durable {
                         let ptr0 = vec0.as_ptr().cast::<u8>();
                         let len0 = vec0.len();
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.0.0")]
+                        #[link(wasm_import_module = "durable:core/sql@2.1.0")]
                         extern "C" {
                             #[link_name = "[static]value.jsonb"]
                             fn wit_import(_: *mut u8, _: usize) -> i32;
@@ -2595,6 +2840,76 @@ pub mod durable {
                         }
                         let ret = wit_import(ptr0.cast_mut(), len0);
                         Value::from_handle(ret as u32)
+                    }
+                }
+            }
+            impl Value {
+                #[allow(unused_unsafe, clippy::all)]
+                pub fn inet(value: IpNetwork) -> Result<Value, _rt::String> {
+                    unsafe {
+                        #[repr(align(4))]
+                        struct RetArea([::core::mem::MaybeUninit<u8>; 12]);
+                        let mut ret_area = RetArea(
+                            [::core::mem::MaybeUninit::uninit(); 12],
+                        );
+                        let (result3_0, result3_1, result3_2, result3_3) = match value {
+                            IpNetwork::V4(e) => {
+                                let Ipv4Network { addr: addr0, prefix: prefix0 } = e;
+                                (
+                                    0i32,
+                                    i64::from(_rt::as_i32(addr0)),
+                                    i64::from(_rt::as_i32(prefix0)),
+                                    0i32,
+                                )
+                            }
+                            IpNetwork::V6(e) => {
+                                let Ipv6Network { addr: addr1, prefix: prefix1 } = e;
+                                let (t2_0, t2_1) = addr1;
+                                (
+                                    1i32,
+                                    _rt::as_i64(t2_0),
+                                    _rt::as_i64(t2_1),
+                                    _rt::as_i32(prefix1),
+                                )
+                            }
+                        };
+                        let ptr4 = ret_area.0.as_mut_ptr().cast::<u8>();
+                        #[cfg(target_arch = "wasm32")]
+                        #[link(wasm_import_module = "durable:core/sql@2.1.0")]
+                        extern "C" {
+                            #[link_name = "[static]value.inet"]
+                            fn wit_import(_: i32, _: i64, _: i64, _: i32, _: *mut u8);
+                        }
+                        #[cfg(not(target_arch = "wasm32"))]
+                        fn wit_import(_: i32, _: i64, _: i64, _: i32, _: *mut u8) {
+                            unreachable!()
+                        }
+                        wit_import(result3_0, result3_1, result3_2, result3_3, ptr4);
+                        let l5 = i32::from(*ptr4.add(0).cast::<u8>());
+                        match l5 {
+                            0 => {
+                                let e = {
+                                    let l6 = *ptr4.add(4).cast::<i32>();
+                                    Value::from_handle(l6 as u32)
+                                };
+                                Ok(e)
+                            }
+                            1 => {
+                                let e = {
+                                    let l7 = *ptr4.add(4).cast::<*mut u8>();
+                                    let l8 = *ptr4.add(8).cast::<usize>();
+                                    let len9 = l8;
+                                    let bytes9 = _rt::Vec::from_raw_parts(
+                                        l7.cast(),
+                                        len9,
+                                        len9,
+                                    );
+                                    _rt::string_lift(bytes9)
+                                };
+                                Err(e)
+                            }
+                            _ => _rt::invalid_enum_discriminant(),
+                        }
                     }
                 }
             }
@@ -2627,7 +2942,7 @@ pub mod durable {
                             }
                         }
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.0.0")]
+                        #[link(wasm_import_module = "durable:core/sql@2.1.0")]
                         extern "C" {
                             #[link_name = "[static]value.boolean-array"]
                             fn wit_import(_: *mut u8, _: usize) -> i32;
@@ -2652,7 +2967,7 @@ pub mod durable {
                         let ptr0 = vec0.as_ptr().cast::<u8>();
                         let len0 = vec0.len();
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.0.0")]
+                        #[link(wasm_import_module = "durable:core/sql@2.1.0")]
                         extern "C" {
                             #[link_name = "[static]value.float4-array"]
                             fn wit_import(_: *mut u8, _: usize) -> i32;
@@ -2674,7 +2989,7 @@ pub mod durable {
                         let ptr0 = vec0.as_ptr().cast::<u8>();
                         let len0 = vec0.len();
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.0.0")]
+                        #[link(wasm_import_module = "durable:core/sql@2.1.0")]
                         extern "C" {
                             #[link_name = "[static]value.float8-array"]
                             fn wit_import(_: *mut u8, _: usize) -> i32;
@@ -2696,7 +3011,7 @@ pub mod durable {
                         let ptr0 = vec0.as_ptr().cast::<u8>();
                         let len0 = vec0.len();
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.0.0")]
+                        #[link(wasm_import_module = "durable:core/sql@2.1.0")]
                         extern "C" {
                             #[link_name = "[static]value.int1-array"]
                             fn wit_import(_: *mut u8, _: usize) -> i32;
@@ -2718,7 +3033,7 @@ pub mod durable {
                         let ptr0 = vec0.as_ptr().cast::<u8>();
                         let len0 = vec0.len();
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.0.0")]
+                        #[link(wasm_import_module = "durable:core/sql@2.1.0")]
                         extern "C" {
                             #[link_name = "[static]value.int2-array"]
                             fn wit_import(_: *mut u8, _: usize) -> i32;
@@ -2740,7 +3055,7 @@ pub mod durable {
                         let ptr0 = vec0.as_ptr().cast::<u8>();
                         let len0 = vec0.len();
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.0.0")]
+                        #[link(wasm_import_module = "durable:core/sql@2.1.0")]
                         extern "C" {
                             #[link_name = "[static]value.int4-array"]
                             fn wit_import(_: *mut u8, _: usize) -> i32;
@@ -2762,7 +3077,7 @@ pub mod durable {
                         let ptr0 = vec0.as_ptr().cast::<u8>();
                         let len0 = vec0.len();
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.0.0")]
+                        #[link(wasm_import_module = "durable:core/sql@2.1.0")]
                         extern "C" {
                             #[link_name = "[static]value.int8-array"]
                             fn wit_import(_: *mut u8, _: usize) -> i32;
@@ -2806,7 +3121,7 @@ pub mod durable {
                             }
                         }
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.0.0")]
+                        #[link(wasm_import_module = "durable:core/sql@2.1.0")]
                         extern "C" {
                             #[link_name = "[static]value.text-array"]
                             fn wit_import(_: *mut u8, _: usize) -> i32;
@@ -2853,7 +3168,7 @@ pub mod durable {
                             }
                         }
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.0.0")]
+                        #[link(wasm_import_module = "durable:core/sql@2.1.0")]
                         extern "C" {
                             #[link_name = "[static]value.bytea-array"]
                             fn wit_import(_: *mut u8, _: usize) -> i32;
@@ -2878,7 +3193,7 @@ pub mod durable {
                         let ptr0 = vec0.as_ptr().cast::<u8>();
                         let len0 = vec0.len();
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.0.0")]
+                        #[link(wasm_import_module = "durable:core/sql@2.1.0")]
                         extern "C" {
                             #[link_name = "[static]value.timestamptz-array"]
                             fn wit_import(_: *mut u8, _: usize) -> i32;
@@ -2900,7 +3215,7 @@ pub mod durable {
                         let ptr0 = vec0.as_ptr().cast::<u8>();
                         let len0 = vec0.len();
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.0.0")]
+                        #[link(wasm_import_module = "durable:core/sql@2.1.0")]
                         extern "C" {
                             #[link_name = "[static]value.timestamp-array"]
                             fn wit_import(_: *mut u8, _: usize) -> i32;
@@ -2922,7 +3237,7 @@ pub mod durable {
                         let ptr0 = vec0.as_ptr().cast::<u8>();
                         let len0 = vec0.len();
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.0.0")]
+                        #[link(wasm_import_module = "durable:core/sql@2.1.0")]
                         extern "C" {
                             #[link_name = "[static]value.uuid-array"]
                             fn wit_import(_: *mut u8, _: usize) -> i32;
@@ -2966,7 +3281,7 @@ pub mod durable {
                             }
                         }
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.0.0")]
+                        #[link(wasm_import_module = "durable:core/sql@2.1.0")]
                         extern "C" {
                             #[link_name = "[static]value.jsonb-array"]
                             fn wit_import(_: *mut u8, _: usize) -> i32;
@@ -2980,6 +3295,94 @@ pub mod durable {
                             _rt::alloc::dealloc(result1.cast(), layout1);
                         }
                         Value::from_handle(ret as u32)
+                    }
+                }
+            }
+            impl Value {
+                #[allow(unused_unsafe, clippy::all)]
+                pub fn inet_array(value: &[IpNetwork]) -> Result<Value, _rt::String> {
+                    unsafe {
+                        #[repr(align(4))]
+                        struct RetArea([::core::mem::MaybeUninit<u8>; 12]);
+                        let mut ret_area = RetArea(
+                            [::core::mem::MaybeUninit::uninit(); 12],
+                        );
+                        let vec3 = value;
+                        let len3 = vec3.len();
+                        let layout3 = _rt::alloc::Layout::from_size_align_unchecked(
+                            vec3.len() * 32,
+                            8,
+                        );
+                        let result3 = if layout3.size() != 0 {
+                            let ptr = _rt::alloc::alloc(layout3).cast::<u8>();
+                            if ptr.is_null() {
+                                _rt::alloc::handle_alloc_error(layout3);
+                            }
+                            ptr
+                        } else {
+                            { ::core::ptr::null_mut() }
+                        };
+                        for (i, e) in vec3.into_iter().enumerate() {
+                            let base = result3.add(i * 32);
+                            {
+                                match e {
+                                    IpNetwork::V4(e) => {
+                                        *base.add(0).cast::<u8>() = (0i32) as u8;
+                                        let Ipv4Network { addr: addr0, prefix: prefix0 } = e;
+                                        *base.add(8).cast::<i32>() = _rt::as_i32(addr0);
+                                        *base.add(12).cast::<u8>() = (_rt::as_i32(prefix0)) as u8;
+                                    }
+                                    IpNetwork::V6(e) => {
+                                        *base.add(0).cast::<u8>() = (1i32) as u8;
+                                        let Ipv6Network { addr: addr1, prefix: prefix1 } = e;
+                                        let (t2_0, t2_1) = addr1;
+                                        *base.add(8).cast::<i64>() = _rt::as_i64(t2_0);
+                                        *base.add(16).cast::<i64>() = _rt::as_i64(t2_1);
+                                        *base.add(24).cast::<u8>() = (_rt::as_i32(prefix1)) as u8;
+                                    }
+                                }
+                            }
+                        }
+                        let ptr4 = ret_area.0.as_mut_ptr().cast::<u8>();
+                        #[cfg(target_arch = "wasm32")]
+                        #[link(wasm_import_module = "durable:core/sql@2.1.0")]
+                        extern "C" {
+                            #[link_name = "[static]value.inet-array"]
+                            fn wit_import(_: *mut u8, _: usize, _: *mut u8);
+                        }
+                        #[cfg(not(target_arch = "wasm32"))]
+                        fn wit_import(_: *mut u8, _: usize, _: *mut u8) {
+                            unreachable!()
+                        }
+                        wit_import(result3, len3, ptr4);
+                        let l5 = i32::from(*ptr4.add(0).cast::<u8>());
+                        if layout3.size() != 0 {
+                            _rt::alloc::dealloc(result3.cast(), layout3);
+                        }
+                        match l5 {
+                            0 => {
+                                let e = {
+                                    let l6 = *ptr4.add(4).cast::<i32>();
+                                    Value::from_handle(l6 as u32)
+                                };
+                                Ok(e)
+                            }
+                            1 => {
+                                let e = {
+                                    let l7 = *ptr4.add(4).cast::<*mut u8>();
+                                    let l8 = *ptr4.add(8).cast::<usize>();
+                                    let len9 = l8;
+                                    let bytes9 = _rt::Vec::from_raw_parts(
+                                        l7.cast(),
+                                        len9,
+                                        len9,
+                                    );
+                                    _rt::string_lift(bytes9)
+                                };
+                                Err(e)
+                            }
+                            _ => _rt::invalid_enum_discriminant(),
+                        }
                     }
                 }
             }
@@ -3019,7 +3422,7 @@ pub mod durable {
                     }
                     let Options { limit: limit2, persistent: persistent2 } = options;
                     #[cfg(target_arch = "wasm32")]
-                    #[link(wasm_import_module = "durable:core/sql@2.0.0")]
+                    #[link(wasm_import_module = "durable:core/sql@2.1.0")]
                     extern "C" {
                         #[link_name = "query"]
                         fn wit_import(
@@ -3067,7 +3470,7 @@ pub mod durable {
                     let mut ret_area = RetArea([::core::mem::MaybeUninit::uninit(); 72]);
                     let ptr0 = ret_area.0.as_mut_ptr().cast::<u8>();
                     #[cfg(target_arch = "wasm32")]
-                    #[link(wasm_import_module = "durable:core/sql@2.0.0")]
+                    #[link(wasm_import_module = "durable:core/sql@2.1.0")]
                     extern "C" {
                         #[link_name = "fetch"]
                         fn wit_import(_: *mut u8);
@@ -3541,94 +3944,102 @@ mod _rt {
 #[cfg(target_arch = "wasm32")]
 #[link_section = "component-type:wit-bindgen:0.30.0:import-sql:encoded world"]
 #[doc(hidden)]
-pub static __WIT_BINDGEN_COMPONENT_TYPE: [u8; 4376] = *b"\
-\0asm\x0d\0\x01\0\0\x19\x16wit-component-encoding\x04\0\x07\x97!\x01A\x02\x01A\x02\
-\x01B\xe2\x01\x04\0\x09type-info\x03\x01\x01r\x02\x07secondsx\x0csubsec-nanosy\x04\
+pub static __WIT_BINDGEN_COMPONENT_TYPE: [u8; 4731] = *b"\
+\0asm\x0d\0\x01\0\0\x19\x16wit-component-encoding\x04\0\x07\xfa#\x01A\x02\x01A\x02\
+\x01B\xf6\x01\x04\0\x09type-info\x03\x01\x01r\x02\x07secondsx\x0csubsec-nanosy\x04\
 \0\x09timestamp\x03\0\x01\x01r\x03\x07secondsx\x0csubsec-nanosy\x06offsetz\x04\0\
-\x0btimestamptz\x03\0\x03\x01r\x02\x02hiw\x02low\x04\0\x04uuid\x03\0\x05\x04\0\x05\
-value\x03\x01\x01i\x07\x01r\x02\x04names\x05value\x08\x04\0\x06column\x03\0\x09\x01\
-p\x0a\x01r\x01\x07columns\x0b\x04\0\x03row\x03\0\x0c\x01q\x02\x05count\x01w\0\x03\
-row\x01\x0d\0\x04\0\x0cquery-result\x03\0\x0e\x01r\x02\x05limit}\x0apersistent\x7f\
-\x04\0\x07options\x03\0\x10\x01r\x02\x05indexs\x06sources\x04\0\x13column-decode\
--error\x03\0\x12\x01m\x05\x10unique-violation\x15foreign-key-violation\x12not-nu\
-ll-violation\x0fcheck-violation\x05other\x04\0\x13database-error-kind\x03\0\x14\x01\
-ks\x01r\x05\x07messages\x04kind\x15\x04code\x16\x0aconstraint\x16\x05table\x16\x04\
-\0\x0edatabase-error\x03\0\x17\x01q\x06\x0dcolumn-decode\x01\x13\0\x0etype-not-f\
-ound\x01s\0\x06encode\x01s\0\x06decode\x01s\0\x08database\x01\x18\0\x05other\x01\
-s\0\x04\0\x05error\x03\0\x19\x01h\0\x01@\x01\x04self\x1b\0s\x04\0\x16[method]typ\
-e-info.name\x01\x1c\x01@\x02\x04self\x1b\x05other\x1b\0\x7f\x04\0\x1c[method]typ\
-e-info.compatible\x01\x1d\x04\0\x17[method]type-info.equal\x01\x1d\x01i\0\x01@\x01\
-\x04self\x1b\0\x1e\x04\0\x17[method]type-info.clone\x01\x1f\x01j\x01s\x01s\x01@\x01\
-\x04self\x1b\0\x20\x04\0\x1b[method]type-info.serialize\x01!\x01j\x01\x1e\x01s\x01\
-@\x01\x04jsons\0\"\x04\0\x1d[static]type-info.deserialize\x01#\x01@\0\0\x1e\x04\0\
-\x19[static]type-info.boolean\x01$\x04\0\x18[static]type-info.float4\x01$\x04\0\x18\
-[static]type-info.float8\x01$\x04\0\x16[static]type-info.int1\x01$\x04\0\x16[sta\
-tic]type-info.int2\x01$\x04\0\x16[static]type-info.int4\x01$\x04\0\x16[static]ty\
-pe-info.int8\x01$\x04\0\x16[static]type-info.text\x01$\x04\0\x17[static]type-inf\
-o.bytea\x01$\x04\0\x1d[static]type-info.timestamptz\x01$\x04\0\x1b[static]type-i\
-nfo.timestamp\x01$\x04\0\x16[static]type-info.uuid\x01$\x04\0\x17[static]type-in\
-fo.jsonb\x01$\x04\0\x1f[static]type-info.boolean-array\x01$\x04\0\x1e[static]typ\
-e-info.float4-array\x01$\x04\0\x1e[static]type-info.float8-array\x01$\x04\0\x1c[\
-static]type-info.int1-array\x01$\x04\0\x1c[static]type-info.int2-array\x01$\x04\0\
-\x1c[static]type-info.int4-array\x01$\x04\0\x1c[static]type-info.int8-array\x01$\
-\x04\0\x1c[static]type-info.text-array\x01$\x04\0\x1d[static]type-info.bytea-arr\
-ay\x01$\x04\0#[static]type-info.timestamptz-array\x01$\x04\0![static]type-info.t\
-imestamp-array\x01$\x04\0\x1c[static]type-info.uuid-array\x01$\x04\0\x1d[static]\
-type-info.jsonb-array\x01$\x01h\x07\x01@\x01\x04self%\0\x7f\x04\0\x15[method]val\
-ue.is-null\x01&\x01@\x01\x04self%\0\x1e\x04\0\x17[method]value.type-info\x01'\x01\
-@\x01\x04self%\0\x08\x04\0\x13[method]value.clone\x01(\x01@\x01\x04self%\0\x20\x04\
-\0\x17[method]value.serialize\x01)\x01j\x01\x08\x01s\x01@\x01\x04jsons\0*\x04\0\x19\
-[static]value.deserialize\x01+\x01k\x7f\x01@\x01\x04self%\0,\x04\0\x18[method]va\
-lue.as-boolean\x01-\x01kv\x01@\x01\x04self%\0.\x04\0\x17[method]value.as-float4\x01\
-/\x01ku\x01@\x01\x04self%\00\x04\0\x17[method]value.as-float8\x011\x01k~\x01@\x01\
-\x04self%\02\x04\0\x15[method]value.as-int1\x013\x01k|\x01@\x01\x04self%\04\x04\0\
-\x15[method]value.as-int2\x015\x01kz\x01@\x01\x04self%\06\x04\0\x15[method]value\
-.as-int4\x017\x01kx\x01@\x01\x04self%\08\x04\0\x15[method]value.as-int8\x019\x01\
-@\x01\x04self%\0\x16\x04\0\x15[method]value.as-text\x01:\x01p}\x01k;\x01@\x01\x04\
-self%\0<\x04\0\x16[method]value.as-bytea\x01=\x01k\x04\x01@\x01\x04self%\0>\x04\0\
-\x1c[method]value.as-timestamptz\x01?\x01k\x02\x01@\x01\x04self%\0\xc0\0\x04\0\x1a\
-[method]value.as-timestamp\x01A\x01k\x06\x01@\x01\x04self%\0\xc2\0\x04\0\x15[met\
-hod]value.as-uuid\x01C\x04\0\x15[method]value.as-json\x01:\x01p\x7f\x01k\xc4\0\x01\
-@\x01\x04self%\0\xc5\0\x04\0\x1e[method]value.as-boolean-array\x01F\x01pv\x01k\xc7\
-\0\x01@\x01\x04self%\0\xc8\0\x04\0\x1d[method]value.as-float4-array\x01I\x01pu\x01\
-k\xca\0\x01@\x01\x04self%\0\xcb\0\x04\0\x1d[method]value.as-float8-array\x01L\x01\
-p~\x01k\xcd\0\x01@\x01\x04self%\0\xce\0\x04\0\x1b[method]value.as-int1-array\x01\
-O\x01p|\x01k\xd0\0\x01@\x01\x04self%\0\xd1\0\x04\0\x1b[method]value.as-int2-arra\
-y\x01R\x01pz\x01k\xd3\0\x01@\x01\x04self%\0\xd4\0\x04\0\x1b[method]value.as-int4\
--array\x01U\x01px\x01k\xd6\0\x01@\x01\x04self%\0\xd7\0\x04\0\x1b[method]value.as\
--int8-array\x01X\x01ps\x01k\xd9\0\x01@\x01\x04self%\0\xda\0\x04\0\x1b[method]val\
-ue.as-text-array\x01[\x01p;\x01k\xdc\0\x01@\x01\x04self%\0\xdd\0\x04\0\x1c[metho\
-d]value.as-bytea-array\x01^\x01p\x04\x01k\xdf\0\x01@\x01\x04self%\0\xe0\0\x04\0\"\
-[method]value.as-timestamptz-array\x01a\x01p\x02\x01k\xe2\0\x01@\x01\x04self%\0\xe3\
-\0\x04\0\x20[method]value.as-timestamp-array\x01d\x01p\x06\x01k\xe5\0\x01@\x01\x04\
-self%\0\xe6\0\x04\0\x1b[method]value.as-uuid-array\x01g\x04\0\x1b[method]value.a\
-s-json-array\x01[\x01@\x01\x06tyinfo\x1e\0\x08\x04\0\x12[static]value.null\x01h\x01\
-@\x01\x05value\x7f\0\x08\x04\0\x15[static]value.boolean\x01i\x01@\x01\x05valuev\0\
-\x08\x04\0\x14[static]value.float4\x01j\x01@\x01\x05valueu\0\x08\x04\0\x14[stati\
-c]value.float8\x01k\x01@\x01\x05value~\0\x08\x04\0\x12[static]value.int1\x01l\x01\
-@\x01\x05value|\0\x08\x04\0\x12[static]value.int2\x01m\x01@\x01\x05valuez\0\x08\x04\
-\0\x12[static]value.int4\x01n\x01@\x01\x05valuex\0\x08\x04\0\x12[static]value.in\
-t8\x01o\x01@\x01\x05values\0\x08\x04\0\x12[static]value.text\x01p\x01@\x01\x05va\
-lue;\0\x08\x04\0\x13[static]value.bytea\x01q\x01@\x01\x05value\x04\0\x08\x04\0\x19\
-[static]value.timestamptz\x01r\x01@\x01\x05value\x02\0\x08\x04\0\x17[static]valu\
-e.timestamp\x01s\x01@\x01\x05value\x06\0\x08\x04\0\x12[static]value.uuid\x01t\x04\
-\0\x13[static]value.jsonb\x01p\x01@\x01\x05value\xc4\0\0\x08\x04\0\x1b[static]va\
-lue.boolean-array\x01u\x01@\x01\x05value\xc7\0\0\x08\x04\0\x1a[static]value.floa\
-t4-array\x01v\x01@\x01\x05value\xca\0\0\x08\x04\0\x1a[static]value.float8-array\x01\
-w\x01@\x01\x05value\xcd\0\0\x08\x04\0\x18[static]value.int1-array\x01x\x01@\x01\x05\
-value\xd0\0\0\x08\x04\0\x18[static]value.int2-array\x01y\x01@\x01\x05value\xd3\0\
-\0\x08\x04\0\x18[static]value.int4-array\x01z\x01@\x01\x05value\xd6\0\0\x08\x04\0\
-\x18[static]value.int8-array\x01{\x01@\x01\x05value\xd9\0\0\x08\x04\0\x18[static\
-]value.text-array\x01|\x01@\x01\x05value\xdc\0\0\x08\x04\0\x19[static]value.byte\
-a-array\x01}\x01@\x01\x05value\xdf\0\0\x08\x04\0\x1f[static]value.timestamptz-ar\
-ray\x01~\x01@\x01\x05value\xe2\0\0\x08\x04\0\x1d[static]value.timestamp-array\x01\
-\x7f\x01@\x01\x05value\xe5\0\0\x08\x04\0\x18[static]value.uuid-array\x01\x80\x01\
-\x04\0\x19[static]value.jsonb-array\x01|\x01p\x08\x01@\x03\x03sqls\x06params\x81\
-\x01\x07options\x11\x01\0\x04\0\x05query\x01\x82\x01\x01j\x01\x0f\x01\x1a\x01k\x83\
-\x01\x01@\0\0\x84\x01\x04\0\x05fetch\x01\x85\x01\x03\x01\x16durable:core/sql@2.0\
-.0\x05\0\x04\x01\x1ddurable:core/import-sql@2.0.0\x04\0\x0b\x10\x01\0\x0aimport-\
-sql\x03\0\0\0G\x09producers\x01\x0cprocessed-by\x02\x0dwit-component\x070.215.0\x10\
-wit-bindgen-rust\x060.30.0";
+\x0btimestamptz\x03\0\x03\x01r\x02\x02hiw\x02low\x04\0\x04uuid\x03\0\x05\x01r\x02\
+\x04addry\x06prefix}\x04\0\x0cipv4-network\x03\0\x07\x01o\x02ww\x01r\x02\x04addr\
+\x09\x06prefix}\x04\0\x0cipv6-network\x03\0\x0a\x01q\x02\x02v4\x01\x08\0\x02v6\x01\
+\x0b\0\x04\0\x0aip-network\x03\0\x0c\x04\0\x05value\x03\x01\x01i\x0e\x01r\x02\x04\
+names\x05value\x0f\x04\0\x06column\x03\0\x10\x01p\x11\x01r\x01\x07columns\x12\x04\
+\0\x03row\x03\0\x13\x01q\x02\x05count\x01w\0\x03row\x01\x14\0\x04\0\x0cquery-res\
+ult\x03\0\x15\x01r\x02\x05limit}\x0apersistent\x7f\x04\0\x07options\x03\0\x17\x01\
+r\x02\x05indexs\x06sources\x04\0\x13column-decode-error\x03\0\x19\x01m\x05\x10un\
+ique-violation\x15foreign-key-violation\x12not-null-violation\x0fcheck-violation\
+\x05other\x04\0\x13database-error-kind\x03\0\x1b\x01ks\x01r\x05\x07messages\x04k\
+ind\x1c\x04code\x1d\x0aconstraint\x1d\x05table\x1d\x04\0\x0edatabase-error\x03\0\
+\x1e\x01q\x06\x0dcolumn-decode\x01\x1a\0\x0etype-not-found\x01s\0\x06encode\x01s\
+\0\x06decode\x01s\0\x08database\x01\x1f\0\x05other\x01s\0\x04\0\x05error\x03\0\x20\
+\x01h\0\x01@\x01\x04self\"\0s\x04\0\x16[method]type-info.name\x01#\x01@\x02\x04s\
+elf\"\x05other\"\0\x7f\x04\0\x1c[method]type-info.compatible\x01$\x04\0\x17[meth\
+od]type-info.equal\x01$\x01i\0\x01@\x01\x04self\"\0%\x04\0\x17[method]type-info.\
+clone\x01&\x01j\x01s\x01s\x01@\x01\x04self\"\0'\x04\0\x1b[method]type-info.seria\
+lize\x01(\x01j\x01%\x01s\x01@\x01\x04jsons\0)\x04\0\x1d[static]type-info.deseria\
+lize\x01*\x01@\0\0%\x04\0\x19[static]type-info.boolean\x01+\x04\0\x18[static]typ\
+e-info.float4\x01+\x04\0\x18[static]type-info.float8\x01+\x04\0\x16[static]type-\
+info.int1\x01+\x04\0\x16[static]type-info.int2\x01+\x04\0\x16[static]type-info.i\
+nt4\x01+\x04\0\x16[static]type-info.int8\x01+\x04\0\x16[static]type-info.text\x01\
++\x04\0\x17[static]type-info.bytea\x01+\x04\0\x1d[static]type-info.timestamptz\x01\
++\x04\0\x1b[static]type-info.timestamp\x01+\x04\0\x16[static]type-info.uuid\x01+\
+\x04\0\x17[static]type-info.jsonb\x01+\x04\0\x16[static]type-info.inet\x01+\x04\0\
+\x1f[static]type-info.boolean-array\x01+\x04\0\x1e[static]type-info.float4-array\
+\x01+\x04\0\x1e[static]type-info.float8-array\x01+\x04\0\x1c[static]type-info.in\
+t1-array\x01+\x04\0\x1c[static]type-info.int2-array\x01+\x04\0\x1c[static]type-i\
+nfo.int4-array\x01+\x04\0\x1c[static]type-info.int8-array\x01+\x04\0\x1c[static]\
+type-info.text-array\x01+\x04\0\x1d[static]type-info.bytea-array\x01+\x04\0#[sta\
+tic]type-info.timestamptz-array\x01+\x04\0![static]type-info.timestamp-array\x01\
++\x04\0\x1c[static]type-info.uuid-array\x01+\x04\0\x1d[static]type-info.jsonb-ar\
+ray\x01+\x04\0\x1c[static]type-info.inet-array\x01+\x01h\x0e\x01@\x01\x04self,\0\
+\x7f\x04\0\x15[method]value.is-null\x01-\x01@\x01\x04self,\0%\x04\0\x17[method]v\
+alue.type-info\x01.\x01@\x01\x04self,\0\x0f\x04\0\x13[method]value.clone\x01/\x01\
+@\x01\x04self,\0'\x04\0\x17[method]value.serialize\x010\x01j\x01\x0f\x01s\x01@\x01\
+\x04jsons\01\x04\0\x19[static]value.deserialize\x012\x01k\x7f\x01@\x01\x04self,\0\
+3\x04\0\x18[method]value.as-boolean\x014\x01kv\x01@\x01\x04self,\05\x04\0\x17[me\
+thod]value.as-float4\x016\x01ku\x01@\x01\x04self,\07\x04\0\x17[method]value.as-f\
+loat8\x018\x01k~\x01@\x01\x04self,\09\x04\0\x15[method]value.as-int1\x01:\x01k|\x01\
+@\x01\x04self,\0;\x04\0\x15[method]value.as-int2\x01<\x01kz\x01@\x01\x04self,\0=\
+\x04\0\x15[method]value.as-int4\x01>\x01kx\x01@\x01\x04self,\0?\x04\0\x15[method\
+]value.as-int8\x01@\x01@\x01\x04self,\0\x1d\x04\0\x15[method]value.as-text\x01A\x01\
+p}\x01k\xc2\0\x01@\x01\x04self,\0\xc3\0\x04\0\x16[method]value.as-bytea\x01D\x01\
+k\x04\x01@\x01\x04self,\0\xc5\0\x04\0\x1c[method]value.as-timestamptz\x01F\x01k\x02\
+\x01@\x01\x04self,\0\xc7\0\x04\0\x1a[method]value.as-timestamp\x01H\x01k\x06\x01\
+@\x01\x04self,\0\xc9\0\x04\0\x15[method]value.as-uuid\x01J\x04\0\x15[method]valu\
+e.as-json\x01A\x01k\x0d\x01@\x01\x04self,\0\xcb\0\x04\0\x15[method]value.as-inet\
+\x01L\x01p\x7f\x01k\xcd\0\x01@\x01\x04self,\0\xce\0\x04\0\x1e[method]value.as-bo\
+olean-array\x01O\x01pv\x01k\xd0\0\x01@\x01\x04self,\0\xd1\0\x04\0\x1d[method]val\
+ue.as-float4-array\x01R\x01pu\x01k\xd3\0\x01@\x01\x04self,\0\xd4\0\x04\0\x1d[met\
+hod]value.as-float8-array\x01U\x01p~\x01k\xd6\0\x01@\x01\x04self,\0\xd7\0\x04\0\x1b\
+[method]value.as-int1-array\x01X\x01p|\x01k\xd9\0\x01@\x01\x04self,\0\xda\0\x04\0\
+\x1b[method]value.as-int2-array\x01[\x01pz\x01k\xdc\0\x01@\x01\x04self,\0\xdd\0\x04\
+\0\x1b[method]value.as-int4-array\x01^\x01px\x01k\xdf\0\x01@\x01\x04self,\0\xe0\0\
+\x04\0\x1b[method]value.as-int8-array\x01a\x01ps\x01k\xe2\0\x01@\x01\x04self,\0\xe3\
+\0\x04\0\x1b[method]value.as-text-array\x01d\x01p\xc2\0\x01k\xe5\0\x01@\x01\x04s\
+elf,\0\xe6\0\x04\0\x1c[method]value.as-bytea-array\x01g\x01p\x04\x01k\xe8\0\x01@\
+\x01\x04self,\0\xe9\0\x04\0\"[method]value.as-timestamptz-array\x01j\x01p\x02\x01\
+k\xeb\0\x01@\x01\x04self,\0\xec\0\x04\0\x20[method]value.as-timestamp-array\x01m\
+\x01p\x06\x01k\xee\0\x01@\x01\x04self,\0\xef\0\x04\0\x1b[method]value.as-uuid-ar\
+ray\x01p\x04\0\x1b[method]value.as-json-array\x01d\x01p\x0d\x01k\xf1\0\x01@\x01\x04\
+self,\0\xf2\0\x04\0\x1b[method]value.as-inet-array\x01s\x01@\x01\x06tyinfo%\0\x0f\
+\x04\0\x12[static]value.null\x01t\x01@\x01\x05value\x7f\0\x0f\x04\0\x15[static]v\
+alue.boolean\x01u\x01@\x01\x05valuev\0\x0f\x04\0\x14[static]value.float4\x01v\x01\
+@\x01\x05valueu\0\x0f\x04\0\x14[static]value.float8\x01w\x01@\x01\x05value~\0\x0f\
+\x04\0\x12[static]value.int1\x01x\x01@\x01\x05value|\0\x0f\x04\0\x12[static]valu\
+e.int2\x01y\x01@\x01\x05valuez\0\x0f\x04\0\x12[static]value.int4\x01z\x01@\x01\x05\
+valuex\0\x0f\x04\0\x12[static]value.int8\x01{\x01@\x01\x05values\0\x0f\x04\0\x12\
+[static]value.text\x01|\x01@\x01\x05value\xc2\0\0\x0f\x04\0\x13[static]value.byt\
+ea\x01}\x01@\x01\x05value\x04\0\x0f\x04\0\x19[static]value.timestamptz\x01~\x01@\
+\x01\x05value\x02\0\x0f\x04\0\x17[static]value.timestamp\x01\x7f\x01@\x01\x05val\
+ue\x06\0\x0f\x04\0\x12[static]value.uuid\x01\x80\x01\x04\0\x13[static]value.json\
+b\x01|\x01@\x01\x05value\x0d\01\x04\0\x12[static]value.inet\x01\x81\x01\x01@\x01\
+\x05value\xcd\0\0\x0f\x04\0\x1b[static]value.boolean-array\x01\x82\x01\x01@\x01\x05\
+value\xd0\0\0\x0f\x04\0\x1a[static]value.float4-array\x01\x83\x01\x01@\x01\x05va\
+lue\xd3\0\0\x0f\x04\0\x1a[static]value.float8-array\x01\x84\x01\x01@\x01\x05valu\
+e\xd6\0\0\x0f\x04\0\x18[static]value.int1-array\x01\x85\x01\x01@\x01\x05value\xd9\
+\0\0\x0f\x04\0\x18[static]value.int2-array\x01\x86\x01\x01@\x01\x05value\xdc\0\0\
+\x0f\x04\0\x18[static]value.int4-array\x01\x87\x01\x01@\x01\x05value\xdf\0\0\x0f\
+\x04\0\x18[static]value.int8-array\x01\x88\x01\x01@\x01\x05value\xe2\0\0\x0f\x04\
+\0\x18[static]value.text-array\x01\x89\x01\x01@\x01\x05value\xe5\0\0\x0f\x04\0\x19\
+[static]value.bytea-array\x01\x8a\x01\x01@\x01\x05value\xe8\0\0\x0f\x04\0\x1f[st\
+atic]value.timestamptz-array\x01\x8b\x01\x01@\x01\x05value\xeb\0\0\x0f\x04\0\x1d\
+[static]value.timestamp-array\x01\x8c\x01\x01@\x01\x05value\xee\0\0\x0f\x04\0\x18\
+[static]value.uuid-array\x01\x8d\x01\x04\0\x19[static]value.jsonb-array\x01\x89\x01\
+\x01@\x01\x05value\xf1\0\01\x04\0\x18[static]value.inet-array\x01\x8e\x01\x01p\x0f\
+\x01@\x03\x03sqls\x06params\x8f\x01\x07options\x18\x01\0\x04\0\x05query\x01\x90\x01\
+\x01j\x01\x16\x01!\x01k\x91\x01\x01@\0\0\x92\x01\x04\0\x05fetch\x01\x93\x01\x03\x01\
+\x16durable:core/sql@2.1.0\x05\0\x04\x01\x1ddurable:core/import-sql@2.1.0\x04\0\x0b\
+\x10\x01\0\x0aimport-sql\x03\0\0\0G\x09producers\x01\x0cprocessed-by\x02\x0dwit-\
+component\x070.215.0\x10wit-bindgen-rust\x060.30.0";
 #[inline(never)]
 #[doc(hidden)]
 pub fn __link_custom_section_describing_imports() {

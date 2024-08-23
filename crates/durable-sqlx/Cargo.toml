@@ -15,6 +15,7 @@ macros = ["durable-sqlx-macros", "sqlx/macros"]
 json = ["sqlx/json", "sqlx-core/json", "durable-sqlx-macros?/json"]
 chrono = ["sqlx/chrono", "durable-sqlx-macros?/chrono", "dep:chrono"]
 uuid = ["sqlx/uuid", "durable-sqlx-macros?/uuid", "dep:uuid"]
+ipnetwork = ["sqlx/ipnetwork", "durable-sqlx-macros?/ipnetwork", "dep:ipnetwork"]
 
 [dependencies]
 durable-core = { workspace = true }
@@ -24,6 +25,7 @@ async-stream = "0.3.5"
 chrono = { version = "0.4.38", optional = true }
 futures-core = "0.3.30"
 futures-util = "0.3.30"
+ipnetwork = { version = "0.20.0", features = ["serde"], optional = true }
 log = "0.4.22"
 serde = "1.0.204"
 serde_json = { version = "1.0", features = ["raw_value"] }

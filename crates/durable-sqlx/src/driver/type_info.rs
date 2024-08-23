@@ -45,6 +45,7 @@ impl TypeInfo {
         timestamp,
         uuid,
         jsonb,
+        inet,
         boolean_array,
         float4_array,
         float8_array,
@@ -57,7 +58,8 @@ impl TypeInfo {
         timestamptz_array,
         timestamp_array,
         uuid_array,
-        jsonb_array
+        jsonb_array,
+        inet_array,
     );
 }
 
