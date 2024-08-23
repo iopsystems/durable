@@ -22,7 +22,7 @@ impl sqlx::Decode<'_, Durable> for DateTime<FixedOffset> {
             return Ok(ts.into());
         }
 
-        Err(unexpected_nonnull_type("timestamptz", value))
+        Err(unexpected_nonnull_type(&TypeInfo::timestamptz(), value))
     }
 }
 
@@ -61,7 +61,7 @@ impl sqlx::Decode<'_, Durable> for NaiveDateTime {
             return Ok(ts.into());
         }
 
-        Err(unexpected_nonnull_type("timestamp", value))
+        Err(unexpected_nonnull_type(&TypeInfo::timestamp(), value))
     }
 }
 
@@ -99,7 +99,10 @@ impl sqlx::Decode<'_, Durable> for Vec<DateTime<FixedOffset>> {
             return Ok(values);
         }
 
-        Err(unexpected_nonnull_type("timestamptz[]", value))
+        Err(unexpected_nonnull_type(
+            &TypeInfo::timestamptz_array(),
+            value,
+        ))
     }
 }
 
@@ -114,7 +117,10 @@ impl sqlx::Decode<'_, Durable> for Vec<DateTime<Utc>> {
             return Ok(values);
         }
 
-        Err(unexpected_nonnull_type("timestamptz[]", value))
+        Err(unexpected_nonnull_type(
+            &TypeInfo::timestamptz_array(),
+            value,
+        ))
     }
 }
 
@@ -129,7 +135,10 @@ impl sqlx::Decode<'_, Durable> for Vec<DateTime<Local>> {
             return Ok(values);
         }
 
-        Err(unexpected_nonnull_type("timestamptz[]", value))
+        Err(unexpected_nonnull_type(
+            &TypeInfo::timestamptz_array(),
+            value,
+        ))
     }
 }
 
@@ -173,7 +182,7 @@ impl sqlx::Decode<'_, Durable> for Vec<NaiveDateTime> {
             return Ok(values);
         }
 
-        Err(unexpected_nonnull_type("timestamp[]", value))
+        Err(unexpected_nonnull_type(&TypeInfo::timestamp_array(), value))
     }
 }
 

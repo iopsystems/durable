@@ -42,7 +42,7 @@ impl sqlx::Decode<'_, Durable> for IpNetwork {
             return Ok(inet.try_into()?);
         }
 
-        Err(unexpected_nonnull_type("inet", value))
+        Err(unexpected_nonnull_type(&TypeInfo::inet(), value))
     }
 }
 

@@ -1,3 +1,5 @@
+use std::borrow::Cow;
+
 use sqlx::encode::IsNull;
 use sqlx::error::BoxDynError;
 use uuid::Uuid;
@@ -22,7 +24,7 @@ impl sqlx::Decode<'_, Durable> for Uuid {
             return Ok(value.into());
         }
 
-        Err(unexpected_nonnull_type("uuid", value))
+        Err(unexpected_nonnull_type(&TypeInfo::uuid(), value))
     }
 }
 
@@ -32,7 +34,7 @@ impl sqlx::Type<Durable> for Uuid {
     }
 }
 
-impl sqlx::Encode<'_, Durable> for &'_ [Uuid] {
+impl sqlx::Encode<'_, Durable> for [Uuid] {
     fn encode_by_ref(
         &self,
         buf: &mut <Durable as sqlx::Database>::ArgumentBuffer<'_>,
@@ -63,6 +65,10 @@ impl sqlx::Encode<'_, Durable> for Vec<Uuid> {
     }
 }
 
+forward_encode_deref!(&'_ [Uuid] => [Uuid]);
+forward_encode_deref!(Box<[Uuid]> => [Uuid]);
+forward_encode_deref!(Cow<'_, [Uuid]> => [Uuid]);
+
 impl sqlx::Decode<'_, Durable> for Vec<Uuid> {
     fn decode(value: <Durable as sqlx::Database>::ValueRef<'_>) -> Result<Self, BoxDynError> {
         if let Some(value) = value.0.as_uuid_array() {
@@ -71,13 +77,7 @@ impl sqlx::Decode<'_, Durable> for Vec<Uuid> {
             return Ok(array);
         }
 
-        Err(unexpected_nonnull_type("uuid[]", value))
-    }
-}
-
-impl sqlx::Type<Durable> for &'_ [Uuid] {
-    fn type_info() -> <Durable as sqlx::Database>::TypeInfo {
-        TypeInfo::uuid_array()
+        Err(unexpected_nonnull_type(&TypeInfo::uuid_array(), value))
     }
 }
 
@@ -86,6 +86,8 @@ impl sqlx::Type<Durable> for Vec<Uuid> {
         TypeInfo::uuid_array()
     }
 }
+
+forward_slice_type!(Uuid);
 
 impl From<sql::Uuid> for Uuid {
     fn from(value: sql::Uuid) -> Self {
