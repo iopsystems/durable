@@ -115,7 +115,7 @@ pub struct Config {
     /// Note that, once compiled, the resulting machine code is cached so if the
     /// same WASM binary is encountered multiple times then the compiled code
     /// will be reused.
-    /// 
+    ///
     /// The default limit is 4 concurrent compilation tasks.
     pub max_concurrent_compilations: usize,
 }
