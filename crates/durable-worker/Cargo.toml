@@ -9,7 +9,7 @@ repository = { workspace = true }
 description = "Durable worker binary"
 
 [features]
-tokio-console = ["durable-runtime/tokio-console"]
+tokio-console = ["durable-runtime/tokio-console", "dep:console-subscriber"]
 
 [dependencies]
 durable-runtime = { workspace = true }
