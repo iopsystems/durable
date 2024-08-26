@@ -38,6 +38,8 @@ impl Dev {
         command.arg("-e");
         command.arg("POSTGRES_HOST_AUTH_METHOD=trust");
         command.arg("--rm");
+        command.arg("--shm-size");
+        command.arg("4GB");
         command.arg("--name");
         command.arg("durable-postgres");
 
