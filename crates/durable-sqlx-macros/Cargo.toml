@@ -6,6 +6,7 @@ license.workspace = true
 publish.workspace = true
 repository.workspace = true
 homepage.workspace = true
+description = "macro shim for using sqlx macros in durable"
 
 [features]
 chrono = ["sqlx-macros-core/chrono"]
