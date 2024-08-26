@@ -123,7 +123,7 @@
 //! use durable_migrate::{EmbedOptions, Migrator};
 //!
 //! fn main() {
-//!     # let tempdir = tempdir::TempDir::new("durable").expect("failed to create temp dir");
+//!     # let tempdir = tempfile::tempdir().expect("failed to create temp dir");
 //!     # let out_dir = tempdir.path();
 //!     # if cfg!(any()) {
 //!     let out_dir = PathBuf::from(std::env::var_os("OUT_DIR").unwrap());

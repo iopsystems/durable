@@ -21,4 +21,4 @@ optional = true
 features = ["postgres"]
 
 [dev-dependencies]
-tempdir = "0.3.7"
+tempfile = "3.12.0"
