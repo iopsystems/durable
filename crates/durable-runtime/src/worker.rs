@@ -241,18 +241,8 @@ impl Worker {
 
         tracing::info!("durable worker id is {}", self.worker_id);
 
-        let leader_id = sqlx::query!(
-            "SELECT id
-            FROM durable.worker
-            ORDER BY started_at ASC
-            LIMIT 1",
-        )
-        .fetch_one(&self.shared.pool)
-        .await?
-        .id;
-
         self.shared.shutdown.reset();
-        self.shared.leader.store(leader_id);
+        self.load_leader_id().await?;
 
         let worker_id = self.worker_id;
         let heartbeat = Self::heartbeat(self.shared.clone(), self.worker_id);
@@ -333,9 +323,23 @@ impl Worker {
     /// This task is responsible for periodically validating that all workers in
     /// the table are still live.
     async fn validate_workers(shared: Arc<SharedState>, worker_id: i64) -> anyhow::Result<()> {
+        // When detecting whether workers are live we want two main things:
+        // - Dead workers should be removed promptly, as soon as they fail to update
+        //   their heartbeat within the requested interval.
+        // - We would like to avoid having the database melt down when there are a few
+        //   workers.
+        //
+        // Explicitly out of consideration is working well when there are 1000+ workers.
+        //
+        // How we do things here is that we order workers by id, each worker looks at
+        // the one just in front of it and schedules a liveness check for just after
+        // that worker would expire. The exception to this is the
+
         let _guard = ShutdownGuard::new(&shared.shutdown);
         let mut shutdown = std::pin::pin!(shared.shutdown.wait());
         let mut next = Instant::now();
+
+        let mut following: Option<i64> = None;
 
         'outer: loop {
             tokio::select! {
@@ -348,36 +352,97 @@ impl Worker {
             let mut tx = shared.pool.begin().await?;
             let timeout = shared.config.heartbeat_timeout.into_pg_interval();
 
-            let result = sqlx::query!(
-                "DELETE FROM durable.worker
-                WHERE CURRENT_TIMESTAMP - heartbeat_at > $1
-                  AND NOT id = $2",
-                timeout,
-                worker_id
-            )
-            .execute(&mut *tx)
-            .await?;
+            let mut result = if let Some(following) = following.take() {
+                sqlx::query!(
+                    "
+                    DELETE FROM durable.worker
+                    WHERE id = $1
+                      AND CURRENT_TIMESTAMP - heartbeat_at > $2
+                    ",
+                    following,
+                    timeout
+                )
+                .execute(&mut *tx)
+                .await?
+            } else {
+                Default::default()
+            };
 
             if result.rows_affected() > 0 {
-                tracing::trace!(
+                result.extend(std::iter::once(
+                    sqlx::query!(
+                        "
+                        DELETE FROM durable.worker
+                        WHERE CURRENT_TIMESTAMP - heartbeat_at > $2
+                        AND NOT id = $1
+                        ",
+                        worker_id,
+                        timeout
+                    )
+                    .execute(&mut *tx)
+                    .await?,
+                ));
+
+                tracing::debug!(
                     target: "durable_runtime::validate_workers",
-                    "expired {} inactive workers",
+                    "deleted {} expired workers",
                     result.rows_affected()
                 );
             }
 
-            let record = sqlx::query!(r#"SELECT COUNT(*) as "count!" FROM durable.worker"#)
-                .fetch_one(&mut *tx)
-                .await?;
+            // Select either the next worker in sequence, or the newest id in the sequence.
+            let record = sqlx::query!(
+                r#"
+                WITH
+                    prev AS (
+                        SELECT id, heartbeat_at
+                        FROM durable.worker
+                        WHERE id < $1
+                        ORDER BY id DESC
+                        LIMIT 1
+                    ),
+                    next AS (
+                        SELECT id, heartbeat_at
+                        FROM durable.worker
+                        WHERE NOT id = $1
+                        ORDER BY id DESC
+                        LIMIT 1
+                    ),
+                    combined AS (
+                        SELECT * FROM prev
+                        UNION ALL
+                        SELECT * FROM next
+                    )
+                SELECT
+                    id as "id!",
+                    heartbeat_at as "heartbeat_at!"
+                FROM combined
+                ORDER BY id ASC
+                LIMIT 1
+                "#,
+                worker_id
+            )
+            .fetch_optional(&mut *tx)
+            .await?;
 
             tx.commit().await?;
 
-            // To avoid weird cases with large clusters the maximum interval is 1 day.
-            let mut interval = ((shared.config.heartbeat_timeout / 2)
-                * (record.count as u32).max(1))
-            .min(Duration::from_secs(24 * 3600));
-            let jitter = rand::thread_rng().gen_range(0..(interval / 2).as_nanos());
-            interval -= Duration::from_nanos(jitter as u64);
+            let interval;
+            if let Some(record) = record {
+                tracing::trace!(
+                    target: "durable_runtime::validate_workers",
+                    "following worker {}",
+                    record.id
+                );
+
+                following = Some(record.id);
+
+                let expires =
+                    record.heartbeat_at + shared.config.heartbeat_timeout + Duration::from_secs(1);
+                interval = (expires - Utc::now()).to_std().unwrap_or_default();
+            } else {
+                interval = shared.config.heartbeat_interval;
+            }
 
             tracing::trace!(
                 target: "durable_runtime::validate_workers",
@@ -552,7 +617,7 @@ impl Worker {
             "
             SELECT id
              FROM durable.worker
-            ORDER BY started_at ASC
+            ORDER BY started_at ASC, id ASC
             LIMIT 1
             "
         )
