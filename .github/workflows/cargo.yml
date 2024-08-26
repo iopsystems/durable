@@ -80,7 +80,7 @@ jobs:
 
       - name: cargo clippy
         run: |
-          cargo clippy --all-targets --all-features --message-format json \
+          cargo clippy --all-targets --all-features --message-format json --profile dev-ci \
             | cargo deduplicate-warnings \
             | clippy-sarif      \
             | tee clippy.sarif  \

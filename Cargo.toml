@@ -48,3 +48,10 @@ debug = "line-tables-only"
 inherits = "dev"
 debug = "line-tables-only"
 opt-level = 1
+
+[profile.dev-ci.package."*"]
+debug = false
+
+[profile.dev-ci.build-override]
+debug = false
+strip = true
