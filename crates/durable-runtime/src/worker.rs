@@ -155,15 +155,15 @@ impl WorkerBuilder {
 
         let shared = Arc::new(SharedState {
             shutdown: ShutdownFlag::new(),
-            pool: self.pool,
             client: self.client.unwrap_or_default(),
             notifications: broadcast::channel(128).0,
-            config: self.config,
-            plugins: self.plugins,
             leader: Mailbox::new(-1),
             suspend: Notify::new(),
             cache: Mutex::new(uluru::LRUCache::new()),
-            compile_sema: Semaphore::new(4),
+            compile_sema: Semaphore::new(self.config.max_concurrent_compilations),
+            pool: self.pool,
+            config: self.config,
+            plugins: self.plugins,
         });
 
         let mut config = self.wasmtime_config.unwrap_or_else(|| {

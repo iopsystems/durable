@@ -1,3 +1,5 @@
+//! The worker and runtime responsible for executing durable tasks.
+
 #[macro_use]
 extern crate serde;
 
