@@ -18,9 +18,7 @@ use std::time::Duration;
 
 use durable_core::transaction;
 use http::header::{InvalidHeaderName, InvalidHeaderValue};
-use http::{HeaderMap, HeaderName, HeaderValue, Method, StatusCode};
 use serde::{Deserialize, Serialize};
-use url::Url;
 
 mod bindings {
     #![allow(unused_braces, clippy::all)]
@@ -29,6 +27,11 @@ mod bindings {
 
     pub use self::durable::core::http::*;
 }
+
+#[doc(inline)]
+pub use http::{HeaderMap, HeaderName, HeaderValue, Method, StatusCode};
+#[doc(inline)]
+pub use url::Url;
 
 pub type Result<T, E = Error> = std::result::Result<T, E>;
 
