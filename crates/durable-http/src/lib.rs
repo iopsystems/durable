@@ -567,6 +567,8 @@ impl fmt::Debug for Error {
     }
 }
 
+impl std::error::Error for Error {}
+
 impl fmt::Display for ErrorKind {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
