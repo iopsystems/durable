@@ -39,7 +39,8 @@ fn send(request: &Request) -> Result<Response, Error> {
     use crate::bindings::*;
 
     let label = format!("durable::http::send({} {})", request.method, request.url);
-    crate::transaction::maybe_txn(&label, || {
+    let result = crate::transaction::maybe_txn(&label, || {
+        let original = &request;
         let method = request.method.as_str().to_owned();
         let url = request.url.to_string();
         let headers: Vec<_> = request
@@ -80,9 +81,10 @@ fn send(request: &Request) -> Result<Response, Error> {
                     status,
                     headers,
                     body: response.body,
+                    url: original.url.clone(),
                 })
             }
-            Err(err) => Err(Error(match err {
+            Err(err) => Err(Error::from(match err {
                 HttpError::Timeout => ErrorKind::Timeout,
                 HttpError::InvalidMethod => ErrorKind::InvalidMethod,
                 HttpError::InvalidUrl(msg) => ErrorKind::InvalidUri(msg),
@@ -91,7 +93,9 @@ fn send(request: &Request) -> Result<Response, Error> {
                 HttpError::Other(msg) => ErrorKind::Other(msg),
             })),
         }
-    })
+    });
+
+    result.map_err(|e| e.with_url(request.url.clone()))
 }
 
 /// Create a [`RequestBuilder`] for a `GET` request.
@@ -205,6 +209,7 @@ impl Request {
 /// A response to a submitted [`Request`].
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Response {
+    url: Url,
     #[serde(with = "http_serde_ext::status_code")]
     status: StatusCode,
     #[serde(with = "http_serde_ext::header_map")]
@@ -217,6 +222,11 @@ impl Response {
     /// Get the status code of this response.
     pub fn status(&self) -> StatusCode {
         self.status
+    }
+
+    /// Get the url that the request was made from.
+    pub fn url(&self) -> &Url {
+        &self.url
     }
 
     /// Get the headers of this response.
@@ -264,6 +274,16 @@ impl Response {
     {
         serde_json::from_slice(&self.body)
     }
+
+    /// Turn a response into an error if the server returned an error.
+    pub fn error_for_status(self) -> Result<Self> {
+        let status = self.status();
+        if status.is_client_error() || status.is_server_error() {
+            Err(Error::from(ErrorKind::Status(status)).with_url(self.url))
+        } else {
+            Ok(self)
+        }
+    }
 }
 
 /// A builder to construct the properties of a [`Request`].
@@ -290,7 +310,7 @@ impl RequestBuilder {
     fn _new(method: Method, url: &str) -> Self {
         let result = match Url::from_str(url) {
             Ok(uri) => Ok(Request::new(method, uri)),
-            Err(e) => Err(Error(ErrorKind::InvalidUri(e.to_string()))),
+            Err(e) => Err(ErrorKind::InvalidUri(e.to_string()).into()),
         };
 
         Self { request: result }
@@ -478,8 +498,31 @@ impl RequestBuilder {
     }
 }
 
+#[derive(Serialize, Deserialize)]
+#[serde(transparent)]
+pub struct Error(Box<ErrorImpl>);
+
+impl Error {
+    pub fn with_url(mut self, url: Url) -> Self {
+        self.0.url = Some(url);
+        self
+    }
+
+    pub fn without_url(mut self) -> Self {
+        self.0.url = None;
+        self
+    }
+
+    pub fn url(&self) -> Option<&Url> {
+        self.0.url.as_ref()
+    }
+}
+
 #[derive(Debug, Serialize, Deserialize)]
-pub struct Error(ErrorKind);
+struct ErrorImpl {
+    kind: ErrorKind,
+    url: Option<Url>,
+}
 
 #[derive(Debug, Serialize, Deserialize)]
 enum ErrorKind {
@@ -493,12 +536,34 @@ enum ErrorKind {
         valid_up_to: usize,
         error_len: Option<usize>,
     },
+    Status(#[serde(with = "status_code")] StatusCode),
     Other(String),
 }
 
 impl From<ErrorKind> for Error {
-    fn from(value: ErrorKind) -> Self {
-        Self(value)
+    fn from(kind: ErrorKind) -> Self {
+        Self(Box::new(ErrorImpl { kind, url: None }))
+    }
+}
+
+impl fmt::Display for Error {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.0.kind.fmt(f)?;
+
+        if let Some(url) = self.url() {
+            write!(f, " for url ({url})")?;
+        }
+
+        Ok(())
+    }
+}
+
+impl fmt::Debug for Error {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Error")
+            .field("kind", &self.0.kind)
+            .field("url", &self.0.url)
+            .finish()
     }
 }
 
@@ -507,7 +572,7 @@ impl fmt::Display for ErrorKind {
         match self {
             Self::Timeout => write!(f, "the request timed out"),
             Self::InvalidUri(msg) => write!(f, "invalid uri: {msg}"),
-            Self::InvalidStatus(status) => write!(f, "invalid HTTP status code: {status}"),
+            Self::InvalidStatus(status) => write!(f, "{status} is not a valid HTTP status code"),
             Self::InvalidMethod => write!(f, "invalid HTTP method"),
             Self::InvalidHeaderName => write!(f, "invalid HTTP header name"),
             Self::InvalidHeaderValue => write!(f, "invalid HTTP header value"),
@@ -523,6 +588,15 @@ impl fmt::Display for ErrorKind {
                 } else {
                     write!(f, "incomplete utf-8 byte sequence from index {valid_up_to}")
                 }
+            }
+            Self::Status(ref status) => {
+                let prefix = if status.is_client_error() {
+                    "HTTP status client error"
+                } else {
+                    "HTTP status server error"
+                };
+
+                write!(f, "{prefix} ({status})")
             }
             Self::Other(e) => e.fmt(f),
         }
@@ -596,6 +670,30 @@ mod bytes_or_string {
             let data: Option<OwnedBytes> = Deserialize::deserialize(de)?;
             Ok(data.map(|bytes| bytes.0))
         }
+    }
+}
+
+mod status_code {
+    use http::StatusCode;
+    use serde::{Deserialize, Deserializer, Serialize, Serializer};
+
+    pub fn serialize<S>(data: &StatusCode, ser: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        data.as_u16().serialize(ser)
+    }
+
+    pub fn deserialize<'de, D>(de: D) -> Result<StatusCode, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        use serde::de::Error;
+
+        let status = u16::deserialize(de)?;
+        let status = StatusCode::from_u16(status).map_err(Error::custom)?;
+
+        Ok(status)
     }
 }
 
