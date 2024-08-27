@@ -691,7 +691,7 @@ mod status_code {
         use serde::de::Error;
 
         let status = u16::deserialize(de)?;
-        let status = StatusCode::from_u16(status).map_err(|e| Error::custom(e))?;
+        let status = StatusCode::from_u16(status).map_err(Error::custom)?;
 
         Ok(status)
     }
