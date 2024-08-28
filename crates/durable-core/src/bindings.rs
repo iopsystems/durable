@@ -13,7 +13,7 @@ pub mod durable {
             pub fn task_id() -> i64 {
                 unsafe {
                     #[cfg(target_arch = "wasm32")]
-                    #[link(wasm_import_module = "durable:core/core@2.1.0")]
+                    #[link(wasm_import_module = "durable:core/core@2.2.0")]
                     extern "C" {
                         #[link_name = "task-id"]
                         fn wit_import() -> i64;
@@ -35,7 +35,7 @@ pub mod durable {
                     let mut ret_area = RetArea([::core::mem::MaybeUninit::uninit(); 8]);
                     let ptr0 = ret_area.0.as_mut_ptr().cast::<u8>();
                     #[cfg(target_arch = "wasm32")]
-                    #[link(wasm_import_module = "durable:core/core@2.1.0")]
+                    #[link(wasm_import_module = "durable:core/core@2.2.0")]
                     extern "C" {
                         #[link_name = "task-name"]
                         fn wit_import(_: *mut u8);
@@ -61,7 +61,7 @@ pub mod durable {
                     let mut ret_area = RetArea([::core::mem::MaybeUninit::uninit(); 8]);
                     let ptr0 = ret_area.0.as_mut_ptr().cast::<u8>();
                     #[cfg(target_arch = "wasm32")]
-                    #[link(wasm_import_module = "durable:core/core@2.1.0")]
+                    #[link(wasm_import_module = "durable:core/core@2.2.0")]
                     extern "C" {
                         #[link_name = "task-data"]
                         fn wit_import(_: *mut u8);
@@ -98,7 +98,7 @@ pub mod durable {
                     let len0 = vec0.len();
                     let ptr1 = ret_area.0.as_mut_ptr().cast::<u8>();
                     #[cfg(target_arch = "wasm32")]
-                    #[link(wasm_import_module = "durable:core/core@2.1.0")]
+                    #[link(wasm_import_module = "durable:core/core@2.2.0")]
                     extern "C" {
                         #[link_name = "transaction-enter"]
                         fn wit_import(_: *mut u8, _: usize, _: i32, _: *mut u8);
@@ -148,7 +148,7 @@ pub mod durable {
                     let ptr0 = vec0.as_ptr().cast::<u8>();
                     let len0 = vec0.len();
                     #[cfg(target_arch = "wasm32")]
-                    #[link(wasm_import_module = "durable:core/core@2.1.0")]
+                    #[link(wasm_import_module = "durable:core/core@2.2.0")]
                     extern "C" {
                         #[link_name = "transaction-exit"]
                         fn wit_import(_: *mut u8, _: usize);
@@ -190,6 +190,43 @@ pub mod durable {
                         .finish()
                 }
             }
+            /// Errors that can occur as when attempting to notify another task.
+            #[derive(Clone)]
+            pub enum NotifyError {
+                /// There is no task with the requested task id.
+                TaskNotFound,
+                /// There is a task with the requested id, but it is no longer running.
+                TaskDead,
+                /// Other unspecified errors that may occur, such as data not being valid JSON.
+                Other(_rt::String),
+            }
+            impl ::core::fmt::Debug for NotifyError {
+                fn fmt(
+                    &self,
+                    f: &mut ::core::fmt::Formatter<'_>,
+                ) -> ::core::fmt::Result {
+                    match self {
+                        NotifyError::TaskNotFound => {
+                            f.debug_tuple("NotifyError::TaskNotFound").finish()
+                        }
+                        NotifyError::TaskDead => {
+                            f.debug_tuple("NotifyError::TaskDead").finish()
+                        }
+                        NotifyError::Other(e) => {
+                            f.debug_tuple("NotifyError::Other").field(e).finish()
+                        }
+                    }
+                }
+            }
+            impl ::core::fmt::Display for NotifyError {
+                fn fmt(
+                    &self,
+                    f: &mut ::core::fmt::Formatter<'_>,
+                ) -> ::core::fmt::Result {
+                    write!(f, "{:?}", self)
+                }
+            }
+            impl std::error::Error for NotifyError {}
             #[allow(unused_unsafe, clippy::all)]
             /// Attempt to read the next available notification, if there is one.
             /// notification: func() -> option<event>;
@@ -201,7 +238,7 @@ pub mod durable {
                     let mut ret_area = RetArea([::core::mem::MaybeUninit::uninit(); 32]);
                     let ptr0 = ret_area.0.as_mut_ptr().cast::<u8>();
                     #[cfg(target_arch = "wasm32")]
-                    #[link(wasm_import_module = "durable:core/notify@2.1.0")]
+                    #[link(wasm_import_module = "durable:core/notify@2.2.0")]
                     extern "C" {
                         #[link_name = "notification-blocking"]
                         fn wit_import(_: *mut u8);
@@ -228,6 +265,92 @@ pub mod durable {
                         },
                         event: _rt::string_lift(bytes5),
                         data: _rt::string_lift(bytes8),
+                    }
+                }
+            }
+            #[allow(unused_unsafe, clippy::all)]
+            /// Emit a notification for a task.
+            pub fn notify(
+                task: i64,
+                event: &str,
+                data: &str,
+            ) -> Result<(), NotifyError> {
+                unsafe {
+                    #[repr(align(4))]
+                    struct RetArea([::core::mem::MaybeUninit<u8>; 16]);
+                    let mut ret_area = RetArea([::core::mem::MaybeUninit::uninit(); 16]);
+                    let vec0 = event;
+                    let ptr0 = vec0.as_ptr().cast::<u8>();
+                    let len0 = vec0.len();
+                    let vec1 = data;
+                    let ptr1 = vec1.as_ptr().cast::<u8>();
+                    let len1 = vec1.len();
+                    let ptr2 = ret_area.0.as_mut_ptr().cast::<u8>();
+                    #[cfg(target_arch = "wasm32")]
+                    #[link(wasm_import_module = "durable:core/notify@2.2.0")]
+                    extern "C" {
+                        #[link_name = "notify"]
+                        fn wit_import(
+                            _: i64,
+                            _: *mut u8,
+                            _: usize,
+                            _: *mut u8,
+                            _: usize,
+                            _: *mut u8,
+                        );
+                    }
+                    #[cfg(not(target_arch = "wasm32"))]
+                    fn wit_import(
+                        _: i64,
+                        _: *mut u8,
+                        _: usize,
+                        _: *mut u8,
+                        _: usize,
+                        _: *mut u8,
+                    ) {
+                        unreachable!()
+                    }
+                    wit_import(
+                        _rt::as_i64(&task),
+                        ptr0.cast_mut(),
+                        len0,
+                        ptr1.cast_mut(),
+                        len1,
+                        ptr2,
+                    );
+                    let l3 = i32::from(*ptr2.add(0).cast::<u8>());
+                    match l3 {
+                        0 => {
+                            let e = ();
+                            Ok(e)
+                        }
+                        1 => {
+                            let e = {
+                                let l4 = i32::from(*ptr2.add(4).cast::<u8>());
+                                let v8 = match l4 {
+                                    0 => NotifyError::TaskNotFound,
+                                    1 => NotifyError::TaskDead,
+                                    n => {
+                                        debug_assert_eq!(n, 2, "invalid enum discriminant");
+                                        let e8 = {
+                                            let l5 = *ptr2.add(8).cast::<*mut u8>();
+                                            let l6 = *ptr2.add(12).cast::<usize>();
+                                            let len7 = l6;
+                                            let bytes7 = _rt::Vec::from_raw_parts(
+                                                l5.cast(),
+                                                len7,
+                                                len7,
+                                            );
+                                            _rt::string_lift(bytes7)
+                                        };
+                                        NotifyError::Other(e8)
+                                    }
+                                };
+                                v8
+                            };
+                            Err(e)
+                        }
+                        _ => _rt::invalid_enum_discriminant(),
                     }
                 }
             }
@@ -349,25 +472,50 @@ mod _rt {
             core::hint::unreachable_unchecked()
         }
     }
+    pub fn as_i64<T: AsI64>(t: T) -> i64 {
+        t.as_i64()
+    }
+    pub trait AsI64 {
+        fn as_i64(self) -> i64;
+    }
+    impl<'a, T: Copy + AsI64> AsI64 for &'a T {
+        fn as_i64(self) -> i64 {
+            (*self).as_i64()
+        }
+    }
+    impl AsI64 for i64 {
+        #[inline]
+        fn as_i64(self) -> i64 {
+            self as i64
+        }
+    }
+    impl AsI64 for u64 {
+        #[inline]
+        fn as_i64(self) -> i64 {
+            self as i64
+        }
+    }
     extern crate alloc as alloc_crate;
 }
 #[cfg(target_arch = "wasm32")]
 #[link_section = "component-type:wit-bindgen:0.30.0:import-core:encoded world"]
 #[doc(hidden)]
-pub static __WIT_BINDGEN_COMPONENT_TYPE: [u8; 566] = *b"\
-\0asm\x0d\0\x01\0\0\x19\x16wit-component-encoding\x04\0\x07\xb4\x03\x01A\x02\x01\
+pub static __WIT_BINDGEN_COMPONENT_TYPE: [u8; 665] = *b"\
+\0asm\x0d\0\x01\0\0\x19\x16wit-component-encoding\x04\0\x07\x97\x04\x01A\x02\x01\
 A\x07\x01B\x0a\x01@\0\0x\x04\0\x07task-id\x01\0\x01@\0\0s\x04\0\x09task-name\x01\
 \x01\x04\0\x09task-data\x01\x01\x01ks\x01@\x02\x05labels\x05is-db\x7f\0\x02\x04\0\
 \x11transaction-enter\x01\x03\x01@\x01\x04datas\x01\0\x04\0\x10transaction-exit\x01\
-\x04\x03\x01\x17durable:core/core@2.1.0\x05\0\x01B\x05\x01r\x02\x07secondsw\x0bn\
+\x04\x03\x01\x17durable:core/core@2.2.0\x05\0\x01B\x05\x01r\x02\x07secondsw\x0bn\
 anosecondsy\x04\0\x08datetime\x03\0\0\x01@\0\0\x01\x04\0\x03now\x01\x02\x04\0\x0a\
 resolution\x01\x02\x03\x01\x1cwasi:clocks/wall-clock@0.2.0\x05\x01\x02\x03\0\x01\
-\x08datetime\x01B\x06\x02\x03\x02\x01\x02\x04\0\x08datetime\x03\0\0\x01r\x03\x0a\
-created-at\x01\x05events\x04datas\x04\0\x05event\x03\0\x02\x01@\0\0\x03\x04\0\x15\
-notification-blocking\x01\x04\x03\x01\x19durable:core/notify@2.1.0\x05\x03\x04\x01\
-\x1edurable:core/import-core@2.1.0\x04\0\x0b\x11\x01\0\x0bimport-core\x03\0\0\0G\
-\x09producers\x01\x0cprocessed-by\x02\x0dwit-component\x070.215.0\x10wit-bindgen\
--rust\x060.30.0";
+\x08datetime\x01B\x0b\x02\x03\x02\x01\x02\x04\0\x08datetime\x03\0\0\x01r\x03\x0a\
+created-at\x01\x05events\x04datas\x04\0\x05event\x03\0\x02\x01q\x03\x0etask-not-\
+found\0\0\x09task-dead\0\0\x05other\x01s\0\x04\0\x0cnotify-error\x03\0\x04\x01@\0\
+\0\x03\x04\0\x15notification-blocking\x01\x06\x01j\0\x01\x05\x01@\x03\x04taskx\x05\
+events\x04datas\0\x07\x04\0\x06notify\x01\x08\x03\x01\x19durable:core/notify@2.2\
+.0\x05\x03\x04\x01\x1edurable:core/import-core@2.2.0\x04\0\x0b\x11\x01\0\x0bimpo\
+rt-core\x03\0\0\0G\x09producers\x01\x0cprocessed-by\x02\x0dwit-component\x070.21\
+5.0\x10wit-bindgen-rust\x060.30.0";
 #[inline(never)]
 #[doc(hidden)]
 pub fn __link_custom_section_describing_imports() {

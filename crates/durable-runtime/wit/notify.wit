@@ -19,4 +19,21 @@ interface notify {
 
     /// Read the next available notification, blocking until one is available.
     notification-blocking: func() -> event;
+
+    /// Errors that can occur as when attempting to notify another task.
+    @since(version = 2.2.0)
+    variant notify-error {
+        /// There is no task with the requested task id.
+        task-not-found,
+
+        /// There is a task with the requested id, but it is no longer running.
+        task-dead,
+
+        /// Other unspecified errors that may occur, such as data not being valid JSON.
+        other(string),
+    }
+
+    /// Emit a notification for a task.
+    @since(version = 2.2.0)
+    notify: func(task: s64, event: string, data: string) -> result<_, notify-error>;
 }

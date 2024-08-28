@@ -1,0 +1,28 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n                WITH\n                    prev AS (\n                        SELECT id, heartbeat_at\n                        FROM durable.worker\n                        WHERE id < $1\n                        ORDER BY id DESC\n                        LIMIT 1\n                    ),\n                    next AS (\n                        SELECT id, heartbeat_at\n                        FROM durable.worker\n                        WHERE NOT id = $1\n                        ORDER BY id DESC\n                        LIMIT 1\n                    ),\n                    combined AS (\n                        SELECT * FROM prev\n                        UNION ALL\n                        SELECT * FROM next\n                    )\n                SELECT\n                    id as \"id!\",\n                    heartbeat_at as \"heartbeat_at!\"\n                FROM combined\n                ORDER BY id ASC\n                LIMIT 1\n                ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id!",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 1,
+        "name": "heartbeat_at!",
+        "type_info": "Timestamptz"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int8"
+      ]
+    },
+    "nullable": [
+      null,
+      null
+    ]
+  },
+  "hash": "c6857347c4dfab3aec1bdfc7323dab8715d8d407b5b7f2f73ba9a374d8b1eee6"
+}

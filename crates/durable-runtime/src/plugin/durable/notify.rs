@@ -4,7 +4,7 @@ use sqlx::types::Json;
 use tokio::sync::broadcast::error::RecvError;
 use tokio::time::Instant;
 
-use crate::bindings::durable::core::notify::{Event, Host};
+use crate::bindings::durable::core::notify::{Event, Host, NotifyError};
 use crate::task::TransactionOptions;
 use crate::{Task, TaskStatus};
 
@@ -118,6 +118,78 @@ impl Host for Task {
 
         Ok(data.into())
     }
+
+    async fn notify(
+        &mut self,
+        task: i64,
+        event: String,
+        data: String,
+    ) -> wasmtime::Result<Result<(), NotifyError>> {
+        if self.state.transaction().is_some() {
+            anyhow::bail!("durable:core/notify.notify cannot be called from within a transaction");
+        }
+
+        let options = TransactionOptions::new("durable:core/notify.notify").database(true);
+        if let Some(result) = self.state.enter::<Result<(), NotifyError>>(options).await? {
+            return Ok(result);
+        }
+
+        let txn = self.state.transaction_mut().unwrap();
+        let tx = txn.conn().unwrap();
+
+        let future = async {
+            let json: &RawValue = match serde_json::from_str(&data) {
+                Ok(value) => value,
+                Err(e) => return Ok(Err(NotifyError::Other(e.to_string()))),
+            };
+
+            // Note: we lock the row here so that other transactions running at the same
+            // time cannot modify the
+            let state = sqlx::query_scalar!(
+                r#"
+                SELECT state as "state!: TaskState" 
+                 FROM durable.task
+                WHERE task.id = $1
+                "#,
+                task
+            )
+            .fetch_optional(&mut **tx)
+            .await?;
+
+            match state {
+                Some(TaskState::Complete | TaskState::Failed) => {
+                    return Ok(Err(NotifyError::TaskDead))
+                }
+                None => return Ok(Err(NotifyError::TaskNotFound)),
+                _ => (),
+            }
+
+            let result = sqlx::query_scalar!(
+                r#"
+                INSERT INTO durable.notification(task_id, event, data)
+                VALUES ($1, $2, $3)
+                "#,
+                task,
+                event,
+                Json(json) as Json<&RawValue>
+            )
+            .execute(&mut **tx)
+            .await;
+
+            match result {
+                Ok(_) => Ok(Ok(())),
+                Err(sqlx::Error::Database(ref error)) if error.constraint() == Some("fk_task") => {
+                    Ok(Err(NotifyError::TaskNotFound))
+                }
+                Err(e) => Err(e),
+            }
+        };
+
+        let result = future.await?;
+        self.state.exit(&result).await?;
+
+        Ok(result)
+    }
 }
 
 #[derive(Serialize, Deserialize)]
@@ -141,4 +213,42 @@ impl From<EventData> for Event {
             data: data.data.get().to_owned(),
         }
     }
+}
+
+#[derive(Serialize, Deserialize)]
+#[serde(remote = "NotifyError")]
+#[serde(tag = "error", content = "message")]
+#[serde(rename_all = "kebab-case")]
+enum RemoteNotifyError {
+    TaskNotFound,
+    TaskDead,
+    Other(String),
+}
+
+impl serde::Serialize for NotifyError {
+    fn serialize<S>(&self, ser: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        RemoteNotifyError::serialize(self, ser)
+    }
+}
+
+impl<'de> serde::Deserialize<'de> for NotifyError {
+    fn deserialize<D>(de: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        RemoteNotifyError::deserialize(de)
+    }
+}
+
+#[derive(Copy, Clone, Debug, Eq, PartialEq, sqlx::Type)]
+#[sqlx(type_name = "durable.task_state", rename_all = "lowercase")]
+enum TaskState {
+    Ready,
+    Active,
+    Suspended,
+    Complete,
+    Failed,
 }

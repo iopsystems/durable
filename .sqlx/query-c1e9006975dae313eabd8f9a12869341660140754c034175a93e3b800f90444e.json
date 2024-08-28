@@ -1,0 +1,35 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n                SELECT state as \"state!: TaskState\" \n                 FROM durable.task\n                WHERE task.id = $1\n                ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "state!: TaskState",
+        "type_info": {
+          "Custom": {
+            "name": "durable.task_state",
+            "kind": {
+              "Enum": [
+                "ready",
+                "active",
+                "suspended",
+                "complete",
+                "failed"
+              ]
+            }
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int8"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "c1e9006975dae313eabd8f9a12869341660140754c034175a93e3b800f90444e"
+}
