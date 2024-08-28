@@ -14,7 +14,6 @@ pub fn expand_query(input: TokenStream) -> TokenStream {
             };
 
             syn::visit_mut::visit_expr_mut(&mut Visitor, &mut expr);
-            // panic!("{expr:#?}");
 
             expr.to_token_stream().into()
         }
