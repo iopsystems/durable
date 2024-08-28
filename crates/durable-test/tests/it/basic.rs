@@ -1,3 +1,5 @@
+use std::time::Duration;
+
 use durable_client::DurableClient;
 use futures::TryStreamExt;
 
@@ -85,6 +87,28 @@ async fn run_sqlx_use_json(pool: sqlx::PgPool) -> anyhow::Result<()> {
     crate::tail_logs(&client, &task);
     let status = task.wait(&client).await?;
 
+    assert!(status.success());
+
+    Ok(())
+}
+
+#[sqlx::test]
+async fn run_notify_self(pool: sqlx::PgPool) -> anyhow::Result<()> {
+    use tokio::time::timeout;
+
+    let _guard = durable_test::spawn_worker(pool.clone()).await?;
+    let client = DurableClient::new(pool)?;
+    let program = crate::load_binary(&client, "notify-self.wasm").await?;
+
+    let task = client
+        .launch("notify self test", &program, &serde_json::json!(null))
+        .await?;
+    crate::tail_logs(&client, &task);
+
+    let status = match timeout(Duration::from_secs(30), task.wait(&client)).await {
+        Ok(result) => result?,
+        Err(_) => anyhow::bail!("task failed to complete in under 30s"),
+    };
     assert!(status.success());
 
     Ok(())

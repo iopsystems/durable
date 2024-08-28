@@ -40,7 +40,7 @@ pub mod durable {
                     unreachable!();
                     #[cfg(target_arch = "wasm32")]
                     {
-                        #[link(wasm_import_module = "durable:core/sql@2.1.0")]
+                        #[link(wasm_import_module = "durable:core/sql@2.2.0")]
                         extern "C" {
                             #[link_name = "[resource-drop]type-info"]
                             fn drop(_: u32);
@@ -213,7 +213,7 @@ pub mod durable {
                     unreachable!();
                     #[cfg(target_arch = "wasm32")]
                     {
-                        #[link(wasm_import_module = "durable:core/sql@2.1.0")]
+                        #[link(wasm_import_module = "durable:core/sql@2.2.0")]
                         extern "C" {
                             #[link_name = "[resource-drop]value"]
                             fn drop(_: u32);
@@ -438,7 +438,7 @@ pub mod durable {
                         );
                         let ptr0 = ret_area.0.as_mut_ptr().cast::<u8>();
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.1.0")]
+                        #[link(wasm_import_module = "durable:core/sql@2.2.0")]
                         extern "C" {
                             #[link_name = "[method]type-info.name"]
                             fn wit_import(_: i32, _: *mut u8);
@@ -462,7 +462,7 @@ pub mod durable {
                 pub fn compatible(&self, other: &TypeInfo) -> bool {
                     unsafe {
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.1.0")]
+                        #[link(wasm_import_module = "durable:core/sql@2.2.0")]
                         extern "C" {
                             #[link_name = "[method]type-info.compatible"]
                             fn wit_import(_: i32, _: i32) -> i32;
@@ -485,7 +485,7 @@ pub mod durable {
                 pub fn equal(&self, other: &TypeInfo) -> bool {
                     unsafe {
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.1.0")]
+                        #[link(wasm_import_module = "durable:core/sql@2.2.0")]
                         extern "C" {
                             #[link_name = "[method]type-info.equal"]
                             fn wit_import(_: i32, _: i32) -> i32;
@@ -508,7 +508,7 @@ pub mod durable {
                 pub fn clone(&self) -> TypeInfo {
                     unsafe {
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.1.0")]
+                        #[link(wasm_import_module = "durable:core/sql@2.2.0")]
                         extern "C" {
                             #[link_name = "[method]type-info.clone"]
                             fn wit_import(_: i32) -> i32;
@@ -536,7 +536,7 @@ pub mod durable {
                         );
                         let ptr0 = ret_area.0.as_mut_ptr().cast::<u8>();
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.1.0")]
+                        #[link(wasm_import_module = "durable:core/sql@2.2.0")]
                         extern "C" {
                             #[link_name = "[method]type-info.serialize"]
                             fn wit_import(_: i32, _: *mut u8);
@@ -596,7 +596,7 @@ pub mod durable {
                         let len0 = vec0.len();
                         let ptr1 = ret_area.0.as_mut_ptr().cast::<u8>();
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.1.0")]
+                        #[link(wasm_import_module = "durable:core/sql@2.2.0")]
                         extern "C" {
                             #[link_name = "[static]type-info.deserialize"]
                             fn wit_import(_: *mut u8, _: usize, _: *mut u8);
@@ -654,7 +654,7 @@ pub mod durable {
                 pub fn boolean() -> TypeInfo {
                     unsafe {
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.1.0")]
+                        #[link(wasm_import_module = "durable:core/sql@2.2.0")]
                         extern "C" {
                             #[link_name = "[static]type-info.boolean"]
                             fn wit_import() -> i32;
@@ -673,7 +673,7 @@ pub mod durable {
                 pub fn float4() -> TypeInfo {
                     unsafe {
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.1.0")]
+                        #[link(wasm_import_module = "durable:core/sql@2.2.0")]
                         extern "C" {
                             #[link_name = "[static]type-info.float4"]
                             fn wit_import() -> i32;
@@ -692,7 +692,7 @@ pub mod durable {
                 pub fn float8() -> TypeInfo {
                     unsafe {
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.1.0")]
+                        #[link(wasm_import_module = "durable:core/sql@2.2.0")]
                         extern "C" {
                             #[link_name = "[static]type-info.float8"]
                             fn wit_import() -> i32;
@@ -711,7 +711,7 @@ pub mod durable {
                 pub fn int1() -> TypeInfo {
                     unsafe {
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.1.0")]
+                        #[link(wasm_import_module = "durable:core/sql@2.2.0")]
                         extern "C" {
                             #[link_name = "[static]type-info.int1"]
                             fn wit_import() -> i32;
@@ -730,7 +730,7 @@ pub mod durable {
                 pub fn int2() -> TypeInfo {
                     unsafe {
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.1.0")]
+                        #[link(wasm_import_module = "durable:core/sql@2.2.0")]
                         extern "C" {
                             #[link_name = "[static]type-info.int2"]
                             fn wit_import() -> i32;
@@ -749,7 +749,7 @@ pub mod durable {
                 pub fn int4() -> TypeInfo {
                     unsafe {
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.1.0")]
+                        #[link(wasm_import_module = "durable:core/sql@2.2.0")]
                         extern "C" {
                             #[link_name = "[static]type-info.int4"]
                             fn wit_import() -> i32;
@@ -768,7 +768,7 @@ pub mod durable {
                 pub fn int8() -> TypeInfo {
                     unsafe {
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.1.0")]
+                        #[link(wasm_import_module = "durable:core/sql@2.2.0")]
                         extern "C" {
                             #[link_name = "[static]type-info.int8"]
                             fn wit_import() -> i32;
@@ -787,7 +787,7 @@ pub mod durable {
                 pub fn text() -> TypeInfo {
                     unsafe {
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.1.0")]
+                        #[link(wasm_import_module = "durable:core/sql@2.2.0")]
                         extern "C" {
                             #[link_name = "[static]type-info.text"]
                             fn wit_import() -> i32;
@@ -806,7 +806,7 @@ pub mod durable {
                 pub fn bytea() -> TypeInfo {
                     unsafe {
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.1.0")]
+                        #[link(wasm_import_module = "durable:core/sql@2.2.0")]
                         extern "C" {
                             #[link_name = "[static]type-info.bytea"]
                             fn wit_import() -> i32;
@@ -825,7 +825,7 @@ pub mod durable {
                 pub fn timestamptz() -> TypeInfo {
                     unsafe {
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.1.0")]
+                        #[link(wasm_import_module = "durable:core/sql@2.2.0")]
                         extern "C" {
                             #[link_name = "[static]type-info.timestamptz"]
                             fn wit_import() -> i32;
@@ -844,7 +844,7 @@ pub mod durable {
                 pub fn timestamp() -> TypeInfo {
                     unsafe {
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.1.0")]
+                        #[link(wasm_import_module = "durable:core/sql@2.2.0")]
                         extern "C" {
                             #[link_name = "[static]type-info.timestamp"]
                             fn wit_import() -> i32;
@@ -863,7 +863,7 @@ pub mod durable {
                 pub fn uuid() -> TypeInfo {
                     unsafe {
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.1.0")]
+                        #[link(wasm_import_module = "durable:core/sql@2.2.0")]
                         extern "C" {
                             #[link_name = "[static]type-info.uuid"]
                             fn wit_import() -> i32;
@@ -882,7 +882,7 @@ pub mod durable {
                 pub fn jsonb() -> TypeInfo {
                     unsafe {
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.1.0")]
+                        #[link(wasm_import_module = "durable:core/sql@2.2.0")]
                         extern "C" {
                             #[link_name = "[static]type-info.jsonb"]
                             fn wit_import() -> i32;
@@ -901,7 +901,7 @@ pub mod durable {
                 pub fn inet() -> TypeInfo {
                     unsafe {
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.1.0")]
+                        #[link(wasm_import_module = "durable:core/sql@2.2.0")]
                         extern "C" {
                             #[link_name = "[static]type-info.inet"]
                             fn wit_import() -> i32;
@@ -920,7 +920,7 @@ pub mod durable {
                 pub fn boolean_array() -> TypeInfo {
                     unsafe {
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.1.0")]
+                        #[link(wasm_import_module = "durable:core/sql@2.2.0")]
                         extern "C" {
                             #[link_name = "[static]type-info.boolean-array"]
                             fn wit_import() -> i32;
@@ -939,7 +939,7 @@ pub mod durable {
                 pub fn float4_array() -> TypeInfo {
                     unsafe {
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.1.0")]
+                        #[link(wasm_import_module = "durable:core/sql@2.2.0")]
                         extern "C" {
                             #[link_name = "[static]type-info.float4-array"]
                             fn wit_import() -> i32;
@@ -958,7 +958,7 @@ pub mod durable {
                 pub fn float8_array() -> TypeInfo {
                     unsafe {
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.1.0")]
+                        #[link(wasm_import_module = "durable:core/sql@2.2.0")]
                         extern "C" {
                             #[link_name = "[static]type-info.float8-array"]
                             fn wit_import() -> i32;
@@ -977,7 +977,7 @@ pub mod durable {
                 pub fn int1_array() -> TypeInfo {
                     unsafe {
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.1.0")]
+                        #[link(wasm_import_module = "durable:core/sql@2.2.0")]
                         extern "C" {
                             #[link_name = "[static]type-info.int1-array"]
                             fn wit_import() -> i32;
@@ -996,7 +996,7 @@ pub mod durable {
                 pub fn int2_array() -> TypeInfo {
                     unsafe {
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.1.0")]
+                        #[link(wasm_import_module = "durable:core/sql@2.2.0")]
                         extern "C" {
                             #[link_name = "[static]type-info.int2-array"]
                             fn wit_import() -> i32;
@@ -1015,7 +1015,7 @@ pub mod durable {
                 pub fn int4_array() -> TypeInfo {
                     unsafe {
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.1.0")]
+                        #[link(wasm_import_module = "durable:core/sql@2.2.0")]
                         extern "C" {
                             #[link_name = "[static]type-info.int4-array"]
                             fn wit_import() -> i32;
@@ -1034,7 +1034,7 @@ pub mod durable {
                 pub fn int8_array() -> TypeInfo {
                     unsafe {
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.1.0")]
+                        #[link(wasm_import_module = "durable:core/sql@2.2.0")]
                         extern "C" {
                             #[link_name = "[static]type-info.int8-array"]
                             fn wit_import() -> i32;
@@ -1053,7 +1053,7 @@ pub mod durable {
                 pub fn text_array() -> TypeInfo {
                     unsafe {
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.1.0")]
+                        #[link(wasm_import_module = "durable:core/sql@2.2.0")]
                         extern "C" {
                             #[link_name = "[static]type-info.text-array"]
                             fn wit_import() -> i32;
@@ -1072,7 +1072,7 @@ pub mod durable {
                 pub fn bytea_array() -> TypeInfo {
                     unsafe {
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.1.0")]
+                        #[link(wasm_import_module = "durable:core/sql@2.2.0")]
                         extern "C" {
                             #[link_name = "[static]type-info.bytea-array"]
                             fn wit_import() -> i32;
@@ -1091,7 +1091,7 @@ pub mod durable {
                 pub fn timestamptz_array() -> TypeInfo {
                     unsafe {
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.1.0")]
+                        #[link(wasm_import_module = "durable:core/sql@2.2.0")]
                         extern "C" {
                             #[link_name = "[static]type-info.timestamptz-array"]
                             fn wit_import() -> i32;
@@ -1110,7 +1110,7 @@ pub mod durable {
                 pub fn timestamp_array() -> TypeInfo {
                     unsafe {
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.1.0")]
+                        #[link(wasm_import_module = "durable:core/sql@2.2.0")]
                         extern "C" {
                             #[link_name = "[static]type-info.timestamp-array"]
                             fn wit_import() -> i32;
@@ -1129,7 +1129,7 @@ pub mod durable {
                 pub fn uuid_array() -> TypeInfo {
                     unsafe {
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.1.0")]
+                        #[link(wasm_import_module = "durable:core/sql@2.2.0")]
                         extern "C" {
                             #[link_name = "[static]type-info.uuid-array"]
                             fn wit_import() -> i32;
@@ -1148,7 +1148,7 @@ pub mod durable {
                 pub fn jsonb_array() -> TypeInfo {
                     unsafe {
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.1.0")]
+                        #[link(wasm_import_module = "durable:core/sql@2.2.0")]
                         extern "C" {
                             #[link_name = "[static]type-info.jsonb-array"]
                             fn wit_import() -> i32;
@@ -1167,7 +1167,7 @@ pub mod durable {
                 pub fn inet_array() -> TypeInfo {
                     unsafe {
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.1.0")]
+                        #[link(wasm_import_module = "durable:core/sql@2.2.0")]
                         extern "C" {
                             #[link_name = "[static]type-info.inet-array"]
                             fn wit_import() -> i32;
@@ -1189,7 +1189,7 @@ pub mod durable {
                 pub fn is_null(&self) -> bool {
                     unsafe {
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.1.0")]
+                        #[link(wasm_import_module = "durable:core/sql@2.2.0")]
                         extern "C" {
                             #[link_name = "[method]value.is-null"]
                             fn wit_import(_: i32) -> i32;
@@ -1209,7 +1209,7 @@ pub mod durable {
                 pub fn type_info(&self) -> TypeInfo {
                     unsafe {
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.1.0")]
+                        #[link(wasm_import_module = "durable:core/sql@2.2.0")]
                         extern "C" {
                             #[link_name = "[method]value.type-info"]
                             fn wit_import(_: i32) -> i32;
@@ -1229,7 +1229,7 @@ pub mod durable {
                 pub fn clone(&self) -> Value {
                     unsafe {
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.1.0")]
+                        #[link(wasm_import_module = "durable:core/sql@2.2.0")]
                         extern "C" {
                             #[link_name = "[method]value.clone"]
                             fn wit_import(_: i32) -> i32;
@@ -1257,7 +1257,7 @@ pub mod durable {
                         );
                         let ptr0 = ret_area.0.as_mut_ptr().cast::<u8>();
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.1.0")]
+                        #[link(wasm_import_module = "durable:core/sql@2.2.0")]
                         extern "C" {
                             #[link_name = "[method]value.serialize"]
                             fn wit_import(_: i32, _: *mut u8);
@@ -1317,7 +1317,7 @@ pub mod durable {
                         let len0 = vec0.len();
                         let ptr1 = ret_area.0.as_mut_ptr().cast::<u8>();
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.1.0")]
+                        #[link(wasm_import_module = "durable:core/sql@2.2.0")]
                         extern "C" {
                             #[link_name = "[static]value.deserialize"]
                             fn wit_import(_: *mut u8, _: usize, _: *mut u8);
@@ -1366,7 +1366,7 @@ pub mod durable {
                         );
                         let ptr0 = ret_area.0.as_mut_ptr().cast::<u8>();
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.1.0")]
+                        #[link(wasm_import_module = "durable:core/sql@2.2.0")]
                         extern "C" {
                             #[link_name = "[method]value.as-boolean"]
                             fn wit_import(_: i32, _: *mut u8);
@@ -1402,7 +1402,7 @@ pub mod durable {
                         );
                         let ptr0 = ret_area.0.as_mut_ptr().cast::<u8>();
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.1.0")]
+                        #[link(wasm_import_module = "durable:core/sql@2.2.0")]
                         extern "C" {
                             #[link_name = "[method]value.as-float4"]
                             fn wit_import(_: i32, _: *mut u8);
@@ -1438,7 +1438,7 @@ pub mod durable {
                         );
                         let ptr0 = ret_area.0.as_mut_ptr().cast::<u8>();
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.1.0")]
+                        #[link(wasm_import_module = "durable:core/sql@2.2.0")]
                         extern "C" {
                             #[link_name = "[method]value.as-float8"]
                             fn wit_import(_: i32, _: *mut u8);
@@ -1474,7 +1474,7 @@ pub mod durable {
                         );
                         let ptr0 = ret_area.0.as_mut_ptr().cast::<u8>();
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.1.0")]
+                        #[link(wasm_import_module = "durable:core/sql@2.2.0")]
                         extern "C" {
                             #[link_name = "[method]value.as-int1"]
                             fn wit_import(_: i32, _: *mut u8);
@@ -1510,7 +1510,7 @@ pub mod durable {
                         );
                         let ptr0 = ret_area.0.as_mut_ptr().cast::<u8>();
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.1.0")]
+                        #[link(wasm_import_module = "durable:core/sql@2.2.0")]
                         extern "C" {
                             #[link_name = "[method]value.as-int2"]
                             fn wit_import(_: i32, _: *mut u8);
@@ -1546,7 +1546,7 @@ pub mod durable {
                         );
                         let ptr0 = ret_area.0.as_mut_ptr().cast::<u8>();
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.1.0")]
+                        #[link(wasm_import_module = "durable:core/sql@2.2.0")]
                         extern "C" {
                             #[link_name = "[method]value.as-int4"]
                             fn wit_import(_: i32, _: *mut u8);
@@ -1582,7 +1582,7 @@ pub mod durable {
                         );
                         let ptr0 = ret_area.0.as_mut_ptr().cast::<u8>();
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.1.0")]
+                        #[link(wasm_import_module = "durable:core/sql@2.2.0")]
                         extern "C" {
                             #[link_name = "[method]value.as-int8"]
                             fn wit_import(_: i32, _: *mut u8);
@@ -1618,7 +1618,7 @@ pub mod durable {
                         );
                         let ptr0 = ret_area.0.as_mut_ptr().cast::<u8>();
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.1.0")]
+                        #[link(wasm_import_module = "durable:core/sql@2.2.0")]
                         extern "C" {
                             #[link_name = "[method]value.as-text"]
                             fn wit_import(_: i32, _: *mut u8);
@@ -1661,7 +1661,7 @@ pub mod durable {
                         );
                         let ptr0 = ret_area.0.as_mut_ptr().cast::<u8>();
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.1.0")]
+                        #[link(wasm_import_module = "durable:core/sql@2.2.0")]
                         extern "C" {
                             #[link_name = "[method]value.as-bytea"]
                             fn wit_import(_: i32, _: *mut u8);
@@ -1699,7 +1699,7 @@ pub mod durable {
                         );
                         let ptr0 = ret_area.0.as_mut_ptr().cast::<u8>();
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.1.0")]
+                        #[link(wasm_import_module = "durable:core/sql@2.2.0")]
                         extern "C" {
                             #[link_name = "[method]value.as-timestamptz"]
                             fn wit_import(_: i32, _: *mut u8);
@@ -1741,7 +1741,7 @@ pub mod durable {
                         );
                         let ptr0 = ret_area.0.as_mut_ptr().cast::<u8>();
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.1.0")]
+                        #[link(wasm_import_module = "durable:core/sql@2.2.0")]
                         extern "C" {
                             #[link_name = "[method]value.as-timestamp"]
                             fn wit_import(_: i32, _: *mut u8);
@@ -1781,7 +1781,7 @@ pub mod durable {
                         );
                         let ptr0 = ret_area.0.as_mut_ptr().cast::<u8>();
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.1.0")]
+                        #[link(wasm_import_module = "durable:core/sql@2.2.0")]
                         extern "C" {
                             #[link_name = "[method]value.as-uuid"]
                             fn wit_import(_: i32, _: *mut u8);
@@ -1822,7 +1822,7 @@ pub mod durable {
                         );
                         let ptr0 = ret_area.0.as_mut_ptr().cast::<u8>();
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.1.0")]
+                        #[link(wasm_import_module = "durable:core/sql@2.2.0")]
                         extern "C" {
                             #[link_name = "[method]value.as-json"]
                             fn wit_import(_: i32, _: *mut u8);
@@ -1865,7 +1865,7 @@ pub mod durable {
                         );
                         let ptr0 = ret_area.0.as_mut_ptr().cast::<u8>();
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.1.0")]
+                        #[link(wasm_import_module = "durable:core/sql@2.2.0")]
                         extern "C" {
                             #[link_name = "[method]value.as-inet"]
                             fn wit_import(_: i32, _: *mut u8);
@@ -1927,7 +1927,7 @@ pub mod durable {
                         );
                         let ptr0 = ret_area.0.as_mut_ptr().cast::<u8>();
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.1.0")]
+                        #[link(wasm_import_module = "durable:core/sql@2.2.0")]
                         extern "C" {
                             #[link_name = "[method]value.as-boolean-array"]
                             fn wit_import(_: i32, _: *mut u8);
@@ -1976,7 +1976,7 @@ pub mod durable {
                         );
                         let ptr0 = ret_area.0.as_mut_ptr().cast::<u8>();
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.1.0")]
+                        #[link(wasm_import_module = "durable:core/sql@2.2.0")]
                         extern "C" {
                             #[link_name = "[method]value.as-float4-array"]
                             fn wit_import(_: i32, _: *mut u8);
@@ -2014,7 +2014,7 @@ pub mod durable {
                         );
                         let ptr0 = ret_area.0.as_mut_ptr().cast::<u8>();
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.1.0")]
+                        #[link(wasm_import_module = "durable:core/sql@2.2.0")]
                         extern "C" {
                             #[link_name = "[method]value.as-float8-array"]
                             fn wit_import(_: i32, _: *mut u8);
@@ -2052,7 +2052,7 @@ pub mod durable {
                         );
                         let ptr0 = ret_area.0.as_mut_ptr().cast::<u8>();
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.1.0")]
+                        #[link(wasm_import_module = "durable:core/sql@2.2.0")]
                         extern "C" {
                             #[link_name = "[method]value.as-int1-array"]
                             fn wit_import(_: i32, _: *mut u8);
@@ -2090,7 +2090,7 @@ pub mod durable {
                         );
                         let ptr0 = ret_area.0.as_mut_ptr().cast::<u8>();
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.1.0")]
+                        #[link(wasm_import_module = "durable:core/sql@2.2.0")]
                         extern "C" {
                             #[link_name = "[method]value.as-int2-array"]
                             fn wit_import(_: i32, _: *mut u8);
@@ -2128,7 +2128,7 @@ pub mod durable {
                         );
                         let ptr0 = ret_area.0.as_mut_ptr().cast::<u8>();
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.1.0")]
+                        #[link(wasm_import_module = "durable:core/sql@2.2.0")]
                         extern "C" {
                             #[link_name = "[method]value.as-int4-array"]
                             fn wit_import(_: i32, _: *mut u8);
@@ -2166,7 +2166,7 @@ pub mod durable {
                         );
                         let ptr0 = ret_area.0.as_mut_ptr().cast::<u8>();
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.1.0")]
+                        #[link(wasm_import_module = "durable:core/sql@2.2.0")]
                         extern "C" {
                             #[link_name = "[method]value.as-int8-array"]
                             fn wit_import(_: i32, _: *mut u8);
@@ -2204,7 +2204,7 @@ pub mod durable {
                         );
                         let ptr0 = ret_area.0.as_mut_ptr().cast::<u8>();
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.1.0")]
+                        #[link(wasm_import_module = "durable:core/sql@2.2.0")]
                         extern "C" {
                             #[link_name = "[method]value.as-text-array"]
                             fn wit_import(_: i32, _: *mut u8);
@@ -2260,7 +2260,7 @@ pub mod durable {
                         );
                         let ptr0 = ret_area.0.as_mut_ptr().cast::<u8>();
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.1.0")]
+                        #[link(wasm_import_module = "durable:core/sql@2.2.0")]
                         extern "C" {
                             #[link_name = "[method]value.as-bytea-array"]
                             fn wit_import(_: i32, _: *mut u8);
@@ -2311,7 +2311,7 @@ pub mod durable {
                         );
                         let ptr0 = ret_area.0.as_mut_ptr().cast::<u8>();
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.1.0")]
+                        #[link(wasm_import_module = "durable:core/sql@2.2.0")]
                         extern "C" {
                             #[link_name = "[method]value.as-timestamptz-array"]
                             fn wit_import(_: i32, _: *mut u8);
@@ -2349,7 +2349,7 @@ pub mod durable {
                         );
                         let ptr0 = ret_area.0.as_mut_ptr().cast::<u8>();
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.1.0")]
+                        #[link(wasm_import_module = "durable:core/sql@2.2.0")]
                         extern "C" {
                             #[link_name = "[method]value.as-timestamp-array"]
                             fn wit_import(_: i32, _: *mut u8);
@@ -2387,7 +2387,7 @@ pub mod durable {
                         );
                         let ptr0 = ret_area.0.as_mut_ptr().cast::<u8>();
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.1.0")]
+                        #[link(wasm_import_module = "durable:core/sql@2.2.0")]
                         extern "C" {
                             #[link_name = "[method]value.as-uuid-array"]
                             fn wit_import(_: i32, _: *mut u8);
@@ -2425,7 +2425,7 @@ pub mod durable {
                         );
                         let ptr0 = ret_area.0.as_mut_ptr().cast::<u8>();
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.1.0")]
+                        #[link(wasm_import_module = "durable:core/sql@2.2.0")]
                         extern "C" {
                             #[link_name = "[method]value.as-json-array"]
                             fn wit_import(_: i32, _: *mut u8);
@@ -2481,7 +2481,7 @@ pub mod durable {
                         );
                         let ptr0 = ret_area.0.as_mut_ptr().cast::<u8>();
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.1.0")]
+                        #[link(wasm_import_module = "durable:core/sql@2.2.0")]
                         extern "C" {
                             #[link_name = "[method]value.as-inet-array"]
                             fn wit_import(_: i32, _: *mut u8);
@@ -2551,7 +2551,7 @@ pub mod durable {
                 pub fn null(tyinfo: TypeInfo) -> Value {
                     unsafe {
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.1.0")]
+                        #[link(wasm_import_module = "durable:core/sql@2.2.0")]
                         extern "C" {
                             #[link_name = "[static]value.null"]
                             fn wit_import(_: i32) -> i32;
@@ -2570,7 +2570,7 @@ pub mod durable {
                 pub fn boolean(value: bool) -> Value {
                     unsafe {
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.1.0")]
+                        #[link(wasm_import_module = "durable:core/sql@2.2.0")]
                         extern "C" {
                             #[link_name = "[static]value.boolean"]
                             fn wit_import(_: i32) -> i32;
@@ -2594,7 +2594,7 @@ pub mod durable {
                 pub fn float4(value: f32) -> Value {
                     unsafe {
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.1.0")]
+                        #[link(wasm_import_module = "durable:core/sql@2.2.0")]
                         extern "C" {
                             #[link_name = "[static]value.float4"]
                             fn wit_import(_: f32) -> i32;
@@ -2613,7 +2613,7 @@ pub mod durable {
                 pub fn float8(value: f64) -> Value {
                     unsafe {
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.1.0")]
+                        #[link(wasm_import_module = "durable:core/sql@2.2.0")]
                         extern "C" {
                             #[link_name = "[static]value.float8"]
                             fn wit_import(_: f64) -> i32;
@@ -2632,7 +2632,7 @@ pub mod durable {
                 pub fn int1(value: i8) -> Value {
                     unsafe {
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.1.0")]
+                        #[link(wasm_import_module = "durable:core/sql@2.2.0")]
                         extern "C" {
                             #[link_name = "[static]value.int1"]
                             fn wit_import(_: i32) -> i32;
@@ -2651,7 +2651,7 @@ pub mod durable {
                 pub fn int2(value: i16) -> Value {
                     unsafe {
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.1.0")]
+                        #[link(wasm_import_module = "durable:core/sql@2.2.0")]
                         extern "C" {
                             #[link_name = "[static]value.int2"]
                             fn wit_import(_: i32) -> i32;
@@ -2670,7 +2670,7 @@ pub mod durable {
                 pub fn int4(value: i32) -> Value {
                     unsafe {
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.1.0")]
+                        #[link(wasm_import_module = "durable:core/sql@2.2.0")]
                         extern "C" {
                             #[link_name = "[static]value.int4"]
                             fn wit_import(_: i32) -> i32;
@@ -2689,7 +2689,7 @@ pub mod durable {
                 pub fn int8(value: i64) -> Value {
                     unsafe {
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.1.0")]
+                        #[link(wasm_import_module = "durable:core/sql@2.2.0")]
                         extern "C" {
                             #[link_name = "[static]value.int8"]
                             fn wit_import(_: i64) -> i32;
@@ -2711,7 +2711,7 @@ pub mod durable {
                         let ptr0 = vec0.as_ptr().cast::<u8>();
                         let len0 = vec0.len();
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.1.0")]
+                        #[link(wasm_import_module = "durable:core/sql@2.2.0")]
                         extern "C" {
                             #[link_name = "[static]value.text"]
                             fn wit_import(_: *mut u8, _: usize) -> i32;
@@ -2733,7 +2733,7 @@ pub mod durable {
                         let ptr0 = vec0.as_ptr().cast::<u8>();
                         let len0 = vec0.len();
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.1.0")]
+                        #[link(wasm_import_module = "durable:core/sql@2.2.0")]
                         extern "C" {
                             #[link_name = "[static]value.bytea"]
                             fn wit_import(_: *mut u8, _: usize) -> i32;
@@ -2757,7 +2757,7 @@ pub mod durable {
                             offset: offset0,
                         } = value;
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.1.0")]
+                        #[link(wasm_import_module = "durable:core/sql@2.2.0")]
                         extern "C" {
                             #[link_name = "[static]value.timestamptz"]
                             fn wit_import(_: i64, _: i32, _: i32) -> i32;
@@ -2784,7 +2784,7 @@ pub mod durable {
                             subsec_nanos: subsec_nanos0,
                         } = value;
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.1.0")]
+                        #[link(wasm_import_module = "durable:core/sql@2.2.0")]
                         extern "C" {
                             #[link_name = "[static]value.timestamp"]
                             fn wit_import(_: i64, _: i32) -> i32;
@@ -2807,7 +2807,7 @@ pub mod durable {
                     unsafe {
                         let Uuid { hi: hi0, lo: lo0 } = value;
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.1.0")]
+                        #[link(wasm_import_module = "durable:core/sql@2.2.0")]
                         extern "C" {
                             #[link_name = "[static]value.uuid"]
                             fn wit_import(_: i64, _: i64) -> i32;
@@ -2829,7 +2829,7 @@ pub mod durable {
                         let ptr0 = vec0.as_ptr().cast::<u8>();
                         let len0 = vec0.len();
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.1.0")]
+                        #[link(wasm_import_module = "durable:core/sql@2.2.0")]
                         extern "C" {
                             #[link_name = "[static]value.jsonb"]
                             fn wit_import(_: *mut u8, _: usize) -> i32;
@@ -2875,7 +2875,7 @@ pub mod durable {
                         };
                         let ptr4 = ret_area.0.as_mut_ptr().cast::<u8>();
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.1.0")]
+                        #[link(wasm_import_module = "durable:core/sql@2.2.0")]
                         extern "C" {
                             #[link_name = "[static]value.inet"]
                             fn wit_import(_: i32, _: i64, _: i64, _: i32, _: *mut u8);
@@ -2942,7 +2942,7 @@ pub mod durable {
                             }
                         }
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.1.0")]
+                        #[link(wasm_import_module = "durable:core/sql@2.2.0")]
                         extern "C" {
                             #[link_name = "[static]value.boolean-array"]
                             fn wit_import(_: *mut u8, _: usize) -> i32;
@@ -2967,7 +2967,7 @@ pub mod durable {
                         let ptr0 = vec0.as_ptr().cast::<u8>();
                         let len0 = vec0.len();
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.1.0")]
+                        #[link(wasm_import_module = "durable:core/sql@2.2.0")]
                         extern "C" {
                             #[link_name = "[static]value.float4-array"]
                             fn wit_import(_: *mut u8, _: usize) -> i32;
@@ -2989,7 +2989,7 @@ pub mod durable {
                         let ptr0 = vec0.as_ptr().cast::<u8>();
                         let len0 = vec0.len();
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.1.0")]
+                        #[link(wasm_import_module = "durable:core/sql@2.2.0")]
                         extern "C" {
                             #[link_name = "[static]value.float8-array"]
                             fn wit_import(_: *mut u8, _: usize) -> i32;
@@ -3011,7 +3011,7 @@ pub mod durable {
                         let ptr0 = vec0.as_ptr().cast::<u8>();
                         let len0 = vec0.len();
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.1.0")]
+                        #[link(wasm_import_module = "durable:core/sql@2.2.0")]
                         extern "C" {
                             #[link_name = "[static]value.int1-array"]
                             fn wit_import(_: *mut u8, _: usize) -> i32;
@@ -3033,7 +3033,7 @@ pub mod durable {
                         let ptr0 = vec0.as_ptr().cast::<u8>();
                         let len0 = vec0.len();
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.1.0")]
+                        #[link(wasm_import_module = "durable:core/sql@2.2.0")]
                         extern "C" {
                             #[link_name = "[static]value.int2-array"]
                             fn wit_import(_: *mut u8, _: usize) -> i32;
@@ -3055,7 +3055,7 @@ pub mod durable {
                         let ptr0 = vec0.as_ptr().cast::<u8>();
                         let len0 = vec0.len();
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.1.0")]
+                        #[link(wasm_import_module = "durable:core/sql@2.2.0")]
                         extern "C" {
                             #[link_name = "[static]value.int4-array"]
                             fn wit_import(_: *mut u8, _: usize) -> i32;
@@ -3077,7 +3077,7 @@ pub mod durable {
                         let ptr0 = vec0.as_ptr().cast::<u8>();
                         let len0 = vec0.len();
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.1.0")]
+                        #[link(wasm_import_module = "durable:core/sql@2.2.0")]
                         extern "C" {
                             #[link_name = "[static]value.int8-array"]
                             fn wit_import(_: *mut u8, _: usize) -> i32;
@@ -3121,7 +3121,7 @@ pub mod durable {
                             }
                         }
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.1.0")]
+                        #[link(wasm_import_module = "durable:core/sql@2.2.0")]
                         extern "C" {
                             #[link_name = "[static]value.text-array"]
                             fn wit_import(_: *mut u8, _: usize) -> i32;
@@ -3168,7 +3168,7 @@ pub mod durable {
                             }
                         }
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.1.0")]
+                        #[link(wasm_import_module = "durable:core/sql@2.2.0")]
                         extern "C" {
                             #[link_name = "[static]value.bytea-array"]
                             fn wit_import(_: *mut u8, _: usize) -> i32;
@@ -3193,7 +3193,7 @@ pub mod durable {
                         let ptr0 = vec0.as_ptr().cast::<u8>();
                         let len0 = vec0.len();
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.1.0")]
+                        #[link(wasm_import_module = "durable:core/sql@2.2.0")]
                         extern "C" {
                             #[link_name = "[static]value.timestamptz-array"]
                             fn wit_import(_: *mut u8, _: usize) -> i32;
@@ -3215,7 +3215,7 @@ pub mod durable {
                         let ptr0 = vec0.as_ptr().cast::<u8>();
                         let len0 = vec0.len();
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.1.0")]
+                        #[link(wasm_import_module = "durable:core/sql@2.2.0")]
                         extern "C" {
                             #[link_name = "[static]value.timestamp-array"]
                             fn wit_import(_: *mut u8, _: usize) -> i32;
@@ -3237,7 +3237,7 @@ pub mod durable {
                         let ptr0 = vec0.as_ptr().cast::<u8>();
                         let len0 = vec0.len();
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.1.0")]
+                        #[link(wasm_import_module = "durable:core/sql@2.2.0")]
                         extern "C" {
                             #[link_name = "[static]value.uuid-array"]
                             fn wit_import(_: *mut u8, _: usize) -> i32;
@@ -3281,7 +3281,7 @@ pub mod durable {
                             }
                         }
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.1.0")]
+                        #[link(wasm_import_module = "durable:core/sql@2.2.0")]
                         extern "C" {
                             #[link_name = "[static]value.jsonb-array"]
                             fn wit_import(_: *mut u8, _: usize) -> i32;
@@ -3345,7 +3345,7 @@ pub mod durable {
                         }
                         let ptr4 = ret_area.0.as_mut_ptr().cast::<u8>();
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.1.0")]
+                        #[link(wasm_import_module = "durable:core/sql@2.2.0")]
                         extern "C" {
                             #[link_name = "[static]value.inet-array"]
                             fn wit_import(_: *mut u8, _: usize, _: *mut u8);
@@ -3422,7 +3422,7 @@ pub mod durable {
                     }
                     let Options { limit: limit2, persistent: persistent2 } = options;
                     #[cfg(target_arch = "wasm32")]
-                    #[link(wasm_import_module = "durable:core/sql@2.1.0")]
+                    #[link(wasm_import_module = "durable:core/sql@2.2.0")]
                     extern "C" {
                         #[link_name = "query"]
                         fn wit_import(
@@ -3470,7 +3470,7 @@ pub mod durable {
                     let mut ret_area = RetArea([::core::mem::MaybeUninit::uninit(); 72]);
                     let ptr0 = ret_area.0.as_mut_ptr().cast::<u8>();
                     #[cfg(target_arch = "wasm32")]
-                    #[link(wasm_import_module = "durable:core/sql@2.1.0")]
+                    #[link(wasm_import_module = "durable:core/sql@2.2.0")]
                     extern "C" {
                         #[link_name = "fetch"]
                         fn wit_import(_: *mut u8);
@@ -4037,7 +4037,7 @@ atic]value.timestamptz-array\x01\x8b\x01\x01@\x01\x05value\xeb\0\0\x0f\x04\0\x1d
 \x01@\x01\x05value\xf1\0\01\x04\0\x18[static]value.inet-array\x01\x8e\x01\x01p\x0f\
 \x01@\x03\x03sqls\x06params\x8f\x01\x07options\x18\x01\0\x04\0\x05query\x01\x90\x01\
 \x01j\x01\x16\x01!\x01k\x91\x01\x01@\0\0\x92\x01\x04\0\x05fetch\x01\x93\x01\x03\x01\
-\x16durable:core/sql@2.1.0\x05\0\x04\x01\x1ddurable:core/import-sql@2.1.0\x04\0\x0b\
+\x16durable:core/sql@2.2.0\x05\0\x04\x01\x1ddurable:core/import-sql@2.2.0\x04\0\x0b\
 \x10\x01\0\x0aimport-sql\x03\0\0\0G\x09producers\x01\x0cprocessed-by\x02\x0dwit-\
 component\x070.215.0\x10wit-bindgen-rust\x060.30.0";
 #[inline(never)]
