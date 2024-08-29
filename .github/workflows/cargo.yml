@@ -124,7 +124,7 @@ jobs:
         run: cargo run --bin xtask --profile dev-ci -- dev -d
 
       - name: check sqlx
-        run: cargo sqlx check --workspace
+        run: cargo sqlx prepare --workspace --check
     
 
   check-success:
