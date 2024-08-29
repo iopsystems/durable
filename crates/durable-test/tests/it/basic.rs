@@ -59,6 +59,23 @@ async fn run_sqlx_test(pool: sqlx::PgPool) -> anyhow::Result<()> {
 }
 
 #[sqlx::test]
+async fn run_sqlx_enum(pool: sqlx::PgPool) -> anyhow::Result<()> {
+    let _guard = durable_test::spawn_worker(pool.clone()).await?;
+    let client = DurableClient::new(pool)?;
+    let program = crate::load_binary(&client, "sqlx-enum.wasm").await?;
+
+    let task = client
+        .launch("sqlx enum test", &program, &serde_json::json!(null))
+        .await?;
+    crate::tail_logs(&client, &task);
+    let status = task.wait(&client).await?;
+
+    assert!(status.success());
+
+    Ok(())
+}
+
+#[sqlx::test]
 async fn run_sqlx_macros_test(pool: sqlx::PgPool) -> anyhow::Result<()> {
     let _guard = durable_test::spawn_worker(pool.clone()).await?;
     let client = DurableClient::new(pool)?;

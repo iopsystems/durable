@@ -4,6 +4,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::value::RawValue;
 
 use crate::bindings::durable::core::sql;
+use crate::{Error, Result};
 
 macro_rules! decl_tyinfo_ctor {
     ($( $name:ident ),* $(,)?) => {$(
@@ -29,6 +30,14 @@ impl TypeInfo {
 
     pub(crate) fn into_inner(self) -> sql::TypeInfo {
         self.tyinfo
+    }
+
+    pub fn with_name(name: &str) -> Result<Self> {
+        sql::TypeInfo::with_name(name)
+            .map(Self::new)
+            .map_err(|_| Error::TypeNotFound {
+                type_name: name.to_owned(),
+            })
     }
 
     decl_tyinfo_ctor!(

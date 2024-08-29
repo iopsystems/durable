@@ -1,4 +1,4 @@
-package durable:core@2.2.0;
+package durable:core@2.3.0;
 
 world imports {
     import core;
