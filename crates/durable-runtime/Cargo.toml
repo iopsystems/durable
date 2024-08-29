@@ -49,6 +49,7 @@ tracing = "0.1.40"
 uluru = "3.1.0"
 uuid = { version = "1.10.0", features = ["serde"] }
 wasmtime = { workspace = true }
+url = "2.5.2"
 
 [dependencies.sqlx]
 version = "0.8.0"

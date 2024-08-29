@@ -4,6 +4,8 @@ interface http {
         value: list<u8>,
     }
 
+    @deprecated(version = 2.4.0)
+    @since(version = 2.0.0)
     record http-request {
         method: string,
         url: string,
@@ -18,6 +20,8 @@ interface http {
         body: list<u8>
     }
 
+    @deprecated(version = 2.4.0)
+    @since(version = 2.0.0)
     variant http-error {
         timeout,
         invalid-method,
@@ -27,9 +31,69 @@ interface http {
         other(string)
     }
 
-    // Make an HTTP request.
-    //
-    // # Parameters
-    // - `request` - A description of the HTTP request to make.
+    /// Make an HTTP request.
+    ///
+    /// # Parameters
+    /// - `request` - A description of the HTTP request to make.
+    @deprecated(version = 2.4.0)
+    @since(version = 2.0.0)
     fetch: func(request: http-request) -> result<http-response, http-error>;
+
+    @since(version = 2.4.0)
+    resource http-error2 {
+        /// The error message describing what went wrong.
+        message: func() -> string;
+
+        /// Whether this error is related to a timeout.
+        is-timeout: func() -> bool;
+
+        /// Whether this error was created while building the request.
+        is-builder: func() -> bool;
+
+        /// Whether this error is related to a request.
+        is-request: func() -> bool;
+
+        /// Whether this error is related to the attempt to connect while making the
+        /// request.
+        is-connect: func() -> bool;
+    }
+
+    /// A HTTP request.
+    /// 
+    /// In order to actually make the request you will need to call `fetch2`.
+    @since(version = 2.4.0)
+    resource http-request2 {
+        /// Create a new request from an HTTP method and a URL.
+        new: static func(method: string, url: string) -> result<http-request2, http-error2>;
+
+        /// Set the HTTP method for this request.
+        set-method: func(method: string) -> result<_, http-error2>;
+
+        /// Set the URL for this request.
+        set-url: func(url: string) -> result<_, http-error2>;
+
+        /// Set all the headers for this request at once.
+        /// 
+        /// This overrides any headers that have been previously set.
+        set-headers: func(headers: list<http-header>) -> result<_, http-error2>;
+
+        /// Set the request timeout, in nanoseconds.
+        set-timeout: func(timeout: u64);
+
+        /// Set the body of this request.
+        set-body: func(body: list<u8>);
+    }
+
+    /// Make an HTTP request.
+    /// 
+    /// This is similar to `fetch` except it returns an opaque error resource
+    /// instead of an error enum.
+    ///
+    /// # Parameters
+    /// - `request` - A description of the HTTP request to make.
+    /// 
+    /// # Traps
+    /// This function will trap if called from outside of a durable transaction.
+    @since(version = 2.4.0)
+    fetch2: func(request: http-request2) -> result<http-response, http-error2>;
 }

@@ -41,8 +41,7 @@ fn send(request: &Request) -> Result<Response, Error> {
     let label = format!("durable::http::send({} {})", request.method, request.url);
     let result = crate::transaction::maybe_txn(&label, || {
         let original = &request;
-        let method = request.method.as_str().to_owned();
-        let url = request.url.to_string();
+
         let headers: Vec<_> = request
             .headers
             .iter()
@@ -51,19 +50,20 @@ fn send(request: &Request) -> Result<Response, Error> {
                 value: value.as_bytes(),
             })
             .collect();
-        let timeout = request
-            .timeout
-            .map(|t| t.as_nanos().try_into().unwrap_or(u64::MAX));
 
-        let request = HttpRequest {
-            method: &method,
-            url: &url,
-            headers: &headers,
-            body: request.body.as_deref(),
-            timeout,
-        };
+        let req = HttpRequest2::new(request.method.as_str(), request.url.as_str())?;
+        req.set_headers(&headers)?;
 
-        match fetch(request) {
+        if let Some(body) = &request.body {
+            req.set_body(body);
+        }
+
+        if let Some(timeout) = request.timeout {
+            let timeout = timeout.as_nanos().try_into().unwrap_or(u64::MAX);
+            req.set_timeout(timeout);
+        }
+
+        match fetch2(req) {
             Ok(response) => {
                 let status = StatusCode::from_u16(response.status)
                     .map_err(|_| ErrorKind::InvalidStatus(response.status))?;
@@ -84,14 +84,7 @@ fn send(request: &Request) -> Result<Response, Error> {
                     url: original.url.clone(),
                 })
             }
-            Err(err) => Err(Error::from(match err {
-                HttpError::Timeout => ErrorKind::Timeout,
-                HttpError::InvalidMethod => ErrorKind::InvalidMethod,
-                HttpError::InvalidUrl(msg) => ErrorKind::InvalidUri(msg),
-                HttpError::InvalidHeaderName => ErrorKind::InvalidHeaderName,
-                HttpError::InvalidHeaderValue => ErrorKind::InvalidHeaderValue,
-                HttpError::Other(msg) => ErrorKind::Other(msg),
-            })),
+            Err(err) => Err(Error::from(err)),
         }
     });
 
@@ -516,6 +509,37 @@ impl Error {
     pub fn url(&self) -> Option<&Url> {
         self.0.url.as_ref()
     }
+
+    pub fn is_builder(&self) -> bool {
+        match &self.0.kind {
+            ErrorKind::Bindings(err) => err.kind == BindingsErrorKind::Builder,
+            ErrorKind::Status(_) => false,
+            _ => true,
+        }
+    }
+
+    pub fn is_timeout(&self) -> bool {
+        matches!(&self.0.kind, ErrorKind::Bindings(err) if err.kind == BindingsErrorKind::Timeout)
+    }
+
+    pub fn is_request(&self) -> bool {
+        matches!(&self.0.kind, ErrorKind::Bindings(err) if err.kind == BindingsErrorKind::Request)
+    }
+
+    pub fn is_connect(&self) -> bool {
+        matches!(&self.0.kind, ErrorKind::Bindings(err) if err.kind == BindingsErrorKind::Connect)
+    }
+
+    pub fn is_status(&self) -> bool {
+        matches!(self.0.kind, ErrorKind::Status(_))
+    }
+
+    pub fn status(&self) -> Option<StatusCode> {
+        match self.0.kind {
+            ErrorKind::Status(status) => Some(status),
+            _ => None,
+        }
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -525,8 +549,11 @@ struct ErrorImpl {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
 enum ErrorKind {
-    Timeout,
+    /// The underlying runtime emitted an error.
+    Bindings(BindingsError),
+
     InvalidStatus(u16),
     InvalidUri(String),
     InvalidMethod,
@@ -546,12 +573,20 @@ impl From<ErrorKind> for Error {
     }
 }
 
+impl From<bindings::HttpError2> for Error {
+    fn from(value: bindings::HttpError2) -> Self {
+        ErrorKind::Bindings(value.into()).into()
+    }
+}
+
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         self.0.kind.fmt(f)?;
 
         if let Some(url) = self.url() {
-            write!(f, " for url ({url})")?;
+            if !matches!(self.0.kind, ErrorKind::Bindings(_)) {
+                write!(f, " for url ({url})")?;
+            }
         }
 
         Ok(())
@@ -572,7 +607,7 @@ impl std::error::Error for Error {}
 impl fmt::Display for ErrorKind {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::Timeout => write!(f, "the request timed out"),
+            Self::Bindings(err) => f.write_str(&err.message),
             Self::InvalidUri(msg) => write!(f, "invalid uri: {msg}"),
             Self::InvalidStatus(status) => write!(f, "{status} is not a valid HTTP status code"),
             Self::InvalidMethod => write!(f, "invalid HTTP method"),
@@ -602,6 +637,42 @@ impl fmt::Display for ErrorKind {
             }
             Self::Other(e) => e.fmt(f),
         }
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+enum BindingsErrorKind {
+    Timeout,
+    Builder,
+    Request,
+    Connect,
+    Other,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+struct BindingsError {
+    kind: BindingsErrorKind,
+    message: String,
+}
+
+impl From<bindings::HttpError2> for BindingsError {
+    fn from(error: bindings::HttpError2) -> Self {
+        let message = error.message();
+        let kind = match &error {
+            e if e.is_timeout() => BindingsErrorKind::Timeout,
+            e if e.is_builder() => BindingsErrorKind::Builder,
+            e if e.is_request() => BindingsErrorKind::Request,
+            e if e.is_connect() => BindingsErrorKind::Connect,
+            _ => BindingsErrorKind::Other,
+        };
+
+        Self { kind, message }
+    }
+}
+
+impl fmt::Display for BindingsError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.message.fmt(f)
     }
 }
 

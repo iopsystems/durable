@@ -1002,6 +1002,7 @@ dependencies = [
  "tracing",
  "tracing-subscriber",
  "uluru",
+ "url",
  "uuid",
  "wasmtime",
  "wasmtime-wit-bindgen",
