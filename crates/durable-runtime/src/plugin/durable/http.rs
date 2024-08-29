@@ -8,13 +8,13 @@ use crate::bindings::durable::core::http::*;
 use crate::{Config, Resourceable, Task};
 
 impl Resourceable for HttpError2 {
-    const NAME: &str = "http-error2";
+    const NAME: &'static str = "http-error2";
 
     type Data = DurableHttpError;
 }
 
 impl Resourceable for HttpRequest2 {
-    const NAME: &str = "http-request2";
+    const NAME: &'static str = "http-request2";
 
     type Data = reqwest::Request;
 }
