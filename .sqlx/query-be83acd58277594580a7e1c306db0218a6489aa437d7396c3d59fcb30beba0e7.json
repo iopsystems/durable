@@ -1,0 +1,27 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT $1::regtype::oid as \"oid!\"",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "oid!",
+        "type_info": "Oid"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        {
+          "Custom": {
+            "name": "regtype",
+            "kind": "Simple"
+          }
+        }
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "be83acd58277594580a7e1c306db0218a6489aa437d7396c3d59fcb30beba0e7"
+}
