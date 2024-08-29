@@ -4,6 +4,7 @@ use derive_setters::Setters;
 
 /// Config options controlling the behaviour of this worker.
 #[derive(Clone, Debug, Setters)]
+#[non_exhaustive]
 pub struct Config {
     /// The period with which the worker will update its heartbeat timestamp in
     /// the database.
@@ -104,6 +105,19 @@ pub struct Config {
     ///
     /// The default limit is 2000 tasks.
     pub max_tasks: usize,
+
+    /// The maximum number of WASM binaries that can be compiled concurrently.
+    ///
+    /// Compiling WASM down to machine code is moderately expensive (e.g. a
+    /// decent sized module can take 300ms to compile) so if a worker has to
+    /// build it can use up all the available cores and memory on a machine.
+    ///
+    /// Note that, once compiled, the resulting machine code is cached so if the
+    /// same WASM binary is encountered multiple times then the compiled code
+    /// will be reused.
+    ///
+    /// The default limit is 4 concurrent compilation tasks.
+    pub max_concurrent_compilations: usize,
 }
 
 impl Config {
@@ -125,6 +139,7 @@ impl Default for Config {
             suspend_timeout: Duration::from_secs(60),
             suspend_margin: Duration::from_secs(10),
             max_tasks: 1000,
+            max_concurrent_compilations: 4,
         }
     }
 }
