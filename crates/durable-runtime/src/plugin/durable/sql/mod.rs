@@ -11,6 +11,7 @@ use uuid::Uuid;
 use value::ValueResource;
 use wasmtime::component::Resource;
 
+use self::type_info::TypeInfoResource;
 use self::value::Value;
 use crate::bindings::durable::core::sql::{self, Host};
 use crate::resource::Resourceable;
@@ -18,12 +19,13 @@ use crate::task::QueryResult;
 use crate::Task;
 
 mod oids;
+mod type_info;
 mod value;
 
 impl Resourceable for sql::TypeInfo {
     const NAME: &'static str = "durable:core/sql.type-info";
 
-    type Data = PgTypeInfo;
+    type Data = TypeInfoResource;
 }
 
 impl Resourceable for sql::Value {
@@ -32,11 +34,14 @@ impl Resourceable for sql::Value {
     type Data = ValueResource;
 }
 
-fn type_info<'q, T>(value: &T) -> PgTypeInfo
+fn type_info<'q, T>(value: &T) -> TypeInfoResource
 where
     T: sqlx::Encode<'q, sqlx::Postgres> + sqlx::Type<sqlx::Postgres>,
 {
-    value.produces().unwrap_or_else(T::type_info)
+    TypeInfoResource {
+        type_info: value.produces().unwrap_or_else(T::type_info),
+        name: None,
+    }
 }
 
 #[async_trait::async_trait]
@@ -94,7 +99,7 @@ impl sql::HostTypeInfo for Task {
         &mut self,
         json: String,
     ) -> wasmtime::Result<Result<Resource<sql::TypeInfo>, String>> {
-        let tyinfo: PgTypeInfo = match serde_json::from_str(&json) {
+        let tyinfo: TypeInfoResource = match serde_json::from_str(&json) {
             Ok(tyinfo) => tyinfo,
             Err(e) => return Ok(Err(e.to_string())),
         };
@@ -102,144 +107,170 @@ impl sql::HostTypeInfo for Task {
         Ok(Ok(self.resources.insert(tyinfo)?))
     }
 
+    async fn with_name(
+        &mut self,
+        name: String,
+    ) -> wasmtime::Result<Result<Resource<sql::TypeInfo>, String>> {
+        let pool = self.state.pool();
+
+        let result = sqlx::query_scalar!(r#"SELECT $1::regtype::oid as "oid!""#, &name as &str)
+            .fetch_one(pool)
+            .await;
+
+        let oid = match result {
+            Ok(oid) => oid,
+            Err(sqlx::Error::Database(err)) if err.code().as_deref() == Some("42704") => {
+                return Ok(Err(err.to_string()))
+            }
+            Err(e) => return Err(e.into()),
+        };
+
+        let tyinfo = PgTypeInfo::with_oid(oid);
+
+        Ok(Ok(self.resources.insert(TypeInfoResource {
+            type_info: tyinfo,
+            name: Some(name),
+        })?))
+    }
+
     async fn boolean(&mut self) -> wasmtime::Result<Resource<sql::TypeInfo>> {
         self.resources
-            .insert(<bool as sqlx::Type<sqlx::Postgres>>::type_info())
+            .insert(<bool as sqlx::Type<sqlx::Postgres>>::type_info().into())
     }
 
     async fn float4(&mut self) -> wasmtime::Result<Resource<sql::TypeInfo>> {
         self.resources
-            .insert(<f32 as sqlx::Type<sqlx::Postgres>>::type_info())
+            .insert(<f32 as sqlx::Type<sqlx::Postgres>>::type_info().into())
     }
 
     async fn float8(&mut self) -> wasmtime::Result<Resource<sql::TypeInfo>> {
         self.resources
-            .insert(<f64 as sqlx::Type<sqlx::Postgres>>::type_info())
+            .insert(<f64 as sqlx::Type<sqlx::Postgres>>::type_info().into())
     }
 
     async fn int1(&mut self) -> wasmtime::Result<Resource<sql::TypeInfo>> {
         self.resources
-            .insert(<i8 as sqlx::Type<sqlx::Postgres>>::type_info())
+            .insert(<i8 as sqlx::Type<sqlx::Postgres>>::type_info().into())
     }
 
     async fn int2(&mut self) -> wasmtime::Result<Resource<sql::TypeInfo>> {
         self.resources
-            .insert(<i16 as sqlx::Type<sqlx::Postgres>>::type_info())
+            .insert(<i16 as sqlx::Type<sqlx::Postgres>>::type_info().into())
     }
 
     async fn int4(&mut self) -> wasmtime::Result<Resource<sql::TypeInfo>> {
         self.resources
-            .insert(<i32 as sqlx::Type<sqlx::Postgres>>::type_info())
+            .insert(<i32 as sqlx::Type<sqlx::Postgres>>::type_info().into())
     }
 
     async fn int8(&mut self) -> wasmtime::Result<Resource<sql::TypeInfo>> {
         self.resources
-            .insert(<i64 as sqlx::Type<sqlx::Postgres>>::type_info())
+            .insert(<i64 as sqlx::Type<sqlx::Postgres>>::type_info().into())
     }
 
     async fn text(&mut self) -> wasmtime::Result<Resource<sql::TypeInfo>> {
         self.resources
-            .insert(<String as sqlx::Type<sqlx::Postgres>>::type_info())
+            .insert(<String as sqlx::Type<sqlx::Postgres>>::type_info().into())
     }
 
     async fn bytea(&mut self) -> wasmtime::Result<Resource<sql::TypeInfo>> {
         self.resources
-            .insert(<Vec<u8> as sqlx::Type<sqlx::Postgres>>::type_info())
+            .insert(<Vec<u8> as sqlx::Type<sqlx::Postgres>>::type_info().into())
     }
 
     async fn timestamptz(&mut self) -> wasmtime::Result<Resource<sql::TypeInfo>> {
         self.resources
-            .insert(<DateTime<Utc> as sqlx::Type<sqlx::Postgres>>::type_info())
+            .insert(<DateTime<Utc> as sqlx::Type<sqlx::Postgres>>::type_info().into())
     }
 
     async fn timestamp(&mut self) -> wasmtime::Result<Resource<sql::TypeInfo>> {
         self.resources
-            .insert(<NaiveDateTime as sqlx::Type<sqlx::Postgres>>::type_info())
+            .insert(<NaiveDateTime as sqlx::Type<sqlx::Postgres>>::type_info().into())
     }
 
     async fn uuid(&mut self) -> wasmtime::Result<Resource<sql::TypeInfo>> {
         self.resources
-            .insert(<Uuid as sqlx::Type<sqlx::Postgres>>::type_info())
+            .insert(<Uuid as sqlx::Type<sqlx::Postgres>>::type_info().into())
     }
 
     async fn jsonb(&mut self) -> wasmtime::Result<Resource<sql::TypeInfo>> {
         self.resources
-            .insert(<Json<()> as sqlx::Type<sqlx::Postgres>>::type_info())
+            .insert(<Json<()> as sqlx::Type<sqlx::Postgres>>::type_info().into())
     }
 
     async fn inet(&mut self) -> wasmtime::Result<Resource<sql::TypeInfo>> {
         self.resources
-            .insert(<IpNetwork as sqlx::Type<sqlx::Postgres>>::type_info())
+            .insert(<IpNetwork as sqlx::Type<sqlx::Postgres>>::type_info().into())
     }
 
     async fn boolean_array(&mut self) -> wasmtime::Result<Resource<sql::TypeInfo>> {
         self.resources
-            .insert(<Vec<bool> as sqlx::Type<sqlx::Postgres>>::type_info())
+            .insert(<Vec<bool> as sqlx::Type<sqlx::Postgres>>::type_info().into())
     }
 
     async fn float4_array(&mut self) -> wasmtime::Result<Resource<sql::TypeInfo>> {
         self.resources
-            .insert(<Vec<f32> as sqlx::Type<sqlx::Postgres>>::type_info())
+            .insert(<Vec<f32> as sqlx::Type<sqlx::Postgres>>::type_info().into())
     }
 
     async fn float8_array(&mut self) -> wasmtime::Result<Resource<sql::TypeInfo>> {
         self.resources
-            .insert(<Vec<f64> as sqlx::Type<sqlx::Postgres>>::type_info())
+            .insert(<Vec<f64> as sqlx::Type<sqlx::Postgres>>::type_info().into())
     }
 
     async fn int1_array(&mut self) -> wasmtime::Result<Resource<sql::TypeInfo>> {
         self.resources
-            .insert(<Vec<i8> as sqlx::Type<sqlx::Postgres>>::type_info())
+            .insert(<Vec<i8> as sqlx::Type<sqlx::Postgres>>::type_info().into())
     }
 
     async fn int2_array(&mut self) -> wasmtime::Result<Resource<sql::TypeInfo>> {
         self.resources
-            .insert(<Vec<i16> as sqlx::Type<sqlx::Postgres>>::type_info())
+            .insert(<Vec<i16> as sqlx::Type<sqlx::Postgres>>::type_info().into())
     }
 
     async fn int4_array(&mut self) -> wasmtime::Result<Resource<sql::TypeInfo>> {
         self.resources
-            .insert(<Vec<i32> as sqlx::Type<sqlx::Postgres>>::type_info())
+            .insert(<Vec<i32> as sqlx::Type<sqlx::Postgres>>::type_info().into())
     }
 
     async fn int8_array(&mut self) -> wasmtime::Result<Resource<sql::TypeInfo>> {
         self.resources
-            .insert(<Vec<i64> as sqlx::Type<sqlx::Postgres>>::type_info())
+            .insert(<Vec<i64> as sqlx::Type<sqlx::Postgres>>::type_info().into())
     }
 
     async fn text_array(&mut self) -> wasmtime::Result<Resource<sql::TypeInfo>> {
         self.resources
-            .insert(<Vec<String> as sqlx::Type<sqlx::Postgres>>::type_info())
+            .insert(<Vec<String> as sqlx::Type<sqlx::Postgres>>::type_info().into())
     }
 
     async fn bytea_array(&mut self) -> wasmtime::Result<Resource<sql::TypeInfo>> {
         self.resources
-            .insert(<Vec<Vec<u8>> as sqlx::Type<sqlx::Postgres>>::type_info())
+            .insert(<Vec<Vec<u8>> as sqlx::Type<sqlx::Postgres>>::type_info().into())
     }
 
     async fn timestamptz_array(&mut self) -> wasmtime::Result<Resource<sql::TypeInfo>> {
         self.resources
-            .insert(<Vec<DateTime<Utc>> as sqlx::Type<sqlx::Postgres>>::type_info())
+            .insert(<Vec<DateTime<Utc>> as sqlx::Type<sqlx::Postgres>>::type_info().into())
     }
 
     async fn timestamp_array(&mut self) -> wasmtime::Result<Resource<sql::TypeInfo>> {
         self.resources
-            .insert(<Vec<NaiveDateTime> as sqlx::Type<sqlx::Postgres>>::type_info())
+            .insert(<Vec<NaiveDateTime> as sqlx::Type<sqlx::Postgres>>::type_info().into())
     }
 
     async fn uuid_array(&mut self) -> wasmtime::Result<Resource<sql::TypeInfo>> {
         self.resources
-            .insert(<Vec<Uuid> as sqlx::Type<sqlx::Postgres>>::type_info())
+            .insert(<Vec<Uuid> as sqlx::Type<sqlx::Postgres>>::type_info().into())
     }
 
     async fn jsonb_array(&mut self) -> wasmtime::Result<Resource<sql::TypeInfo>> {
         self.resources
-            .insert(<Vec<Json<()>> as sqlx::Type<sqlx::Postgres>>::type_info())
+            .insert(<Vec<Json<()>> as sqlx::Type<sqlx::Postgres>>::type_info().into())
     }
 
     async fn inet_array(&mut self) -> wasmtime::Result<Resource<sql::TypeInfo>> {
         self.resources
-            .insert(<Vec<IpNetwork> as sqlx::Type<sqlx::Postgres>>::type_info())
+            .insert(<Vec<IpNetwork> as sqlx::Type<sqlx::Postgres>>::type_info().into())
     }
 
     fn drop(&mut self, rep: Resource<sql::TypeInfo>) -> wasmtime::Result<()> {

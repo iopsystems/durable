@@ -36,7 +36,8 @@ interface sql {
         /// 
         /// This returns an error if there is no type with the provided name
         /// within the database.
-        // with-name: static func(name: string) -> result<type-info>;
+        @since(version = 2.3.0)
+        with-name: static func(name: string) -> result<type-info, string>;
 
         /// Attempt to create an array of the named type.
         /// 

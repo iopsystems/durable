@@ -7,13 +7,14 @@ use sqlx::error::BoxDynError;
 use sqlx::postgres::PgTypeInfo;
 use sqlx::types::ipnetwork::IpNetwork;
 use sqlx::types::Json;
+use sqlx_postgres::PgTypeKind;
 use uuid::Uuid;
 
-use super::oids as oid;
+use super::{oids as oid, TypeInfoResource};
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct ValueResource {
-    pub(crate) type_info: PgTypeInfo,
+    pub(crate) type_info: TypeInfoResource,
     #[serde(flatten)]
     pub(crate) value: Value,
 }
@@ -165,7 +166,7 @@ impl<'a> sqlx::Encode<'a, sqlx::Postgres> for ValueResource {
     }
 
     fn produces(&self) -> Option<PgTypeInfo> {
-        Some(self.type_info.clone())
+        Some(self.type_info.type_info.clone())
     }
 
     fn size_hint(&self) -> usize {
@@ -204,7 +205,7 @@ impl<'a> sqlx::Decode<'a, sqlx::Postgres> for ValueResource {
 
         if value.is_null() {
             return Ok(Self {
-                type_info,
+                type_info: type_info.into(),
                 value: Value::Null,
             });
         }
@@ -224,10 +225,31 @@ impl<'a> sqlx::Decode<'a, sqlx::Postgres> for ValueResource {
             t if t.type_eq(&oid::UUID) => decode(value).map(Value::Uuid),
             t if t.type_eq(&oid::JSON) || t.type_eq(&oid::JSONB) => decode(value).map(Value::Json),
 
+            t if t.type_eq(&oid::BOOL_ARRAY) => decode(value).map(Value::BooleanArray),
+            t if t.type_eq(&oid::FLOAT4_ARRAY) => decode(value).map(Value::Float4Array),
+            t if t.type_eq(&oid::FLOAT8_ARRAY) => decode(value).map(Value::Float8Array),
+            t if t.type_eq(&oid::CHAR_ARRAY) => decode(value).map(Value::Int1Array),
+            t if t.type_eq(&oid::INT2_ARRAY) => decode(value).map(Value::Int2Array),
+            t if t.type_eq(&oid::INT4_ARRAY) => decode(value).map(Value::Int4Array),
+            t if t.type_eq(&oid::INT8_ARRAY) => decode(value).map(Value::Int8Array),
+            t if t.type_eq(&oid::TEXT_ARRAY) => decode(value).map(Value::TextArray),
+            t if t.type_eq(&oid::BYTEA_ARRAY) => decode(value).map(Value::ByteaArray),
+            t if t.type_eq(&oid::TIMESTAMPTZ_ARRAY) => decode(value).map(Value::TimestampTzArray),
+            t if t.type_eq(&oid::TIMESTAMP_ARRAY) => decode(value).map(Value::TimestampArray),
+            t if t.type_eq(&oid::UUID_ARRAY) => decode(value).map(Value::UuidArray),
+            t if t.type_eq(&oid::JSON_ARRAY) || t.type_eq(&oid::JSONB_ARRAY) => {
+                decode(value).map(Value::JsonArray)
+            }
+
+            t if matches!(t.kind(), PgTypeKind::Enum(_)) => decode(value).map(Value::Text),
+
             _ => return Err(Box::new(UnsupportedType::new(type_info))),
         }?;
 
-        Ok(Self { type_info, value })
+        Ok(Self {
+            type_info: type_info.into(),
+            value,
+        })
     }
 }
 

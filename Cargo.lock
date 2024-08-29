@@ -1063,6 +1063,7 @@ dependencies = [
  "anyhow",
  "durable",
  "serde",
+ "sqlx",
 ]
 
 [[package]]
