@@ -200,8 +200,20 @@ pub struct WorkerHandle {
 }
 
 impl WorkerHandle {
+    /// Tell the [`Worker`] to shut down.
+    ///
+    /// Future calls to [`Worker::run`] will continue to shut down immediately
+    /// until the flag is cleared by calling [`reset`].
+    ///
+    /// [`reset`]: WorkerHandle::reset
     pub fn shutdown(&self) {
         self.shared.shutdown.raise();
+    }
+
+    /// Reset the handle and allow future calls to [`Worker::run`] to process
+    /// workflow tasks.
+    pub fn reset(&self) {
+        self.shared.shutdown.reset();
     }
 }
 
@@ -241,7 +253,6 @@ impl Worker {
 
         tracing::info!("durable worker id is {}", self.worker_id);
 
-        self.shared.shutdown.reset();
         self.load_leader_id().await?;
 
         let worker_id = self.worker_id;
