@@ -11,7 +11,7 @@ pub mod migrate;
 pub mod plugin;
 mod resource;
 pub mod task;
-pub mod util;
+mod util;
 mod worker;
 
 #[allow(rustdoc::invalid_html_tags, unused_mut, unused_doc_comments)]

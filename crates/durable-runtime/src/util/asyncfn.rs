@@ -1,6 +1,6 @@
 use std::future::Future;
 
-pub trait AsyncFnOnce<Args> {
+pub(crate) trait AsyncFnOnce<Args> {
     type Output;
     type Future: Future<Output = Self::Output>;
 
