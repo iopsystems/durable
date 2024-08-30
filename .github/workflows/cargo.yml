@@ -61,12 +61,15 @@ jobs:
         with:
           components: clippy
       - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: clippy
       - uses: swlynch99/cargo-sweep-action@v1
       - uses: taiki-e/install-action@v2
         with:
           tool: clippy-sarif,sarif-fmt,cargo-deduplicate-warnings
 
       - name: cargo clippy
+        id: cargo-clippy
         run: |
           cargo clippy --all-targets --all-features --message-format json --profile dev-ci \
             | cargo deduplicate-warnings \
@@ -79,6 +82,12 @@ jobs:
         with:
           name: clippy-sarif
           path: clippy.sarif
+
+      # Prime the cache with the xtask binary so it can be used by the check-sqlx job.
+      # We skip this if the step above failed to error lints get emitted more quickly.
+      - name: build xtask
+        if: ${{ steps.cargo-clippy.outcome == 'success' }}
+        run: cargo build -p xtask --profile dev-ci
 
   clippy-upload:
     if: github.event_name == 'pull_request' || github.ref == 'reads/heads/main'
@@ -96,6 +105,28 @@ jobs:
         with:
           sarif_file: clippy.sarif
 
+  check-sqlx:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: clippy
+          save-if: false
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: sqlx-cli
+      - name: create test database
+        run: cargo run --bin xtask --profile dev-ci -- dev -d
+
+      - name: check sqlx
+        run: cargo sqlx prepare --workspace --check
+    
+
   check-success:
     name: verify all tests pass
     runs-on: ubuntu-latest
@@ -104,6 +135,7 @@ jobs:
       - test
       - clippy
       - rustfmt
+      - check-sqlx
 
     steps:
       - name: fail if any dependencies failed
