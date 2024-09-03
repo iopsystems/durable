@@ -15,7 +15,6 @@ clap = { version = "4.5.11", features = ["derive"] }
 dotenvy = "0.15.7"
 serde = { version = "1.0.204", features = ["derive"] }
 serde_json = "1.0.121"
-sqlx = { version = "0.8.0", features = ["postgres", "runtime-tokio", "tls-rustls"] }
 tokio = { version = "1.39.2", features = ["rt", "macros", "signal", "process"] }
 tracing-subscriber = { version = "0.3.18", features = ["env-filter"] }
 xshell = "0.2.6"
@@ -23,3 +22,8 @@ tracing = "0.1.40"
 libc = "0.2.155"
 glob = "0.3.1"
 scopeguard = "1.2.0"
+
+[dependencies.sqlx]
+version = "0.8.0"
+default-features = false
+features = ["json", "postgres", "runtime-tokio", "tls-rustls"]

@@ -646,7 +646,7 @@ impl TaskState {
         func: F,
     ) -> anyhow::Result<T>
     where
-        F: for<'t> FnOnce(&'t mut Self) -> BoxFuture<anyhow::Result<T>> + Send + 'static,
+        F: for<'t> FnOnce(&'t mut Self) -> BoxFuture<'t, anyhow::Result<T>> + Send + 'static,
         T: Serialize + DeserializeOwned + Send,
     {
         if let Some(data) = self.enter(options).await? {
@@ -682,7 +682,7 @@ impl TaskState {
         func: F,
     ) -> anyhow::Result<T>
     where
-        F: for<'t> FnOnce(&'t mut Transaction) -> BoxFuture<anyhow::Result<T>> + Send + 'static,
+        F: for<'t> FnOnce(&'t mut Transaction) -> BoxFuture<'t, anyhow::Result<T>> + Send + 'static,
         T: Serialize + DeserializeOwned + Send,
     {
         if let Some(txn) = self.transaction_mut() {
