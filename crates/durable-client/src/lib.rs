@@ -124,7 +124,7 @@ impl DurableClient {
     }
 
     /// Launch a new workflow using the provided database connection.
-    /// 
+    ///
     /// This allows program launches to be done as part of a larger transaction.
     pub async fn launch_with<T>(
         &self,
