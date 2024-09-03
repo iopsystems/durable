@@ -97,7 +97,7 @@ impl DurableClient {
         Ok(Program::new(data))
     }
 
-    /// Launch a
+    /// Launch a new workflow with the provided program and task data.
     pub async fn launch<T>(
         &self,
         name: impl AsRef<str>,
@@ -119,7 +119,24 @@ impl DurableClient {
     where
         T: ?Sized + serde::Serialize,
     {
-        let mut tx = self.pool.begin().await?;
+        let mut conn = self.pool.acquire().await?;
+        self.launch_with(name, program, data, &mut conn).await
+    }
+
+    /// Launch a new workflow using the provided database connection.
+    /// 
+    /// This allows program launches to be done as part of a larger transaction.
+    pub async fn launch_with<T>(
+        &self,
+        name: &str,
+        program: &Program,
+        data: &T,
+        conn: &mut sqlx::PgConnection,
+    ) -> Result<Task, DurableError>
+    where
+        T: ?Sized + serde::Serialize,
+    {
+        let mut tx = conn.begin().await?;
 
         let now = Utc::now();
         let last_used = program.0.last_used.get();
@@ -127,9 +144,9 @@ impl DurableClient {
         if last_used < now - Duration::hours(1) {
             let record = sqlx::query!(
                 "UPDATE durable.wasm
-                  SET last_used = CURRENT_TIMESTAMP
-                WHERE id = $1
-                RETURNING last_used",
+                      SET last_used = CURRENT_TIMESTAMP
+                    WHERE id = $1
+                    RETURNING last_used",
                 program.0.id()
             )
             .fetch_optional(&mut *tx)
@@ -145,19 +162,19 @@ impl DurableClient {
             let mut stx = tx.begin().await?;
             let result = sqlx::query!(
                 "
-                INSERT INTO durable.task(name, wasm, data, running_on)
-                SELECT
-                    $1 as name,
-                    $2 as wasm,
-                    $3 as data,
-                    (SELECT id
-                       FROM durable.worker
-                      ORDER BY random()
-                      LIMIT 1
-                      FOR SHARE SKIP LOCKED
-                    ) as running_on
-                RETURNING id
-                ",
+                    INSERT INTO durable.task(name, wasm, data, running_on)
+                    SELECT
+                        $1 as name,
+                        $2 as wasm,
+                        $3 as data,
+                        (SELECT id
+                           FROM durable.worker
+                          ORDER BY random()
+                          LIMIT 1
+                          FOR SHARE SKIP LOCKED
+                        ) as running_on
+                    RETURNING id
+                    ",
                 name,
                 program.0.id(),
                 Json(data) as Json<&T>
