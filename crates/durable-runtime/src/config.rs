@@ -137,6 +137,12 @@ pub struct Config {
     /// The default limit is 4 concurrent compilation tasks.
     #[serde(default = "default_usize::<4>")]
     pub max_concurrent_compilations: usize,
+
+    /// Print task logs directly to stdout while running.
+    ///
+    /// This is mainly meant as a debugging option for use in tests.
+    #[serde(default)]
+    pub debug_emit_task_logs: bool,
 }
 
 impl Config {

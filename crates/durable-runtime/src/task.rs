@@ -514,6 +514,10 @@ impl TaskState {
                 txn.logs
             );
 
+            if self.config().debug_emit_task_logs {
+                print!("{logs}");
+            }
+
             Some(logs)
         };
 

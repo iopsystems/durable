@@ -14,7 +14,8 @@ pub async fn spawn_worker(pool: sqlx::PgPool) -> anyhow::Result<WorkerShutdownGu
         .config(
             Config::new()
                 .suspend_margin(Duration::from_secs(1))
-                .suspend_timeout(Duration::from_secs(1)),
+                .suspend_timeout(Duration::from_secs(1))
+                .debug_emit_task_logs(true),
         )
         .wasmtime_config(config)
         .validate_database(false)
