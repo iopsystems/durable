@@ -396,15 +396,22 @@ impl RequestBuilder {
         })
     }
 
-    /// Send a JSON body.
+    /// Set the request body to a JSON value.
+    ///
+    /// This will also add a `Content-Type: application/json` header to the list
+    /// of headers.
     ///
     /// # Errors
     /// Serialization can fail if `T`'s implementation of `Serialize` decides to
     /// fail, or `T` contains a map with non-string keys.
     pub fn json<T: Serialize + ?Sized>(self, body: &T) -> Self {
+        const CONTENT_TYPE: HeaderName = HeaderName::from_static("content-type");
+        const APPLICATION_JSON: HeaderValue = HeaderValue::from_static("application/json");
+
         self.modify(|req| {
             let body = serde_json::to_vec(body).map_err(|e| ErrorKind::Other(e.to_string()))?;
             req.body = Some(body);
+            req.headers.insert(CONTENT_TYPE, APPLICATION_JSON);
             Ok(())
         })
     }
