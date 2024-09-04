@@ -1,10 +1,7 @@
 use std::path::{Path, PathBuf};
-use std::time::Duration;
 
 use anyhow::Context;
-use durable_client::{DurableClient, Program, ProgramOptions, Task};
-use durable_runtime::Config;
-use futures::TryStreamExt;
+use durable_client::{DurableClient, Program, ProgramOptions};
 
 mod basic;
 
