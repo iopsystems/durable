@@ -26,7 +26,7 @@ impl Error {
     ///
     /// The error type must be '`static`, but there are no other restrictions on
     /// it.
-    pub fn new<E: StdError + 'static>(error: E) -> Self {
+    pub fn new<E: StdError + Send + Sync + 'static>(error: E) -> Self {
         error.into()
     }
 
@@ -80,14 +80,14 @@ impl AsRef<dyn StdError> for Error {
 
 impl<E> From<E> for Error
 where
-    E: StdError + 'static,
+    E: StdError + Send + Sync + 'static,
 {
     fn from(error: E) -> Self {
         Self(ErrorImpl(Box::new(error)))
     }
 }
 
-struct ErrorImpl(Box<dyn StdError>);
+struct ErrorImpl(Box<dyn StdError + Send + Sync>);
 
 impl fmt::Debug for ErrorImpl {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
