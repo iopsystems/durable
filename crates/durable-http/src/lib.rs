@@ -491,6 +491,18 @@ impl RequestBuilder {
     }
 }
 
+impl fmt::Debug for RequestBuilder {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match &self.request {
+            Ok(req) => f
+                .debug_struct("RequestBuilder")
+                .field("request", req)
+                .finish(),
+            Err(e) => f.debug_struct("RequestBuilder").field("error", e).finish(),
+        }
+    }
+}
+
 #[derive(Serialize, Deserialize)]
 #[serde(transparent)]
 pub struct Error(Box<ErrorImpl>);
