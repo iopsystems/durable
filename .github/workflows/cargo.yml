@@ -14,6 +14,8 @@ jobs:
         with:
           targets: wasm32-wasip1
       - uses: Swatinem/rust-cache@v2
+        with:
+          save-if: ${{ github.ref == 'refs/heads/main' }}
       - uses: swlynch99/cargo-sweep-action@v1
       - uses: taiki-e/install-action@v2
         with:
@@ -62,7 +64,7 @@ jobs:
           components: clippy
       - uses: Swatinem/rust-cache@v2
         with:
-          shared-key: clippy
+          save-if: ${{ github.ref == 'refs/heads/main' }}
       - uses: swlynch99/cargo-sweep-action@v1
       - uses: taiki-e/install-action@v2
         with:
@@ -115,8 +117,7 @@ jobs:
           components: clippy
       - uses: Swatinem/rust-cache@v2
         with:
-          shared-key: clippy
-          save-if: false
+          save-if: ${{ github.ref == 'refs/heads/main' }}
       - uses: taiki-e/install-action@v2
         with:
           tool: sqlx-cli
