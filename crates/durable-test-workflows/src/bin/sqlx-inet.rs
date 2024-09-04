@@ -17,8 +17,7 @@ fn main() -> anyhow::Result<()> {
     })?;
 
     let fetched = sqlx::transaction("fetch data", |mut conn| -> Result<IpAddr, _> {
-        sqlx::query_scalar("SELECT addr FROM test")
-            .fetch_one(&mut conn)
+        sqlx::query_scalar("SELECT addr FROM test").fetch_one(&mut conn)
     })?;
 
     assert_eq!(addr, fetched);
