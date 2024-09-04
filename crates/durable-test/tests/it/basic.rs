@@ -12,7 +12,6 @@ async fn check_task_details(pool: sqlx::PgPool) -> anyhow::Result<()> {
     let task = client
         .launch("test task", &program, &serde_json::json!(null))
         .await?;
-    crate::tail_logs(&client, &task);
     let status = task.wait(&client).await?;
 
     assert!(status.success());
@@ -50,7 +49,6 @@ async fn run_sqlx_test(pool: sqlx::PgPool) -> anyhow::Result<()> {
     let task = client
         .launch("test task", &program, &serde_json::json!(null))
         .await?;
-    crate::tail_logs(&client, &task);
     let status = task.wait(&client).await?;
 
     assert!(status.success());
@@ -67,7 +65,6 @@ async fn run_sqlx_enum(pool: sqlx::PgPool) -> anyhow::Result<()> {
     let task = client
         .launch("sqlx enum test", &program, &serde_json::json!(null))
         .await?;
-    crate::tail_logs(&client, &task);
     let status = task.wait(&client).await?;
 
     assert!(status.success());
@@ -84,7 +81,6 @@ async fn run_sqlx_inet(pool: sqlx::PgPool) -> anyhow::Result<()> {
     let task = client
         .launch("sqlx inet test", &program, &serde_json::json!(null))
         .await?;
-    crate::tail_logs(&client, &task);
     let status = task.wait(&client).await?;
 
     assert!(status.success());
@@ -101,7 +97,6 @@ async fn run_sqlx_macros_test(pool: sqlx::PgPool) -> anyhow::Result<()> {
     let task = client
         .launch("wasm macros test", &program, &serde_json::json!(null))
         .await?;
-    crate::tail_logs(&client, &task);
     let status = task.wait(&client).await?;
 
     assert!(status.success());
@@ -118,7 +113,6 @@ async fn run_sqlx_use_json(pool: sqlx::PgPool) -> anyhow::Result<()> {
     let task = client
         .launch("sqlx json types test", &program, &serde_json::json!(null))
         .await?;
-    crate::tail_logs(&client, &task);
     let status = task.wait(&client).await?;
 
     assert!(status.success());
@@ -137,7 +131,6 @@ async fn run_notify_self(pool: sqlx::PgPool) -> anyhow::Result<()> {
     let task = client
         .launch("notify self test", &program, &serde_json::json!(null))
         .await?;
-    crate::tail_logs(&client, &task);
 
     let status = match timeout(Duration::from_secs(30), task.wait(&client)).await {
         Ok(result) => result?,
