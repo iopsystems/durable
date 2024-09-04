@@ -8,12 +8,6 @@ use futures::TryStreamExt;
 
 mod basic;
 
-fn test_config() -> Config {
-    Config::default()
-        .suspend_margin(Duration::from_secs(1))
-        .suspend_timeout(Duration::from_secs(1))
-}
-
 async fn load_binary(client: &DurableClient, name: &str) -> anyhow::Result<Program> {
     let program = client
         .program(
