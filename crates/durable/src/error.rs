@@ -49,6 +49,13 @@ impl Error {
     pub fn chain(&self) -> Causes<'_> {
         Causes(self.source())
     }
+
+    /// Convert this error into a type which implements [`std::error::Error`].
+    ///
+    /// This is useful for integration with other error libraries.
+    pub fn into_std_error(self) -> impl StdError {
+        self.0
+    }
 }
 
 impl fmt::Display for Error {
