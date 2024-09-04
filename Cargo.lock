@@ -966,7 +966,7 @@ dependencies = [
 
 [[package]]
 name = "durable-runtime"
-version = "0.4.7"
+version = "0.4.8"
 dependencies = [
  "ahash",
  "anyhow",
