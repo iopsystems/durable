@@ -98,27 +98,27 @@ pub fn get(url: impl AsRef<str>) -> RequestBuilder {
 
 /// Create a [`RequestBuilder`] for a `POST` request.
 pub fn post(url: impl AsRef<str>) -> RequestBuilder {
-    RequestBuilder::get(url.as_ref())
+    RequestBuilder::post(url.as_ref())
 }
 
 /// Create a [`RequestBuilder`] for a `PUT` request.
 pub fn put(url: impl AsRef<str>) -> RequestBuilder {
-    RequestBuilder::get(url.as_ref())
+    RequestBuilder::put(url.as_ref())
 }
 
 /// Create a [`RequestBuilder`] for a `PATCH` request.
 pub fn patch(url: impl AsRef<str>) -> RequestBuilder {
-    RequestBuilder::get(url.as_ref())
+    RequestBuilder::patch(url.as_ref())
 }
 
 /// Create a [`RequestBuilder`] for a `DELETE` request.
 pub fn delete(url: impl AsRef<str>) -> RequestBuilder {
-    RequestBuilder::get(url.as_ref())
+    RequestBuilder::delete(url.as_ref())
 }
 
 /// Create a [`RequestBuilder`] for a `HEAD` request.
 pub fn head(url: impl AsRef<str>) -> RequestBuilder {
-    RequestBuilder::get(url.as_ref())
+    RequestBuilder::head(url.as_ref())
 }
 
 /// A request which can be executed by calling [`send`].
