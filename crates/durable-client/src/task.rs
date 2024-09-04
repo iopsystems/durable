@@ -139,8 +139,23 @@ impl Task {
     where
         T: ?Sized + Serialize,
     {
-        let mut tx = client.pool.begin().await?;
+        let mut conn = client.pool.acquire().await?;
+        self.notify_with(event, data, &mut conn).await
+    }
 
+    /// Send a notification to the task using the provided connection.
+    ///
+    /// This is useful for when the task notification is done as part of a
+    /// larger transaction.
+    pub async fn notify_with<T>(
+        &self,
+        event: &str,
+        data: &T,
+        conn: &mut sqlx::PgConnection,
+    ) -> Result<(), DurableError>
+    where
+        T: ?Sized + Serialize,
+    {
         sqlx::query!(
             "
             INSERT INTO durable.notification(task_id, event, data)
@@ -150,10 +165,8 @@ impl Task {
             event,
             Json(data) as Json<&T>
         )
-        .execute(&mut *tx)
+        .execute(&mut *conn)
         .await?;
-
-        tx.commit().await?;
 
         Ok(())
     }
