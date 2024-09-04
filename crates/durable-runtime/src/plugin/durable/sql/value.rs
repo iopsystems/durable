@@ -224,6 +224,7 @@ impl<'a> sqlx::Decode<'a, sqlx::Postgres> for ValueResource {
             t if t.type_eq(&oid::TIMESTAMP) => decode(value).map(Value::Timestamp),
             t if t.type_eq(&oid::UUID) => decode(value).map(Value::Uuid),
             t if t.type_eq(&oid::JSON) || t.type_eq(&oid::JSONB) => decode(value).map(Value::Json),
+            t if t.type_eq(&oid::INET) => decode(value).map(Value::Inet),
 
             t if t.type_eq(&oid::BOOL_ARRAY) => decode(value).map(Value::BooleanArray),
             t if t.type_eq(&oid::FLOAT4_ARRAY) => decode(value).map(Value::Float4Array),
@@ -240,6 +241,7 @@ impl<'a> sqlx::Decode<'a, sqlx::Postgres> for ValueResource {
             t if t.type_eq(&oid::JSON_ARRAY) || t.type_eq(&oid::JSONB_ARRAY) => {
                 decode(value).map(Value::JsonArray)
             }
+            t if t.type_eq(&oid::INET_ARRAY) => decode(value).map(Value::InetArray),
 
             t if matches!(t.kind(), PgTypeKind::Enum(_)) => decode(value).map(Value::Text),
 
