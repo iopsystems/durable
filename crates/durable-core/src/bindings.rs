@@ -13,7 +13,7 @@ pub mod durable {
             pub fn task_id() -> i64 {
                 unsafe {
                     #[cfg(target_arch = "wasm32")]
-                    #[link(wasm_import_module = "durable:core/core@2.4.0")]
+                    #[link(wasm_import_module = "durable:core/core@2.5.0")]
                     extern "C" {
                         #[link_name = "task-id"]
                         fn wit_import() -> i64;
@@ -35,7 +35,7 @@ pub mod durable {
                     let mut ret_area = RetArea([::core::mem::MaybeUninit::uninit(); 8]);
                     let ptr0 = ret_area.0.as_mut_ptr().cast::<u8>();
                     #[cfg(target_arch = "wasm32")]
-                    #[link(wasm_import_module = "durable:core/core@2.4.0")]
+                    #[link(wasm_import_module = "durable:core/core@2.5.0")]
                     extern "C" {
                         #[link_name = "task-name"]
                         fn wit_import(_: *mut u8);
@@ -61,7 +61,7 @@ pub mod durable {
                     let mut ret_area = RetArea([::core::mem::MaybeUninit::uninit(); 8]);
                     let ptr0 = ret_area.0.as_mut_ptr().cast::<u8>();
                     #[cfg(target_arch = "wasm32")]
-                    #[link(wasm_import_module = "durable:core/core@2.4.0")]
+                    #[link(wasm_import_module = "durable:core/core@2.5.0")]
                     extern "C" {
                         #[link_name = "task-data"]
                         fn wit_import(_: *mut u8);
@@ -98,7 +98,7 @@ pub mod durable {
                     let len0 = vec0.len();
                     let ptr1 = ret_area.0.as_mut_ptr().cast::<u8>();
                     #[cfg(target_arch = "wasm32")]
-                    #[link(wasm_import_module = "durable:core/core@2.4.0")]
+                    #[link(wasm_import_module = "durable:core/core@2.5.0")]
                     extern "C" {
                         #[link_name = "transaction-enter"]
                         fn wit_import(_: *mut u8, _: usize, _: i32, _: *mut u8);
@@ -148,7 +148,7 @@ pub mod durable {
                     let ptr0 = vec0.as_ptr().cast::<u8>();
                     let len0 = vec0.len();
                     #[cfg(target_arch = "wasm32")]
-                    #[link(wasm_import_module = "durable:core/core@2.4.0")]
+                    #[link(wasm_import_module = "durable:core/core@2.5.0")]
                     extern "C" {
                         #[link_name = "transaction-exit"]
                         fn wit_import(_: *mut u8, _: usize);
@@ -238,7 +238,7 @@ pub mod durable {
                     let mut ret_area = RetArea([::core::mem::MaybeUninit::uninit(); 32]);
                     let ptr0 = ret_area.0.as_mut_ptr().cast::<u8>();
                     #[cfg(target_arch = "wasm32")]
-                    #[link(wasm_import_module = "durable:core/notify@2.4.0")]
+                    #[link(wasm_import_module = "durable:core/notify@2.5.0")]
                     extern "C" {
                         #[link_name = "notification-blocking"]
                         fn wit_import(_: *mut u8);
@@ -287,7 +287,7 @@ pub mod durable {
                     let len1 = vec1.len();
                     let ptr2 = ret_area.0.as_mut_ptr().cast::<u8>();
                     #[cfg(target_arch = "wasm32")]
-                    #[link(wasm_import_module = "durable:core/notify@2.4.0")]
+                    #[link(wasm_import_module = "durable:core/notify@2.5.0")]
                     extern "C" {
                         #[link_name = "notify"]
                         fn wit_import(
@@ -505,15 +505,15 @@ pub static __WIT_BINDGEN_COMPONENT_TYPE: [u8; 665] = *b"\
 A\x07\x01B\x0a\x01@\0\0x\x04\0\x07task-id\x01\0\x01@\0\0s\x04\0\x09task-name\x01\
 \x01\x04\0\x09task-data\x01\x01\x01ks\x01@\x02\x05labels\x05is-db\x7f\0\x02\x04\0\
 \x11transaction-enter\x01\x03\x01@\x01\x04datas\x01\0\x04\0\x10transaction-exit\x01\
-\x04\x03\x01\x17durable:core/core@2.4.0\x05\0\x01B\x05\x01r\x02\x07secondsw\x0bn\
+\x04\x03\x01\x17durable:core/core@2.5.0\x05\0\x01B\x05\x01r\x02\x07secondsw\x0bn\
 anosecondsy\x04\0\x08datetime\x03\0\0\x01@\0\0\x01\x04\0\x03now\x01\x02\x04\0\x0a\
 resolution\x01\x02\x03\x01\x1cwasi:clocks/wall-clock@0.2.0\x05\x01\x02\x03\0\x01\
 \x08datetime\x01B\x0b\x02\x03\x02\x01\x02\x04\0\x08datetime\x03\0\0\x01r\x03\x0a\
 created-at\x01\x05events\x04datas\x04\0\x05event\x03\0\x02\x01q\x03\x0etask-not-\
 found\0\0\x09task-dead\0\0\x05other\x01s\0\x04\0\x0cnotify-error\x03\0\x04\x01@\0\
 \0\x03\x04\0\x15notification-blocking\x01\x06\x01j\0\x01\x05\x01@\x03\x04taskx\x05\
-events\x04datas\0\x07\x04\0\x06notify\x01\x08\x03\x01\x19durable:core/notify@2.4\
-.0\x05\x03\x04\x01\x1edurable:core/import-core@2.4.0\x04\0\x0b\x11\x01\0\x0bimpo\
+events\x04datas\0\x07\x04\0\x06notify\x01\x08\x03\x01\x19durable:core/notify@2.5\
+.0\x05\x03\x04\x01\x1edurable:core/import-core@2.5.0\x04\0\x0b\x11\x01\0\x0bimpo\
 rt-core\x03\0\0\0G\x09producers\x01\x0cprocessed-by\x02\x0dwit-component\x070.21\
 5.0\x10wit-bindgen-rust\x060.30.0";
 #[inline(never)]

@@ -4,6 +4,7 @@ use anyhow::Context;
 use durable_client::{DurableClient, Program, ProgramOptions};
 
 mod basic;
+mod sqlx;
 
 async fn load_binary(client: &DurableClient, name: &str) -> anyhow::Result<Program> {
     let program = client
