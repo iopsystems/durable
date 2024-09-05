@@ -99,6 +99,16 @@ impl Publish {
 
             println!("Publishing {name} {version}");
             xshell::cmd!(sh, "margo add {path} --registry {repository}").run()?;
+
+            println!("Updating cache control header for {ab}/{cd}/{name}");
+            xshell::cmd!(
+                sh,
+                "
+                gcloud storage objects update gs://systemslab-cargo/{ab}/{cd}/{name}
+                    --cache-control=no-cache
+                "
+            )
+            .run()?;
         }
 
         println!("Generating HTML index");
