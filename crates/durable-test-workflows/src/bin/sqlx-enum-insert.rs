@@ -1,5 +1,3 @@
-use std::sync::OnceLock;
-
 use durable::sqlx::driver::{Durable, TypeInfo, Value};
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -30,16 +28,8 @@ impl sqlx::Encode<'_, Durable> for TestDummy {
 
 impl sqlx::Type<Durable> for TestDummy {
     fn type_info() -> <Durable as sqlx::Database>::TypeInfo {
-        static TYINFO_CACHE: OnceLock<TypeInfo> = OnceLock::new();
-
-        // TypeInfo::with_name currently involves a database query within the runtime.
-        // This is expensive, so only do it once and then hand out copies.
-        TYINFO_CACHE
-            .get_or_init(|| {
-                TypeInfo::with_name("test_dummy")
-                    .expect("test_dummy type was not present within the database")
-            })
-            .clone()
+        TypeInfo::with_name("test_dummy")
+            .expect("test_dummy type was not present within the database")
     }
 }
 
