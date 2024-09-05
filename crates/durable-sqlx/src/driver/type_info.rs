@@ -28,6 +28,10 @@ impl TypeInfo {
         }
     }
 
+    pub(crate) fn as_inner(&self) -> &sql::TypeInfo {
+        &self.tyinfo
+    }
+
     pub(crate) fn into_inner(self) -> sql::TypeInfo {
         self.tyinfo
     }

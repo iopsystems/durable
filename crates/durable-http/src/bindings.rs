@@ -153,7 +153,7 @@ pub mod durable {
                     unreachable!();
                     #[cfg(target_arch = "wasm32")]
                     {
-                        #[link(wasm_import_module = "durable:core/http@2.4.0")]
+                        #[link(wasm_import_module = "durable:core/http@2.5.0")]
                         extern "C" {
                             #[link_name = "[resource-drop]http-error2"]
                             fn drop(_: u32);
@@ -193,7 +193,7 @@ pub mod durable {
                     unreachable!();
                     #[cfg(target_arch = "wasm32")]
                     {
-                        #[link(wasm_import_module = "durable:core/http@2.4.0")]
+                        #[link(wasm_import_module = "durable:core/http@2.5.0")]
                         extern "C" {
                             #[link_name = "[resource-drop]http-request2"]
                             fn drop(_: u32);
@@ -271,7 +271,7 @@ pub mod durable {
                     };
                     let ptr10 = ret_area.0.as_mut_ptr().cast::<u8>();
                     #[cfg(target_arch = "wasm32")]
-                    #[link(wasm_import_module = "durable:core/http@2.4.0")]
+                    #[link(wasm_import_module = "durable:core/http@2.5.0")]
                     extern "C" {
                         #[link_name = "fetch"]
                         fn wit_import(
@@ -424,7 +424,7 @@ pub mod durable {
                         );
                         let ptr0 = ret_area.0.as_mut_ptr().cast::<u8>();
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/http@2.4.0")]
+                        #[link(wasm_import_module = "durable:core/http@2.5.0")]
                         extern "C" {
                             #[link_name = "[method]http-error2.message"]
                             fn wit_import(_: i32, _: *mut u8);
@@ -448,7 +448,7 @@ pub mod durable {
                 pub fn is_timeout(&self) -> bool {
                     unsafe {
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/http@2.4.0")]
+                        #[link(wasm_import_module = "durable:core/http@2.5.0")]
                         extern "C" {
                             #[link_name = "[method]http-error2.is-timeout"]
                             fn wit_import(_: i32) -> i32;
@@ -468,7 +468,7 @@ pub mod durable {
                 pub fn is_builder(&self) -> bool {
                     unsafe {
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/http@2.4.0")]
+                        #[link(wasm_import_module = "durable:core/http@2.5.0")]
                         extern "C" {
                             #[link_name = "[method]http-error2.is-builder"]
                             fn wit_import(_: i32) -> i32;
@@ -488,7 +488,7 @@ pub mod durable {
                 pub fn is_request(&self) -> bool {
                     unsafe {
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/http@2.4.0")]
+                        #[link(wasm_import_module = "durable:core/http@2.5.0")]
                         extern "C" {
                             #[link_name = "[method]http-error2.is-request"]
                             fn wit_import(_: i32) -> i32;
@@ -509,7 +509,7 @@ pub mod durable {
                 pub fn is_connect(&self) -> bool {
                     unsafe {
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/http@2.4.0")]
+                        #[link(wasm_import_module = "durable:core/http@2.5.0")]
                         extern "C" {
                             #[link_name = "[method]http-error2.is-connect"]
                             fn wit_import(_: i32) -> i32;
@@ -541,7 +541,7 @@ pub mod durable {
                         let len1 = vec1.len();
                         let ptr2 = ret_area.0.as_mut_ptr().cast::<u8>();
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/http@2.4.0")]
+                        #[link(wasm_import_module = "durable:core/http@2.5.0")]
                         extern "C" {
                             #[link_name = "[static]http-request2.new"]
                             fn wit_import(
@@ -599,7 +599,7 @@ pub mod durable {
                         let len0 = vec0.len();
                         let ptr1 = ret_area.0.as_mut_ptr().cast::<u8>();
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/http@2.4.0")]
+                        #[link(wasm_import_module = "durable:core/http@2.5.0")]
                         extern "C" {
                             #[link_name = "[method]http-request2.set-method"]
                             fn wit_import(_: i32, _: *mut u8, _: usize, _: *mut u8);
@@ -642,7 +642,7 @@ pub mod durable {
                         let len0 = vec0.len();
                         let ptr1 = ret_area.0.as_mut_ptr().cast::<u8>();
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/http@2.4.0")]
+                        #[link(wasm_import_module = "durable:core/http@2.5.0")]
                         extern "C" {
                             #[link_name = "[method]http-request2.set-url"]
                             fn wit_import(_: i32, _: *mut u8, _: usize, _: *mut u8);
@@ -718,7 +718,7 @@ pub mod durable {
                         }
                         let ptr4 = ret_area.0.as_mut_ptr().cast::<u8>();
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/http@2.4.0")]
+                        #[link(wasm_import_module = "durable:core/http@2.5.0")]
                         extern "C" {
                             #[link_name = "[method]http-request2.set-headers"]
                             fn wit_import(_: i32, _: *mut u8, _: usize, _: *mut u8);
@@ -755,7 +755,7 @@ pub mod durable {
                 pub fn set_timeout(&self, timeout: u64) {
                     unsafe {
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/http@2.4.0")]
+                        #[link(wasm_import_module = "durable:core/http@2.5.0")]
                         extern "C" {
                             #[link_name = "[method]http-request2.set-timeout"]
                             fn wit_import(_: i32, _: i64);
@@ -777,7 +777,7 @@ pub mod durable {
                         let ptr0 = vec0.as_ptr().cast::<u8>();
                         let len0 = vec0.len();
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/http@2.4.0")]
+                        #[link(wasm_import_module = "durable:core/http@2.5.0")]
                         extern "C" {
                             #[link_name = "[method]http-request2.set-body"]
                             fn wit_import(_: i32, _: *mut u8, _: usize);
@@ -808,7 +808,7 @@ pub mod durable {
                     let mut ret_area = RetArea([::core::mem::MaybeUninit::uninit(); 24]);
                     let ptr0 = ret_area.0.as_mut_ptr().cast::<u8>();
                     #[cfg(target_arch = "wasm32")]
-                    #[link(wasm_import_module = "durable:core/http@2.4.0")]
+                    #[link(wasm_import_module = "durable:core/http@2.5.0")]
                     extern "C" {
                         #[link_name = "fetch2"]
                         fn wit_import(_: i32, _: *mut u8);
@@ -1034,7 +1034,7 @@ lf\x15\x07headers\x03\0\x16\x04\0![method]http-request2.set-headers\x01\x19\x01@
 \x01@\x02\x04self\x15\x04body\0\x01\0\x04\0\x1e[method]http-request2.set-body\x01\
 \x1b\x01j\x01\x09\x01\x0b\x01@\x01\x07request\x07\0\x1c\x04\0\x05fetch\x01\x1d\x01\
 j\x01\x09\x01\x12\x01@\x01\x07request\x11\0\x1e\x04\0\x06fetch2\x01\x1f\x03\x01\x17\
-durable:core/http@2.4.0\x05\0\x04\x01\x1edurable:core/import-http@2.4.0\x04\0\x0b\
+durable:core/http@2.5.0\x05\0\x04\x01\x1edurable:core/import-http@2.5.0\x04\0\x0b\
 \x11\x01\0\x0bimport-http\x03\0\0\0G\x09producers\x01\x0cprocessed-by\x02\x0dwit\
 -component\x070.215.0\x10wit-bindgen-rust\x060.30.0";
 #[inline(never)]

@@ -18,6 +18,14 @@ impl Value {
     pub fn type_info(&self) -> TypeInfo {
         TypeInfo::new(self.0.type_info())
     }
+
+    pub fn enum_scalar(value: &str, tyinfo: &TypeInfo) -> Self {
+        Self(sql::Value::enum_value(value, tyinfo.as_inner()))
+    }
+
+    pub fn enum_array(values: &[&str], tyinfo: &TypeInfo) -> Self {
+        Self(sql::Value::enum_array(values, tyinfo.as_inner()))
+    }
 }
 
 impl sqlx::Value for Value {

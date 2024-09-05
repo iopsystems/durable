@@ -779,6 +779,20 @@ impl sql::HostValue for Task {
         self.resources.insert(value).map(Ok)
     }
 
+    async fn enum_value(
+        &mut self,
+        value: String,
+        tyinfo: Resource<sql::TypeInfo>,
+    ) -> wasmtime::Result<Resource<sql::Value>> {
+        let tyinfo = self.resources.get(tyinfo)?.clone();
+        let value = ValueResource {
+            type_info: tyinfo,
+            value: Value::Text(value),
+        };
+
+        self.resources.insert(value)
+    }
+
     async fn boolean_array(&mut self, value: Vec<bool>) -> wasmtime::Result<Resource<sql::Value>> {
         let value = ValueResource {
             type_info: type_info(&value),
@@ -931,6 +945,20 @@ impl sql::HostValue for Task {
         };
 
         self.resources.insert(value).map(Ok)
+    }
+
+    async fn enum_array(
+        &mut self,
+        value: Vec<String>,
+        tyinfo: Resource<sql::TypeInfo>,
+    ) -> wasmtime::Result<Resource<sql::Value>> {
+        let tyinfo = self.resources.get(tyinfo)?.clone();
+        let value = ValueResource {
+            type_info: tyinfo,
+            value: Value::TextArray(value),
+        };
+
+        self.resources.insert(value)
     }
 
     fn drop(&mut self, res: Resource<sql::Value>) -> wasmtime::Result<()> {

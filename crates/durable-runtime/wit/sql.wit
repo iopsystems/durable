@@ -212,6 +212,8 @@ interface sql {
         uuid:           static func(value: uuid) -> value;
         jsonb:          static func(value: string) -> value;
         inet:           static func(value: ip-network) -> result<value, string>;
+        @since(version = 2.5.0)
+        enum-value:     static func(value: string, tyinfo: borrow<type-info>) -> value;
 
         boolean-array:  static func(value: list<bool>) -> value;
         float4-array:   static func(value: list<f32>) -> value;
@@ -227,6 +229,8 @@ interface sql {
         uuid-array:     static func(value: list<uuid>) -> value;
         jsonb-array:    static func(value: list<string>) -> value;
         inet-array:     static func(value: list<ip-network>) -> result<value, string>;
+        @since(version = 2.5.0)
+        enum-array:     static func(value: list<string>, tyinfo: borrow<type-info>) -> value;
     }
 
     record column {
