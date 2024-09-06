@@ -123,7 +123,7 @@ impl Task {
                     .is_some();
 
                 if !exists {
-                    Err(ErrorImpl::NonexistantWorkflowId(self.id))?
+                    Err(ErrorImpl::NonexistantTaskId(self.id))?
                 }
             }
         }
@@ -208,7 +208,7 @@ impl Task {
                     .is_some();
 
                 if !exists {
-                    Err(ErrorImpl::NonexistantWorkflowId(self.id))?
+                    Err(ErrorImpl::NonexistantTaskId(self.id))?
                 }
             }
         }
@@ -231,6 +231,21 @@ impl Task {
             listener
                 .listen_all(["durable:log", "durable:task-complete"])
                 .await?;
+
+            let state = sqlx::query!(
+                r#"SELECT state::text as "state!" FROM durable.task WHERE id = $1"#,
+                self.id
+            )
+            .fetch_optional(&mut listener)
+            .await?;
+
+            match state.as_ref().map(|r| r.state.as_str()) {
+                Some("complete" | "failure") => done = true,
+                Some(_) => (),
+                None => {
+                    return Err(ErrorImpl::NonexistantTaskId(self.id()))?;
+                }
+            };
 
             loop {
                 let results = sqlx::query!(
@@ -279,7 +294,7 @@ impl Task {
                 .await?
                 .state;
 
-                if state == "complete" || state == "suspended" {
+                if state == "complete" || state == "failure" {
                     done = true;
                 }
             }
@@ -307,7 +322,7 @@ impl Task {
 
             let state = match record {
                 Some(record) => record.state,
-                None => return Err(ErrorImpl::NonexistantWorkflowId(self.id).into()),
+                None => return Err(ErrorImpl::NonexistantTaskId(self.id).into()),
             };
             let state = TaskState::from_str(&state);
 
