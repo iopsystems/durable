@@ -18,11 +18,12 @@ durable-client = { workspace = true }
 anyhow = "1.0.86"
 clap = { version = "4.5.11", features = ["env", "derive"] }
 futures-util = "0.3.30"
+log = "0.4.22"
 serde = "1.0.204"
 serde_json = { version = "1.0.120", features = ["raw_value"] }
+tabled = "0.16.0"
 tokio = { version = "1.39.1", features = ["full"] }
 tracing-subscriber = { version = "0.3.18", features = ["fmt", "env-filter"] }
-log = "0.4.22"
 
 [dependencies.sqlx]
 version = "0.8.0"

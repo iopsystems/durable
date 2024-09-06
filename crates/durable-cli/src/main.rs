@@ -6,6 +6,7 @@ use sqlx::ConnectOptions;
 use tokio::sync::OnceCell;
 use tracing_subscriber::prelude::*;
 
+mod events;
 mod launch;
 mod logs;
 mod notify;
@@ -23,6 +24,7 @@ struct Args {
 enum Commands {
     Launch(self::launch::Launch),
     Logs(self::logs::Logs),
+    Events(self::events::Events),
     Notify(self::notify::Notify),
 }
 
@@ -38,6 +40,7 @@ async fn main() -> anyhow::Result<()> {
     match args.command {
         Commands::Launch(cmd) => cmd.run(&args.common).await,
         Commands::Logs(cmd) => cmd.run(&args.common).await,
+        Commands::Events(cmd) => cmd.run(&args.common).await,
         Commands::Notify(cmd) => cmd.run(&args.common).await,
     }
 }
