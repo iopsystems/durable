@@ -895,7 +895,7 @@ dependencies = [
 
 [[package]]
 name = "durable-cli"
-version = "0.1.2"
+version = "0.1.3"
 dependencies = [
  "anyhow",
  "clap",
@@ -912,7 +912,7 @@ dependencies = [
 
 [[package]]
 name = "durable-client"
-version = "0.1.4"
+version = "0.1.5"
 dependencies = [
  "async-stream",
  "chrono",
