@@ -4,6 +4,7 @@ use futures_util::TryStreamExt;
 
 use crate::CommonOptions;
 
+/// Print the log messages emitted by a durable task.
 #[derive(Debug, clap::Parser)]
 pub(crate) struct Logs {
     /// The id of the task we want to see the logs for.
