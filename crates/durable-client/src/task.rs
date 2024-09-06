@@ -225,6 +225,7 @@ impl Task {
         let pool = client.pool.clone();
 
         try_stream!({
+            let mut done = false;
             let mut last_seen = -1;
             let mut listener = PgListener::connect_with(&pool).await?;
             listener
@@ -232,7 +233,6 @@ impl Task {
                 .await?;
 
             loop {
-                let event = listener.try_recv().await?;
                 let results = sqlx::query!(
                     "
                     SELECT message, index
@@ -253,10 +253,18 @@ impl Task {
                     last_seen = last_seen.max(record.index);
                 }
 
+                if done {
+                    break;
+                }
+
+                let event = listener.try_recv().await?;
                 match event.as_ref() {
                     Some(event) if event.channel() != "durable:task-complete" => continue,
                     Some(event) => match serde_json::from_str::<TaskComplete>(event.payload()) {
-                        Ok(payload) if payload.id == self.id => break,
+                        Ok(payload) if payload.id == self.id => {
+                            done = true;
+                            continue;
+                        }
                         Ok(_) => continue,
                         Err(_) => (),
                     },
@@ -272,7 +280,7 @@ impl Task {
                 .state;
 
                 if state == "complete" || state == "suspended" {
-                    break;
+                    done = true;
                 }
             }
         })
