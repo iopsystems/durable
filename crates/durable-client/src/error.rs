@@ -30,7 +30,7 @@ mod detail {
         ProgramValidation(wasmparser::BinaryReaderError),
         ProgramIsNotAComponent,
         Database(sqlx::Error),
-        NonexistantWorkflowId(i64),
+        NonexistantTaskId(i64),
     }
 }
 
@@ -52,7 +52,7 @@ impl fmt::Display for DurableError {
                 write!(f, "expected a WASM component but got a WASM module instead")
             }
             ErrorImpl::Database(e) => e.fmt(f),
-            ErrorImpl::NonexistantWorkflowId(id) => write!(f, "no workflow with id {id}"),
+            ErrorImpl::NonexistantTaskId(id) => write!(f, "no task with id {id}"),
         }
     }
 }
@@ -63,7 +63,7 @@ impl std::error::Error for DurableError {
             ErrorImpl::ProgramValidation(e) => Some(e),
             ErrorImpl::ProgramIsNotAComponent => None,
             ErrorImpl::Database(e) => Some(e),
-            ErrorImpl::NonexistantWorkflowId(_) => None,
+            ErrorImpl::NonexistantTaskId(_) => None,
         }
     }
 }
