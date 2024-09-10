@@ -5,3 +5,6 @@ durable = "run -p durable-cli --bin durable --"
 
 [registries]
 iop-systems = { index = "sparse+http://storage.googleapis.com/systemslab-cargo/" }
+
+[env]
+DURABLE_DEVELOPMENT = "1"
