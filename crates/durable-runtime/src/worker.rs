@@ -702,13 +702,20 @@ impl Worker {
         tx.commit().await?;
 
         if !tasks.is_empty() {
-            tracing::info!("launching {} tasks", tasks.len());
+            tracing::debug!("launching {} tasks", tasks.len());
         }
 
         for task in tasks {
             let shared = self.shared.clone();
             let engine = self.engine.clone();
             let worker_id = self.worker_id;
+
+            tracing::trace!(
+                target: "durable_runtime::worker::spawn_new_tasks",
+                id = task.id,
+                "launching task {}", task.name
+            );
+
             let future = async move {
                 let task_id = task.id;
                 if let Err(e) = Self::run_task(shared, engine, task, worker_id)
