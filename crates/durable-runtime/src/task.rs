@@ -419,9 +419,10 @@ impl TaskState {
             }
 
             tracing::trace!(
+                target: "durable_runtime::task::transaction",
                 index = self.txn_index,
-                "entering transaction {}",
-                options.label
+                label = &*options.label,
+                "entering transaction"
             );
 
             self.txn = Some(Transaction::new(
@@ -573,6 +574,13 @@ impl TaskState {
         .fetch_one(&mut *conn)
         .await?
         .running_on;
+
+        tracing::trace!(
+            target: "durable_runtime::task::transaction",
+            index = self.txn_index,
+            label = &*txn.label,
+            "exiting transaction"
+        );
 
         if running_on != Some(self.worker_id) {
             // This task is no longer running on the current worker. Don't commit anything,
