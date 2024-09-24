@@ -136,6 +136,53 @@ impl DurableClient {
     where
         T: ?Sized + serde::Serialize,
     {
+        let tasks = self
+            .launch_many_with(
+                program,
+                std::iter::once(LaunchOptions::new(name, data)),
+                conn,
+            )
+            .await?;
+
+        Ok(tasks.into_iter().next().expect("no tasks were returned"))
+    }
+
+    /// Launch many new workflows at once.
+    ///
+    /// This is more efficient than calling [`launch_with`] in a loop since it
+    /// creates all the tasks using a single database transaction.
+    ///
+    /// [`launch_with`]: DurableClient::launch_with
+    pub async fn launch_many<'a, T>(
+        &self,
+        program: &Program,
+        input: impl IntoIterator<Item = LaunchOptions<'a, T>>,
+    ) -> Result<Vec<Task>, DurableError>
+    where
+        T: ?Sized + serde::Serialize + 'a,
+    {
+        let mut conn = self.pool.acquire().await?;
+        self.launch_many_with(program, input, &mut conn).await
+    }
+
+    /// Launch many new workflows at once.
+    ///
+    /// This is more efficient than calling [`launch_with`] in a loop since it
+    /// creates all the tasks using a single database transaction.
+    ///
+    /// This method allows program launches to be done as part of a larger
+    /// transaction.
+    ///
+    /// [`launch_with`]: DurableClient::launch_with
+    pub async fn launch_many_with<'a, T>(
+        &self,
+        program: &Program,
+        input: impl IntoIterator<Item = LaunchOptions<'a, T>>,
+        conn: &mut sqlx::PgConnection,
+    ) -> Result<Vec<Task>, DurableError>
+    where
+        T: ?Sized + serde::Serialize + 'a,
+    {
         let mut tx = conn.begin().await?;
 
         let now = Utc::now();
@@ -157,35 +204,42 @@ impl DurableClient {
             }
         }
 
-        let workflow = loop {
+        let (names, data): (Vec<_>, Vec<_>) = input
+            .into_iter()
+            .map(|options| (options.name, Json(options.data)))
+            .unzip();
+
+        let workflows = loop {
             // Create a savepoint so that we can rollback if something goes wrong here.
             let mut stx = tx.begin().await?;
-            let result = sqlx::query!(
-                "
-                    INSERT INTO durable.task(name, wasm, data, running_on)
-                    SELECT
-                        $1 as name,
-                        $2 as wasm,
-                        $3 as data,
-                        (SELECT id
-                           FROM durable.worker
-                          ORDER BY random()
-                          LIMIT 1
-                          FOR SHARE SKIP LOCKED
-                        ) as running_on
-                    RETURNING id
-                    ",
-                name,
+            let result = sqlx::query_scalar!(
+                r#"
+                INSERT INTO durable.task(name, wasm, data, running_on)
+                SELECT
+                    name,
+                    $1 as wasm,
+                    data,
+                    (
+                        SELECT id
+                         FROM durable.worker
+                        ORDER BY random(), name
+                        LIMIT 1
+                        FOR SHARE SKIP LOCKED
+                    ) as running_on
+                FROM UNNEST($2::text[], $3::jsonb[]) as t(name, data)
+                RETURNING id
+                "#,
                 program.0.id(),
-                Json(data) as Json<&T>
+                &names as &[&str],
+                &data as &[Json<&T>]
             )
-            .fetch_one(&mut *stx)
+            .fetch_all(&mut *stx)
             .await;
 
             let error = match result {
-                Ok(record) => {
+                Ok(records) => {
                     stx.commit().await?;
-                    break Task { id: record.id };
+                    break records.into_iter().map(|id| Task { id }).collect();
                 }
                 Err(e) => e,
             };
@@ -223,7 +277,19 @@ impl DurableClient {
         };
 
         tx.commit().await?;
-        Ok(workflow)
+        Ok(workflows)
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct LaunchOptions<'a, T: ?Sized + 'a> {
+    name: &'a str,
+    data: &'a T,
+}
+
+impl<'a, T: ?Sized> LaunchOptions<'a, T> {
+    pub fn new(name: &'a str, data: &'a T) -> Self {
+        Self { name, data }
     }
 }
 
