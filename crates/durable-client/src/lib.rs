@@ -1,3 +1,4 @@
+use std::borrow::Cow;
 use std::sync::{Arc, PoisonError, RwLock, Weak};
 
 use chrono::{Duration, Utc};
@@ -5,6 +6,7 @@ use error::ErrorImpl;
 use sha2::{Digest, Sha256};
 use sqlx::types::Json;
 use sqlx::Acquire;
+use util::OwnedOrRef;
 use wasmparser::Validator;
 use weak_table::weak_value_hash_map::Entry;
 use weak_table::WeakValueHashMap;
@@ -159,7 +161,7 @@ impl DurableClient {
         input: impl IntoIterator<Item = LaunchOptions<'a, T>>,
     ) -> Result<Vec<Task>, DurableError>
     where
-        T: ?Sized + serde::Serialize + 'a,
+        T: serde::Serialize + 'a,
     {
         let mut conn = self.pool.acquire().await?;
         self.launch_many_with(program, input, &mut conn).await
@@ -181,7 +183,7 @@ impl DurableClient {
         conn: &mut sqlx::PgConnection,
     ) -> Result<Vec<Task>, DurableError>
     where
-        T: ?Sized + serde::Serialize + 'a,
+        T: serde::Serialize + 'a,
     {
         let mut tx = conn.begin().await?;
 
@@ -230,8 +232,8 @@ impl DurableClient {
                 RETURNING id
                 "#,
                 program.0.id(),
-                &names as &[&str],
-                &data as &[Json<&T>]
+                &names as &[Cow<str>],
+                &data as &[Json<OwnedOrRef<T>>]
             )
             .fetch_all(&mut *stx)
             .await;
@@ -282,14 +284,17 @@ impl DurableClient {
 }
 
 #[derive(Clone, Debug)]
-pub struct LaunchOptions<'a, T: ?Sized + 'a> {
-    name: &'a str,
-    data: &'a T,
+pub struct LaunchOptions<'a, T: 'a> {
+    name: Cow<'a, str>,
+    data: OwnedOrRef<'a, T>,
 }
 
-impl<'a, T: ?Sized> LaunchOptions<'a, T> {
-    pub fn new(name: &'a str, data: &'a T) -> Self {
-        Self { name, data }
+impl<'a, T> LaunchOptions<'a, T> {
+    pub fn new(name: impl Into<Cow<'a, str>>, data: impl Into<OwnedOrRef<'a, T>>) -> Self {
+        Self {
+            name: name.into(),
+            data: data.into(),
+        }
     }
 }
 
