@@ -6,7 +6,6 @@ use error::ErrorImpl;
 use sha2::{Digest, Sha256};
 use sqlx::types::Json;
 use sqlx::Acquire;
-use util::OwnedOrRef;
 use wasmparser::Validator;
 use weak_table::weak_value_hash_map::Entry;
 use weak_table::WeakValueHashMap;
@@ -161,7 +160,7 @@ impl DurableClient {
         input: impl IntoIterator<Item = LaunchOptions<'a, T>>,
     ) -> Result<Vec<Task>, DurableError>
     where
-        T: serde::Serialize + 'a,
+        T: serde::Serialize,
     {
         let mut conn = self.pool.acquire().await?;
         self.launch_many_with(program, input, &mut conn).await
@@ -183,7 +182,7 @@ impl DurableClient {
         conn: &mut sqlx::PgConnection,
     ) -> Result<Vec<Task>, DurableError>
     where
-        T: serde::Serialize + 'a,
+        T: serde::Serialize,
     {
         let mut tx = conn.begin().await?;
 
@@ -233,7 +232,7 @@ impl DurableClient {
                 "#,
                 program.0.id(),
                 &names as &[Cow<str>],
-                &data as &[Json<OwnedOrRef<T>>]
+                &data as &[Json<T>]
             )
             .fetch_all(&mut *stx)
             .await;
@@ -284,16 +283,16 @@ impl DurableClient {
 }
 
 #[derive(Clone, Debug)]
-pub struct LaunchOptions<'a, T: 'a> {
+pub struct LaunchOptions<'a, T> {
     name: Cow<'a, str>,
-    data: OwnedOrRef<'a, T>,
+    data: T,
 }
 
 impl<'a, T> LaunchOptions<'a, T> {
-    pub fn new(name: impl Into<Cow<'a, str>>, data: impl Into<OwnedOrRef<'a, T>>) -> Self {
+    pub fn new(name: impl Into<Cow<'a, str>>, data: T) -> Self {
         Self {
             name: name.into(),
-            data: data.into(),
+            data,
         }
     }
 }
