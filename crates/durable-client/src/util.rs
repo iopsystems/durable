@@ -60,7 +60,7 @@ pub enum OwnedOrRef<'a, T> {
 
 impl<'a, T> OwnedOrRef<'a, T> {
     pub fn as_ref(&self) -> &T {
-        &self
+        self
     }
 }
 
