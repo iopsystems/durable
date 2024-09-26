@@ -233,8 +233,12 @@ CREATE TRIGGER task_inserted
     FOR EACH ROW EXECUTE FUNCTION durable.notify_task();
 
 CREATE TRIGGER task_updated
-    AFTER UPDATE OF running_on ON durable.task
-    FOR EACH ROW WHEN (NEW.running_on IS NULL AND NEW.state IN ('active', 'ready'))
+    AFTER UPDATE OF state ON durable.task
+    FOR EACH ROW WHEN (
+        NEW.state IN ('active', 'ready')
+        AND
+        NOT OLD.state IN ('active', 'ready')
+    )
     EXECUTE FUNCTION durable.notify_task();
 
 CREATE TRIGGER task_suspended

@@ -4,20 +4,28 @@ use durable_runtime::{Config, WorkerBuilder, WorkerHandle};
 use tokio::task::JoinHandle;
 
 pub async fn spawn_worker(pool: sqlx::PgPool) -> anyhow::Result<WorkerShutdownGuard> {
-    let mut config = wasmtime::Config::new();
-    config
+    spawn_worker_with(
+        pool,
+        Config::new()
+            .suspend_margin(Duration::from_secs(1))
+            .suspend_timeout(Duration::from_secs(1)),
+    )
+    .await
+}
+
+pub async fn spawn_worker_with(
+    pool: sqlx::PgPool,
+    config: Config,
+) -> anyhow::Result<WorkerShutdownGuard> {
+    let mut wasmconfig = wasmtime::Config::new();
+    wasmconfig
         .wasm_backtrace_details(wasmtime::WasmBacktraceDetails::Enable)
         .cranelift_opt_level(wasmtime::OptLevel::None)
         .debug_info(true)
         .cache_config_load_default()?;
     let mut worker = WorkerBuilder::new(pool)
-        .config(
-            Config::new()
-                .suspend_margin(Duration::from_secs(1))
-                .suspend_timeout(Duration::from_secs(1))
-                .debug_emit_task_logs(true),
-        )
-        .wasmtime_config(config)
+        .config(config.debug_emit_task_logs(true))
+        .wasmtime_config(wasmconfig)
         .validate_database(false)
         .build()
         .await?;
@@ -61,4 +69,14 @@ impl Drop for WorkerShutdownGuard {
         //     }
         // })
     }
+}
+
+#[ctor::ctor]
+fn setup_tracing() {
+    use tracing_subscriber::prelude::*;
+
+    tracing_subscriber::registry()
+        .with(tracing_subscriber::EnvFilter::from_default_env())
+        .with(tracing_subscriber::fmt::layer())
+        .init();
 }
