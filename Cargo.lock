@@ -1009,6 +1009,7 @@ dependencies = [
  "sqlx",
  "sqlx-postgres",
  "tokio",
+ "toml",
  "tracing",
  "tracing-subscriber",
  "uluru",

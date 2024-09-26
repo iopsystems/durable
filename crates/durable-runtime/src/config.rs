@@ -216,6 +216,14 @@ mod duration_seconds {
                 Ok(Duration::from_secs(v))
             }
 
+            fn visit_i64<E: Error>(self, v: i64) -> Result<Self::Value, E> {
+                if v < 0 {
+                    return Err(Error::custom("durations cannot be negative"));
+                }
+
+                self.visit_u64(v as u64)
+            }
+
             fn visit_f32<E: Error>(self, v: f32) -> Result<Self::Value, E> {
                 if v < 0.0 {
                     return Err(Error::custom("durations cannot be negative"));
@@ -240,5 +248,30 @@ mod duration_seconds {
         }
 
         de.deserialize_f64(Visitor)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_decode_defaults() {
+        let toml = r#"
+heartbeat_interval = 30
+heartbeat_timeout = 120
+wasm_entry_ttl = 86400
+max_http_timeout = 60
+max_workflow_events = 2147483647
+max_log_bytes_per_transaction = 131072
+max_returned_buffer_len = 8388608
+suspend_timeout = 60
+suspend_margin = 10
+max_tasks = 2000
+max_concurrent_compilations = 4
+debug_emit_task_logs = false
+"#;
+
+        let _: Config = toml::from_str(toml).unwrap();
     }
 }
