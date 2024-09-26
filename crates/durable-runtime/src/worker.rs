@@ -921,6 +921,8 @@ impl Worker {
             }
         }
 
+        tracing::trace!("task exited with status {status:?}");
+
         Ok(())
     }
 
