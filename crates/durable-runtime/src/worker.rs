@@ -1035,6 +1035,13 @@ impl Worker {
             return Ok(status);
         }
 
+        // Some errors are recoverable. We handle those at up one method so that retries
+        // can propagate upwards if recovery fails.
+        let error = match error {
+            Some(error) if is_recoverable_error(&error) => return Err(error),
+            error => error,
+        };
+
         if let Some(txn) = store.data_mut().state.transaction_mut() {
             let index = txn.index();
             let logs = std::mem::take(&mut txn.logs);
@@ -1069,7 +1076,10 @@ impl Worker {
 
             let result = sqlx::query!(
                 "INSERT INTO durable.log(task_id, index, message)
-                 VALUES ($1, $2, $3)",
+                 VALUES ($1, $2, $3)
+                 ON CONFLICT ON CONSTRAINT log_pkey DO UPDATE
+                 SET message = $3
+                 ",
                 task_id,
                 LOG_ERROR_INDEX,
                 message
@@ -1174,4 +1184,18 @@ enum LoopEvent {
 
 fn find_sqlx_error(error: &anyhow::Error) -> Option<&sqlx::Error> {
     error.chain().filter_map(|e| e.downcast_ref()).next()
+}
+
+fn is_recoverable_error(error: &anyhow::Error) -> bool {
+    if let Some(error) = find_sqlx_error(error) {
+        return matches!(
+            error,
+            sqlx::Error::PoolTimedOut
+                | sqlx::Error::WorkerCrashed
+                | sqlx::Error::Io(_)
+                | sqlx::Error::PoolClosed
+        );
+    }
+
+    false
 }
