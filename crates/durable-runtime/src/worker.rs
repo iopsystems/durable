@@ -743,9 +743,10 @@ impl Worker {
             let worker_id = self.worker_id;
             let failures = failure.clone();
 
+            let task_id = task.id;
             tracing::trace!(
                 target: "durable_runtime::worker::spawn_new_tasks",
-                id = task.id,
+                id = task_id,
                 "launching task {}", task.name
             );
 
@@ -766,9 +767,9 @@ impl Worker {
             cfg_if! {
                 if #[cfg(all(tokio_unstable, feature = "tokio-console"))] {
                     self.tasks
-                        .build_task(future)
-                        .name(&format!("task {}", task.id))
-                        .spawn()
+                        .build_task()
+                        .name(&format!("task {}", task_id))
+                        .spawn(future)
                         .context("failed to spawn task on the joinset")?;
                 } else {
                     self.tasks.spawn(future);
