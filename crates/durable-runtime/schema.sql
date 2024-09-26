@@ -189,6 +189,7 @@ CREATE FUNCTION durable.notify_notification() RETURNS trigger as $$
                  FROM durable.worker
                 ORDER BY random()
                 FOR SHARE SKIP LOCKED
+                LIMIT 1
             )
         WHERE id = NEW.task_id
           AND state = 'suspended';
