@@ -96,6 +96,12 @@ impl WorkerBuilder {
         self
     }
 
+    /// Add a new API plugin to the runtime.
+    pub fn plugin(mut self, plugin: Box<dyn Plugin>) -> Self {
+        self.plugins.push(plugin);
+        self
+    }
+
     /// Whether the database should be automatically migrated on runner startup
     /// if the schema version in the database differs from what we expect.
     ///
