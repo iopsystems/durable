@@ -96,6 +96,7 @@ CREATE INDEX task_suspended ON durable.task(wakeup_at ASC NULLS LAST)
 CREATE TABLE durable.event(
     task_id         bigint      NOT NULL,
     index           int         NOT NULL,
+    created_at      timestamptz NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     -- A user-visible text label. Used for debugging and for ensuring that
     -- the events requested are consistent.
@@ -127,6 +128,7 @@ CREATE TABLE durable.log(
     task_id         bigint      NOT NULL,
     index           int         NOT NULL,
     message         text        NOT NULL,
+    created_at      timestamptz NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     PRIMARY KEY(task_id, index),
 
