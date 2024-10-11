@@ -508,13 +508,6 @@ impl TaskState {
         } else {
             logs = std::mem::take(&mut txn.logs);
 
-            tracing::debug!(
-                target: "durable_runtime::task_log",
-                "task {}: {}",
-                self.task_id(),
-                txn.logs
-            );
-
             if self.config().debug_emit_task_logs {
                 print!("{logs}");
             }
