@@ -7,6 +7,7 @@ use crate::util::EmptyMapDeserializer;
 /// Config options controlling the behaviour of this worker.
 #[derive(Clone, Debug, Setters, serde::Serialize, serde::Deserialize)]
 #[non_exhaustive]
+#[serde(deny_unknown_fields)]
 pub struct Config {
     /// The period with which the worker will update its heartbeat timestamp in
     /// the database.
