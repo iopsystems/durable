@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n                    DELETE FROM durable.task\n                    WHERE task.ctid = ANY(ARRAY(\n                        SELECT ctid\n                        FROM durable.task\n                        WHERE completed_at < NOW() - $1::interval\n                        LIMIT $2\n                        FOR UPDATE\n                    ))\n                    ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Interval",
+        "Int8"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "dadbe61077d006ce342f60e7c98d04204dee2e7fc10b5d4a7a2fd0ae0f89dd0f"
+}
