@@ -105,6 +105,33 @@ pub struct Config {
     #[serde(with = "duration_seconds")]
     pub suspend_margin: Duration,
 
+    /// The duration that completed tasks can be kept around before they are
+    /// automatically cleaned up. Setting this to `None` disables task cleanup
+    /// entirely.
+    ///
+    /// Without this old database entries for tasks, including their logs and
+    /// events, will stick around and fill up the database. This will eventually
+    /// slow down event inserts.
+    ///
+    /// The default is to schedule tasks for cleanup after 7 days.
+    #[serde(default = "default_option_seconds::<{ 3600 * 24 * 7 }>")]
+    #[serde(with = "option_duration_seconds")]
+    pub cleanup_age: Option<Duration>,
+
+    /// The maximum number of tasks that will be deleted in a single transaction
+    /// by task cleanup.
+    ///
+    /// This prevents the cleanup task from blocking other work on the server
+    /// while it is deleting old tasks, since the amount of time it will spend
+    /// is bounded by the number of tasks it will delete.
+    ///
+    /// Note that the cleanup task will still delete all old tasks. It will just
+    /// use multiple queries to do so.
+    ///
+    /// The default limit is 10000 tasks.
+    #[serde(default = "default_u32::<10000>")]
+    pub cleanup_batch_limit: u32,
+
     /// The maximum number of tasks that are allowed to be running on this node
     /// at once.
     ///
@@ -172,6 +199,10 @@ fn config_default_does_not_panic() {
 
 const fn default_seconds<const SECONDS: u64>() -> Duration {
     Duration::from_secs(SECONDS)
+}
+
+const fn default_option_seconds<const SECONDS: u64>() -> Option<Duration> {
+    Some(default_seconds::<{ SECONDS }>())
 }
 
 const fn default_u32<const N: u32>() -> u32 {
@@ -249,6 +280,30 @@ mod duration_seconds {
         }
 
         de.deserialize_f64(Visitor)
+    }
+}
+
+mod option_duration_seconds {
+    use std::time::Duration;
+
+    use serde::{Deserialize, Serialize};
+
+    #[derive(Serialize, Deserialize)]
+    #[serde(transparent)]
+    struct Wrapper(#[serde(with = "super::duration_seconds")] Duration);
+
+    pub(crate) fn serialize<S>(duration: &Option<Duration>, ser: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        duration.as_ref().copied().map(Wrapper).serialize(ser)
+    }
+
+    pub(crate) fn deserialize<'de, D>(de: D) -> Result<Option<Duration>, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        Ok(<Option<Wrapper>>::deserialize(de)?.map(|v| v.0))
     }
 }
 
