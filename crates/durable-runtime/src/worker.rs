@@ -15,7 +15,7 @@ use sqlx::postgres::PgNotification;
 use sqlx::types::Json;
 use tokio::sync::{broadcast, mpsc, Mutex, Notify, Semaphore};
 use tokio::task::JoinSet;
-use tokio::time::Instant;
+use tokio::time::{Instant, MissedTickBehavior};
 use tracing::Instrument;
 use wasmtime::component::Component;
 
@@ -265,6 +265,7 @@ impl Worker {
         let heartbeat = Self::heartbeat(self.shared.clone(), self.worker_id);
         let validate = Self::validate_workers(self.shared.clone(), self.worker_id);
         let leader = Self::leader(self.shared.clone(), self.worker_id);
+        let cleanup = Self::task_cleanup(self.shared.clone(), worker_id);
         let process = self.process_events();
 
         // We want to run these all in the same tokio task so that if it has problems
@@ -272,10 +273,11 @@ impl Worker {
         //
         // Spawned tasks are put into their own joinset because running everything in a
         // single task is not reasonable.
-        let (heartbeat, validate, leader, process) = (heartbeat, validate, leader, process)
-            .join()
-            .instrument(tracing::info_span!("worker", worker_id))
-            .await;
+        let (heartbeat, validate, leader, process, cleanup) =
+            (heartbeat, validate, leader, process, cleanup)
+                .join()
+                .instrument(tracing::info_span!("worker", worker_id))
+                .await;
 
         tracing::info!("deleting worker database entry");
         let result = sqlx::query!("DELETE FROM durable.worker WHERE id = $1", self.worker_id)
@@ -289,6 +291,7 @@ impl Worker {
         validate?;
         heartbeat?;
         leader?;
+        cleanup?;
         result?;
 
         Ok(())
@@ -560,6 +563,80 @@ impl Worker {
         }
 
         Ok(())
+    }
+
+    /// This task is responsible for deleting entries for old tasks.
+    async fn task_cleanup(shared: Arc<SharedState>, worker_id: i64) -> anyhow::Result<()> {
+        let cleanup_age = match shared.config.cleanup_age {
+            Some(cleanup_age) => cleanup_age,
+            None => {
+                shared.shutdown.wait().await;
+                return Ok(());
+            }
+        };
+
+        let _guard = ShutdownGuard::new(&shared.shutdown);
+        let mut shutdown = std::pin::pin!(shared.shutdown.wait());
+
+        let mut leader_id = shared.leader.get();
+        let mut leader_stream = std::pin::pin!(shared.leader.stream());
+
+        let mut interval = tokio::time::interval(Duration::from_secs(3600));
+        interval.set_missed_tick_behavior(MissedTickBehavior::Skip);
+
+        'outer: loop {
+            tokio::select! {
+                biased;
+
+                _ = shutdown.as_mut() => break 'outer,
+                _ = interval.tick(), if leader_id == worker_id => (),
+                new_leader = leader_stream.as_mut().next() => {
+                    leader_id = new_leader;
+                    continue 'outer;
+                }
+            }
+
+            let limit = shared.config.cleanup_batch_limit as i64;
+            let interval = cleanup_age.into_pg_interval();
+            let mut conn = match shared.pool.acquire().await {
+                Ok(conn) => conn,
+                Err(e) => {
+                    tracing::warn!("failed to acquire a connection to perform task cleanup: {e}");
+                    continue;
+                }
+            };
+
+            // We do cleanup
+            loop {
+                let result = sqlx::query!(
+                    r#"
+                    DELETE FROM durable.task
+                    WHERE task.ctid = ANY(ARRAY(
+                        SELECT ctid
+                        FROM durable.task
+                        WHERE completed_at < NOW() - $1::interval
+                        LIMIT $2
+                        FOR UPDATE
+                    ))
+                    "#,
+                    interval,
+                    limit
+                )
+                .execute(&mut *conn)
+                .await;
+
+                match result {
+                    Ok(result) if result.rows_affected() < limit as u64 => break,
+                    Ok(_) => (),
+                    Err(e) => {
+                        tracing::error!("failed to clean up old durable tasks: {e}");
+                        break;
+                    }
+                }
+            }
+        }
+
+        todo!()
     }
 
     async fn process_events(&mut self) -> anyhow::Result<()> {
