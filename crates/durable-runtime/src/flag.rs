@@ -87,6 +87,12 @@ impl<'a> ShutdownGuard<'a> {
 
 impl<'a> Drop for ShutdownGuard<'a> {
     fn drop(&mut self) {
+        if !self.0.is_raised() {
+            tracing::warn!(
+                "durable worker task shutting down without the shutdown flag being raised"
+            );
+        }
+
         self.0.raise();
     }
 }
