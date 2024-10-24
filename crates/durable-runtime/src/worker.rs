@@ -262,11 +262,17 @@ impl Worker {
         self.load_leader_id().await?;
 
         let worker_id = self.worker_id;
-        let heartbeat = Self::heartbeat(self.shared.clone(), self.worker_id);
-        let validate = Self::validate_workers(self.shared.clone(), self.worker_id);
-        let leader = Self::leader(self.shared.clone(), self.worker_id);
-        let cleanup = Self::task_cleanup(self.shared.clone(), worker_id);
-        let process = self.process_events();
+        let heartbeat = Self::heartbeat(self.shared.clone(), self.worker_id)
+            .instrument(tracing::info_span!("heartbeat"));
+        let validate = Self::validate_workers(self.shared.clone(), self.worker_id)
+            .instrument(tracing::info_span!("validate_workers"));
+        let leader = Self::leader(self.shared.clone(), self.worker_id)
+            .instrument(tracing::info_span!("leader"));
+        let cleanup = Self::task_cleanup(self.shared.clone(), worker_id)
+            .instrument(tracing::info_span!("task_cleanup"));
+        let process = self
+            .process_events()
+            .instrument(tracing::info_span!("process"));
 
         // We want to run these all in the same tokio task so that if it has problems
         // then the heartbeat will fail.
