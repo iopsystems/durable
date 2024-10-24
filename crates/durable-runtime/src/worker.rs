@@ -778,7 +778,8 @@ impl Worker {
                  FROM durable.task
                 WHERE (state IN ('ready', 'active') AND running_on IS NULL)
                    OR (state = 'ready' AND running_on = $1)
-                FOR UPDATE SKIP LOCKED
+                ORDER BY id ASC
+                FOR NO KEY UPDATE SKIP LOCKED
                 LIMIT $2
             )
             UPDATE durable.task
