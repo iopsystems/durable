@@ -1,5 +1,7 @@
 
 interface core {
+    use wasi:clocks/wall-clock@0.2.0.{datetime};
+
     // Get the task id for the current workflow.
     task-id: func() -> s64;
 
@@ -8,6 +10,10 @@ interface core {
 
     // Get the json-encoded task data for the current workflow.
     task-data: func() -> string;
+
+    // Get the timestamp that this task was created at.
+    @since(version = 2.6.0)
+    task-created-at: func() -> datetime;
 
     // Start a transaction. If this transaction has already executed to completion
     // then return the data from the last time it was executed.

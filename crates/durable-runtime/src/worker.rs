@@ -6,7 +6,7 @@ use anyhow::Context;
 use async_trait::async_trait;
 use cache_compute::Cached;
 use cfg_if::cfg_if;
-use chrono::Utc;
+use chrono::{DateTime, Utc};
 use futures_concurrency::future::Join;
 use futures_util::FutureExt;
 use rand::Rng;
@@ -52,6 +52,7 @@ pub(crate) struct SharedState {
 pub(crate) struct TaskData {
     pub id: i64,
     pub name: String,
+    pub created_at: DateTime<Utc>,
     pub wasm: i64,
     pub data: Json<Box<RawValue>>,
 }
@@ -793,10 +794,11 @@ impl Worker {
              FROM selected
             WHERE selected.id = task.id
             RETURNING
-                task.id     as id,
-                task.name   as name,
-                task.wasm   as "wasm!",
-                task.data   as "data!: Json<Box<RawValue>>"
+                task.id         as id,
+                task.name       as name,
+                task.created_at as created_at,
+                task.wasm       as "wasm!",
+                task.data       as "data!: Json<Box<RawValue>>"
             "#,
             self.worker_id,
             allowed as i64
