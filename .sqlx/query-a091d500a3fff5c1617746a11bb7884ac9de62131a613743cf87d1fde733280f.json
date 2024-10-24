@@ -1,0 +1,47 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            WITH selected AS (\n                SELECT id\n                 FROM durable.task\n                WHERE (state IN ('ready', 'active') AND running_on IS NULL)\n                   OR (state = 'ready' AND running_on = $1)\n                ORDER BY id ASC\n                FOR NO KEY UPDATE SKIP LOCKED\n                LIMIT $2\n            )\n            UPDATE durable.task\n              SET running_on = $1,\n                  state = 'active'\n             FROM selected\n            WHERE selected.id = task.id\n            RETURNING\n                task.id         as id,\n                task.name       as name,\n                task.created_at as created_at,\n                task.wasm       as \"wasm!\",\n                task.data       as \"data!: Json<Box<RawValue>>\"\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 1,
+        "name": "name",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 2,
+        "name": "created_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 3,
+        "name": "wasm!",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 4,
+        "name": "data!: Json<Box<RawValue>>",
+        "type_info": "Jsonb"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int8",
+        "Int8"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      true,
+      false
+    ]
+  },
+  "hash": "a091d500a3fff5c1617746a11bb7884ac9de62131a613743cf87d1fde733280f"
+}
