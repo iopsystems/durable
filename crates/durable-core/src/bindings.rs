@@ -8,6 +8,7 @@ pub mod durable {
             #[doc(hidden)]
             static __FORCE_SECTION_REF: fn() = super::super::super::__link_custom_section_describing_imports;
             use super::super::super::_rt;
+            pub type Datetime = super::super::super::wasi::clocks::wall_clock::Datetime;
             #[allow(unused_unsafe, clippy::all)]
             /// Get the task id for the current workflow.
             pub fn task_id() -> i64 {
@@ -76,6 +77,33 @@ pub mod durable {
                     let len3 = l2;
                     let bytes3 = _rt::Vec::from_raw_parts(l1.cast(), len3, len3);
                     _rt::string_lift(bytes3)
+                }
+            }
+            #[allow(unused_unsafe, clippy::all)]
+            /// Get the timestamp that this task was created at.
+            pub fn task_created_at() -> Datetime {
+                unsafe {
+                    #[repr(align(8))]
+                    struct RetArea([::core::mem::MaybeUninit<u8>; 16]);
+                    let mut ret_area = RetArea([::core::mem::MaybeUninit::uninit(); 16]);
+                    let ptr0 = ret_area.0.as_mut_ptr().cast::<u8>();
+                    #[cfg(target_arch = "wasm32")]
+                    #[link(wasm_import_module = "durable:core/core@2.5.0")]
+                    extern "C" {
+                        #[link_name = "task-created-at"]
+                        fn wit_import(_: *mut u8);
+                    }
+                    #[cfg(not(target_arch = "wasm32"))]
+                    fn wit_import(_: *mut u8) {
+                        unreachable!()
+                    }
+                    wit_import(ptr0);
+                    let l1 = *ptr0.add(0).cast::<i64>();
+                    let l2 = *ptr0.add(8).cast::<i32>();
+                    super::super::super::wasi::clocks::wall_clock::Datetime {
+                        seconds: l1 as u64,
+                        nanoseconds: l2 as u32,
+                    }
                 }
             }
             #[allow(unused_unsafe, clippy::all)]
@@ -500,22 +528,23 @@ mod _rt {
 #[cfg(target_arch = "wasm32")]
 #[link_section = "component-type:wit-bindgen:0.30.0:import-core:encoded world"]
 #[doc(hidden)]
-pub static __WIT_BINDGEN_COMPONENT_TYPE: [u8; 665] = *b"\
-\0asm\x0d\0\x01\0\0\x19\x16wit-component-encoding\x04\0\x07\x97\x04\x01A\x02\x01\
-A\x07\x01B\x0a\x01@\0\0x\x04\0\x07task-id\x01\0\x01@\0\0s\x04\0\x09task-name\x01\
-\x01\x04\0\x09task-data\x01\x01\x01ks\x01@\x02\x05labels\x05is-db\x7f\0\x02\x04\0\
-\x11transaction-enter\x01\x03\x01@\x01\x04datas\x01\0\x04\0\x10transaction-exit\x01\
-\x04\x03\x01\x17durable:core/core@2.5.0\x05\0\x01B\x05\x01r\x02\x07secondsw\x0bn\
-anosecondsy\x04\0\x08datetime\x03\0\0\x01@\0\0\x01\x04\0\x03now\x01\x02\x04\0\x0a\
-resolution\x01\x02\x03\x01\x1cwasi:clocks/wall-clock@0.2.0\x05\x01\x02\x03\0\x01\
-\x08datetime\x01B\x0b\x02\x03\x02\x01\x02\x04\0\x08datetime\x03\0\0\x01r\x03\x0a\
-created-at\x01\x05events\x04datas\x04\0\x05event\x03\0\x02\x01q\x03\x0etask-not-\
-found\0\0\x09task-dead\0\0\x05other\x01s\0\x04\0\x0cnotify-error\x03\0\x04\x01@\0\
-\0\x03\x04\0\x15notification-blocking\x01\x06\x01j\0\x01\x05\x01@\x03\x04taskx\x05\
-events\x04datas\0\x07\x04\0\x06notify\x01\x08\x03\x01\x19durable:core/notify@2.5\
-.0\x05\x03\x04\x01\x1edurable:core/import-core@2.5.0\x04\0\x0b\x11\x01\0\x0bimpo\
-rt-core\x03\0\0\0G\x09producers\x01\x0cprocessed-by\x02\x0dwit-component\x070.21\
-5.0\x10wit-bindgen-rust\x060.30.0";
+pub static __WIT_BINDGEN_COMPONENT_TYPE: [u8; 709] = *b"\
+\0asm\x0d\0\x01\0\0\x19\x16wit-component-encoding\x04\0\x07\xc3\x04\x01A\x02\x01\
+A\x07\x01B\x05\x01r\x02\x07secondsw\x0bnanosecondsy\x04\0\x08datetime\x03\0\0\x01\
+@\0\0\x01\x04\0\x03now\x01\x02\x04\0\x0aresolution\x01\x02\x03\x01\x1cwasi:clock\
+s/wall-clock@0.2.0\x05\0\x02\x03\0\0\x08datetime\x01B\x0e\x02\x03\x02\x01\x01\x04\
+\0\x08datetime\x03\0\0\x01@\0\0x\x04\0\x07task-id\x01\x02\x01@\0\0s\x04\0\x09tas\
+k-name\x01\x03\x04\0\x09task-data\x01\x03\x01@\0\0\x01\x04\0\x0ftask-created-at\x01\
+\x04\x01ks\x01@\x02\x05labels\x05is-db\x7f\0\x05\x04\0\x11transaction-enter\x01\x06\
+\x01@\x01\x04datas\x01\0\x04\0\x10transaction-exit\x01\x07\x03\x01\x17durable:co\
+re/core@2.5.0\x05\x02\x01B\x0b\x02\x03\x02\x01\x01\x04\0\x08datetime\x03\0\0\x01\
+r\x03\x0acreated-at\x01\x05events\x04datas\x04\0\x05event\x03\0\x02\x01q\x03\x0e\
+task-not-found\0\0\x09task-dead\0\0\x05other\x01s\0\x04\0\x0cnotify-error\x03\0\x04\
+\x01@\0\0\x03\x04\0\x15notification-blocking\x01\x06\x01j\0\x01\x05\x01@\x03\x04\
+taskx\x05events\x04datas\0\x07\x04\0\x06notify\x01\x08\x03\x01\x19durable:core/n\
+otify@2.5.0\x05\x03\x04\x01\x1edurable:core/import-core@2.5.0\x04\0\x0b\x11\x01\0\
+\x0bimport-core\x03\0\0\0G\x09producers\x01\x0cprocessed-by\x02\x0dwit-component\
+\x070.215.0\x10wit-bindgen-rust\x060.30.0";
 #[inline(never)]
 #[doc(hidden)]
 pub fn __link_custom_section_describing_imports() {

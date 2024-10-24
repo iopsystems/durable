@@ -1,3 +1,5 @@
+use std::time::{Duration, SystemTime};
+
 pub use serde_json::value::RawValue;
 
 #[macro_use]
@@ -30,6 +32,14 @@ pub fn task_data() -> Box<RawValue> {
     // 2. The runtime guarantees that the task data is valid json, so this does not
     //    create an invalid RawValue instance.
     unsafe { std::mem::transmute(data) }
+}
+
+/// Get the timestamp that this task was created at.
+pub fn task_created_at() -> SystemTime {
+    let datetime = crate::bindings::task_created_at();
+    let duration = Duration::new(datetime.seconds, datetime.nanoseconds);
+
+    SystemTime::UNIX_EPOCH + duration
 }
 
 /// Immediately abort the workflow with a message.

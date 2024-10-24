@@ -1,7 +1,10 @@
+use std::time::{Duration, SystemTime};
+
 use anyhow::Context;
 use serde_json::value::RawValue;
 
 use crate::bindings::durable::core::core::Host;
+use crate::bindings::wasi::clocks::wall_clock::Datetime;
 use crate::task::{Task, TransactionOptions};
 
 #[async_trait::async_trait]
@@ -16,6 +19,20 @@ impl Host for Task {
 
     fn task_data(&mut self) -> anyhow::Result<String> {
         Ok(self.state.task_data().get().to_owned())
+    }
+
+    fn task_created_at(&mut self) -> anyhow::Result<Datetime> {
+        let created_at = self.state.task_created_at();
+        let systime: SystemTime = created_at.into();
+
+        let duration = systime
+            .duration_since(SystemTime::UNIX_EPOCH)
+            .unwrap_or(Duration::ZERO);
+
+        Ok(Datetime {
+            seconds: duration.as_secs(),
+            nanoseconds: duration.subsec_nanos(),
+        })
     }
 
     async fn transaction_enter(

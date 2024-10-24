@@ -40,6 +40,7 @@ fn generate_bindings(out_dir: &Path) -> anyhow::Result<()> {
         "task-id",
         "task-name",
         "task-data",
+        "task-created-at",
         "abort",
         // And these ones are from the various wasi p2 interfaces that we export.
         "[method]error.to-debug-string",

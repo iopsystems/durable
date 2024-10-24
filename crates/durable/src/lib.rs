@@ -22,6 +22,8 @@
 
 #![cfg_attr(docsrs, feature(doc_cfg))]
 
+use std::time::SystemTime;
+
 use serde::de::Deserialize;
 pub use serde_json::value::RawValue;
 
@@ -51,6 +53,7 @@ pub struct Task {
     id: i64,
     name: String,
     data: Box<RawValue>,
+    created_at: SystemTime,
 }
 
 impl Task {
@@ -60,6 +63,7 @@ impl Task {
             id: durable_core::task_id(),
             name: durable_core::task_name(),
             data: durable_core::task_data(),
+            created_at: durable_core::task_created_at(),
         }
     }
 
@@ -74,6 +78,11 @@ impl Task {
     /// messages and debugging purposes by the runtime.
     pub fn name(&self) -> &str {
         &self.name
+    }
+
+    /// The timestamp at which this task was created.
+    pub fn created_at(&self) -> SystemTime {
+        self.created_at
     }
 
     /// The data that this task was created with, deserialized as a `T`.

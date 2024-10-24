@@ -233,6 +233,11 @@ impl TaskState {
         &self.task.data
     }
 
+    /// Get the timestamp at which this task was created.
+    pub fn task_created_at(&self) -> DateTime<Utc> {
+        self.task.created_at
+    }
+
     /// Get the worker id that we are currently runing on.
     ///
     /// Note that it is not safe to expose this to the workflow outside of a
