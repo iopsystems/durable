@@ -5,7 +5,7 @@ pub use serde_json::value::RawValue;
 #[macro_use]
 extern crate serde;
 
-mod alloc;
+// mod alloc;
 pub mod notify;
 mod start;
 pub mod transaction;
