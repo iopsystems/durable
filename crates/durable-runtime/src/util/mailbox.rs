@@ -74,7 +74,7 @@ impl<'a, T: Copy> MailboxStream<'a, T> {
     }
 }
 
-impl<'a, T: Copy> Stream for MailboxStream<'a, T> {
+impl<T: Copy> Stream for MailboxStream<'_, T> {
     type Item = T;
 
     fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {

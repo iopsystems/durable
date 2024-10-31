@@ -1259,10 +1259,25 @@ impl EventSource for PgEventSource {
                         _ => continue,
                     }
                 }
-                Ok(None) => Ok(Event::Lagged),
-                Err(e) => {
-                    tracing::warn!("listener received an error: {e}");
-                    tokio::time::sleep(Duration::from_secs(1)).await;
+                Ok(None) => {
+                    while let Err(e) = sqlx::query("SELECT 1").execute(&mut self.listener).await {
+                        tracing::warn!("listener received an error: {e}");
+                        tokio::time::sleep(Duration::from_secs(1)).await;
+                    }
+
+                    Ok(Event::Lagged)
+                }
+                Err(mut e) => {
+                    loop {
+                        tracing::warn!("listener received an error: {e}");
+
+                        match sqlx::query("SELECT 1").execute(&mut self.listener).await {
+                            Ok(_) => break,
+                            Err(err) => e = err,
+                        }
+                        tokio::time::sleep(Duration::from_secs(1)).await;
+                    }
+
                     Ok(Event::Lagged)
                 }
             };

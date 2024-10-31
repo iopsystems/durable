@@ -237,7 +237,7 @@ mod duration_seconds {
 
         struct Visitor;
 
-        impl<'de> serde::de::Visitor<'de> for Visitor {
+        impl serde::de::Visitor<'_> for Visitor {
             type Value = Duration;
 
             fn expecting(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
