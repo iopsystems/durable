@@ -85,7 +85,7 @@ impl<'a> ShutdownGuard<'a> {
     }
 }
 
-impl<'a> Drop for ShutdownGuard<'a> {
+impl Drop for ShutdownGuard<'_> {
     fn drop(&mut self) {
         if !self.0.is_raised() {
             tracing::warn!(
