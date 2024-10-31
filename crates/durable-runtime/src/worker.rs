@@ -9,6 +9,7 @@ use cfg_if::cfg_if;
 use chrono::{DateTime, Utc};
 use futures_concurrency::future::Join;
 use futures_util::FutureExt;
+use metrics::{Counter, Gauge, Histogram};
 use rand::Rng;
 use serde_json::value::RawValue;
 use sqlx::postgres::PgNotification;
@@ -25,7 +26,7 @@ use crate::event::{self, Event, EventSource, Notification};
 use crate::flag::{ShutdownFlag, ShutdownGuard};
 use crate::plugin::{DurablePlugin, Plugin};
 use crate::task::{Task, TaskState};
-use crate::util::{IntoPgInterval, Mailbox};
+use crate::util::{IntoPgInterval, Mailbox, MetricSpan};
 use crate::Config;
 
 const LOG_ERROR_INDEX: i32 = i32::MAX - 1;
@@ -47,6 +48,31 @@ pub(crate) struct SharedState {
     /// time. These are expensive and can easily end up eating all the memory
     /// and compute time needed by a worker if it gets hammered.
     compile_sema: Semaphore,
+
+    pub(crate) metrics: SharedMetrics,
+}
+
+pub(crate) struct SharedMetrics {
+    task_spawn: Counter,
+    task_suspend: Counter,
+    task_complete: Counter,
+    task_failed: Counter,
+    task_taken: Counter,
+    wasm_compile_latency: Histogram,
+}
+
+impl SharedMetrics {
+    pub fn new() -> Self {
+        Self {
+            task_spawn: metrics::counter!("durable.task_spawn"),
+            task_suspend: metrics::counter!("durable.task_suspend"),
+            task_complete: metrics::counter!("durable.task_complete"),
+            task_failed: metrics::counter!("durable.task_failed"),
+            task_taken: metrics::counter!("durable.task_tasken"),
+
+            wasm_compile_latency: metrics::histogram!("durable.wasm_compile_latency"),
+        }
+    }
 }
 
 pub(crate) struct TaskData {
@@ -171,6 +197,7 @@ impl WorkerBuilder {
             pool: self.pool,
             config: self.config,
             plugins: self.plugins,
+            metrics: SharedMetrics::new(),
         });
 
         let mut config = self.wasmtime_config.unwrap_or_else(|| {
@@ -198,6 +225,8 @@ impl WorkerBuilder {
             worker_id: -1,
             tasks: JoinSet::new(),
             blocked: false,
+
+            active_tasks: metrics::gauge!("durable.active_tasks"),
         })
     }
 }
@@ -237,6 +266,9 @@ pub struct Worker {
     worker_id: i64,
     tasks: JoinSet<()>,
     blocked: bool,
+
+    /// A metric tracking how many tasks are currently active on this worker.
+    active_tasks: Gauge,
 }
 
 impl Worker {
@@ -842,7 +874,9 @@ impl Worker {
                 "launching task {}", task.name
             );
 
+            let active_tasks = self.active_tasks.clone();
             let future = async move {
+                let _guard = MetricSpan::enter(active_tasks);
                 let task_id = task.id;
                 if let Err(e) = Self::run_task(shared, engine, task, worker_id)
                     .instrument(tracing::info_span!("task", task_id))
@@ -879,6 +913,8 @@ impl Worker {
         worker_id: i64,
     ) -> anyhow::Result<()> {
         let task_id = task.id;
+
+        shared.metrics.task_spawn.increment(1);
 
         // We are using the loop here to do some early breaks.
         #[allow(clippy::never_loop)]
@@ -979,10 +1015,12 @@ impl Worker {
                 tracing::debug!("task {task_id} was taken by another worker");
 
                 // Don't do anything since we no longer own this task.
+                shared.metrics.task_taken.increment(1);
             }
             TaskStatus::Suspend => {
                 // The task should have set itself to the suspended state before
                 // returning this error code. Nothing we need to do here.
+                shared.metrics.task_suspend.increment(1);
             }
             TaskStatus::ExitSuccess => {
                 sqlx::query!(
@@ -997,6 +1035,8 @@ impl Worker {
                 )
                 .execute(&shared.pool)
                 .await?;
+
+                shared.metrics.task_complete.increment(1);
             }
             TaskStatus::ExitFailure => {
                 sqlx::query!(
@@ -1010,6 +1050,8 @@ impl Worker {
                 )
                 .execute(&shared.pool)
                 .await?;
+
+                shared.metrics.task_failed.increment(1);
             }
         }
 
@@ -1069,12 +1111,15 @@ impl Worker {
                 .context("component compilation panicked")?
                 .map_err(anyhow::Error::from)?;
 
+                let elapsed = start.elapsed();
                 tracing::debug!(
                     target: "durable_runtime::worker::task_compile",
                     id = task.wasm,
                     "compiling new module took {}",
-                    humantime::Duration::from(start.elapsed())
+                    humantime::Duration::from(elapsed)
                 );
+
+                shared.metrics.wasm_compile_latency.record(elapsed);
 
                 Ok(component)
             })
