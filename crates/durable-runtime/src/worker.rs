@@ -675,7 +675,7 @@ impl Worker {
             }
         }
 
-        todo!()
+        Ok(())
     }
 
     async fn process_events(&mut self) -> anyhow::Result<()> {
