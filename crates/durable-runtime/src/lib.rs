@@ -19,7 +19,7 @@ mod worker;
     clippy::all,
     dead_code,
     unused_mut,
-    unused_doc_comments,
+    unused_doc_comments
 )]
 mod bindings {
     include!(concat!(env!("OUT_DIR"), "/bindings.rs"));
