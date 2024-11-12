@@ -66,7 +66,7 @@ impl HostHttpError2 for Task {
         Ok(error.is_connect())
     }
 
-    fn drop(&mut self, res: Resource<HttpError2>) -> wasmtime::Result<()> {
+    async fn drop(&mut self, res: Resource<HttpError2>) -> wasmtime::Result<()> {
         self.resources.remove(res)?;
         Ok(())
     }
@@ -196,7 +196,7 @@ impl HostHttpRequest2 for Task {
         Ok(())
     }
 
-    fn drop(&mut self, res: Resource<HttpRequest2>) -> wasmtime::Result<()> {
+    async fn drop(&mut self, res: Resource<HttpRequest2>) -> wasmtime::Result<()> {
         self.resources.remove(res)?;
         Ok(())
     }

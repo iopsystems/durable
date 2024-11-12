@@ -20,7 +20,6 @@ use tokio::time::{Instant, MissedTickBehavior};
 use tracing::Instrument;
 use wasmtime::component::Component;
 
-use crate::bindings::exports::wasi::cli::run::GuestPre;
 use crate::error::{ClonableAnyhowError, TaskStatus};
 use crate::event::{self, Event, EventSource, Notification};
 use crate::flag::{ShutdownFlag, ShutdownGuard};
@@ -1069,6 +1068,8 @@ impl Worker {
     ) -> anyhow::Result<TaskStatus> {
         use wasmtime::component::*;
 
+        use crate::bindings::Imports;
+
         // tracing::info!(
         //     target: "durable_runtime::worker::task_launch",
         //     "launching task `{}`", task.name);
@@ -1146,16 +1147,10 @@ impl Worker {
 
         let mut store = wasmtime::Store::new(&engine, task);
 
-        let guest = GuestPre::new(&component) //
-            .context("failed to pre-load the wasm:cli/run export")?;
-        let instance = linker
-            .instantiate_async(&mut store, &component)
+        let instance = Imports::instantiate_async(&mut store, &component, &linker)
             .await
             .context("failed to instantiate the wasm component")?;
-
-        let guest = guest
-            .load(&mut store, &instance)
-            .context("failed to load the wasi:cli/run export")?;
+        let guest = instance.wasi_cli_run();
 
         let mut error = None;
         let status = match guest.call_run(&mut store).await {
