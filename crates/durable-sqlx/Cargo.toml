@@ -32,7 +32,7 @@ sqlx = { version = "0.8.0", default-features = false }
 sqlx-core = { version = "0.8.0", default-features = false }
 url = "2.5.2"
 wit-bindgen-rt = { workspace = true }
-thiserror = "1.0.63"
+thiserror = "2.0.0"
 uuid = { version = "1.10.0", features = ["serde"], optional = true }
 
 [dev-dependencies]
