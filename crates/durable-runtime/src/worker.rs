@@ -231,6 +231,7 @@ impl WorkerBuilder {
     }
 }
 
+#[derive(Clone)]
 pub struct WorkerHandle {
     shared: Arc<SharedState>,
 }
