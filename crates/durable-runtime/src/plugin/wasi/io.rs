@@ -16,6 +16,7 @@ use crate::Task;
 /// ready.
 const SUSPEND_PREWAKE: Duration = Duration::from_secs(10);
 
+#[async_trait]
 impl wasi::io::error::HostError for Task {
     fn to_debug_string(
         &mut self,
@@ -27,7 +28,7 @@ impl wasi::io::error::HostError for Task {
         Ok(error.to_string())
     }
 
-    fn drop(&mut self, res: Resource<wasi::io::error::Error>) -> wasmtime::Result<()> {
+    async fn drop(&mut self, res: Resource<wasi::io::error::Error>) -> wasmtime::Result<()> {
         let resources = self.plugins.expect_mut::<WasiResources>();
         resources.errors.remove(res.rep() as usize);
         Ok(())
@@ -80,7 +81,7 @@ impl wasi::io::streams::HostInputStream for Task {
         Ok(Resource::new_own(u32::MAX))
     }
 
-    fn drop(&mut self, _: Resource<InputStream>) -> wasmtime::Result<()> {
+    async fn drop(&mut self, _: Resource<InputStream>) -> wasmtime::Result<()> {
         Ok(())
     }
 }
@@ -195,7 +196,7 @@ impl wasi::io::streams::HostOutputStream for Task {
         Ok(Err(StreamError::Closed))
     }
 
-    fn drop(&mut self, _: Resource<OutputStream>) -> wasmtime::Result<()> {
+    async fn drop(&mut self, _: Resource<OutputStream>) -> wasmtime::Result<()> {
         Ok(())
     }
 }
@@ -292,7 +293,7 @@ impl wasi::io::poll::HostPollable for Task {
         Ok(())
     }
 
-    fn drop(&mut self, pollable: Resource<Pollable>) -> wasmtime::Result<()> {
+    async fn drop(&mut self, pollable: Resource<Pollable>) -> wasmtime::Result<()> {
         // All stream pollables are shared so no drops necessary.
         if pollable.rep() == u32::MAX {
             return Ok(());

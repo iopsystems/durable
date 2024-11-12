@@ -273,7 +273,7 @@ impl sql::HostTypeInfo for Task {
             .insert(<Vec<IpNetwork> as sqlx::Type<sqlx::Postgres>>::type_info().into())
     }
 
-    fn drop(&mut self, rep: Resource<sql::TypeInfo>) -> wasmtime::Result<()> {
+    async fn drop(&mut self, rep: Resource<sql::TypeInfo>) -> wasmtime::Result<()> {
         self.resources.remove(rep)?;
         Ok(())
     }
@@ -961,7 +961,7 @@ impl sql::HostValue for Task {
         self.resources.insert(value)
     }
 
-    fn drop(&mut self, res: Resource<sql::Value>) -> wasmtime::Result<()> {
+    async fn drop(&mut self, res: Resource<sql::Value>) -> wasmtime::Result<()> {
         self.resources.remove(res)?;
         Ok(())
     }

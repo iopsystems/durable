@@ -14,8 +14,14 @@ pub mod task;
 pub mod util;
 mod worker;
 
-#[allow(rustdoc::invalid_html_tags, unused_mut, unused_doc_comments)]
-pub mod bindings {
+#[allow(
+    rustdoc::invalid_html_tags,
+    clippy::all,
+    dead_code,
+    unused_mut,
+    unused_doc_comments,
+)]
+mod bindings {
     include!(concat!(env!("OUT_DIR"), "/bindings.rs"));
 }
 

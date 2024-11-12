@@ -232,7 +232,7 @@ impl wasi::filesystem::types::HostDescriptor for Task {
         anyhow::bail!("wasi:filesystem/types.descriptor.metadata-hash-at is not implemented")
     }
 
-    fn drop(&mut self, _: Resource<Descriptor>) -> wasmtime::Result<()> {
+    async fn drop(&mut self, _: Resource<Descriptor>) -> wasmtime::Result<()> {
         Ok(())
     }
 }
@@ -248,7 +248,7 @@ impl wasi::filesystem::types::HostDirectoryEntryStream for Task {
         )
     }
 
-    fn drop(&mut self, _: Resource<DirectoryEntryStream>) -> wasmtime::Result<()> {
+    async fn drop(&mut self, _: Resource<DirectoryEntryStream>) -> wasmtime::Result<()> {
         Ok(())
     }
 }
