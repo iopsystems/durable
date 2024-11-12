@@ -1,6 +1,10 @@
+use std::future::Future;
+use std::pin::Pin;
+use std::task::{Context, Poll};
 use std::time::Duration;
 
 use durable_runtime::{Config, WorkerBuilder, WorkerHandle};
+use futures::FutureExt;
 use tokio::task::JoinHandle;
 
 pub async fn spawn_worker(pool: sqlx::PgPool) -> anyhow::Result<WorkerShutdownGuard> {
@@ -33,41 +37,39 @@ pub async fn spawn_worker_with(
     let handle = worker.handle();
     let task = tokio::spawn(async move { worker.run().await });
 
-    Ok(WorkerShutdownGuard {
-        handle,
-        _task: Some(task),
-    })
+    Ok(WorkerShutdownGuard { handle, task })
 }
 
 pub struct WorkerShutdownGuard {
     handle: WorkerHandle,
-    _task: Option<JoinHandle<anyhow::Result<()>>>,
+    task: JoinHandle<anyhow::Result<()>>,
+}
+
+impl WorkerShutdownGuard {
+    pub fn handle(&self) -> WorkerHandle {
+        self.handle.clone()
+    }
+}
+
+impl Future for WorkerShutdownGuard {
+    type Output = anyhow::Result<()>;
+
+    fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        let result = std::task::ready!(self.task.poll_unpin(cx));
+
+        Poll::Ready(match result {
+            Ok(result) => result,
+            Err(e) => match e.try_into_panic() {
+                Ok(payload) => std::panic::resume_unwind(payload),
+                Err(e) => Err(anyhow::anyhow!(e)),
+            },
+        })
+    }
 }
 
 impl Drop for WorkerShutdownGuard {
     fn drop(&mut self) {
         self.handle.shutdown();
-
-        // if std::thread::panicking() {
-        //     return;
-        // }
-
-        // tokio::task::block_in_place(|| {
-        //     if let Some(task) = self.task.take() {
-        //         let future = tokio::time::timeout(Duration::from_secs(1),
-        // task);         match Handle::current().block_on(future) {
-        //             Ok(Ok(Ok(()))) => (),
-        //             Ok(Ok(Err(e))) => {
-        //                 eprintln!("durable runtime exited with an error:
-        // {e:?}");                 panic!("durable runtime exited with
-        // an error")             }
-        //             Ok(Err(e)) => std::panic::resume_unwind(e.into_panic()),
-        //             Err(_) => {
-        //                 eprintln!("warning: failed to wait for the runtime
-        // task to complete")             }
-        //         }
-        //     }
-        // })
     }
 }
 

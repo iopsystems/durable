@@ -5,6 +5,7 @@ use durable_client::{DurableClient, Program, ProgramOptions};
 
 mod basic;
 mod notify;
+mod shutdown;
 mod sqlx;
 
 async fn load_binary(client: &DurableClient, name: &str) -> anyhow::Result<Program> {
