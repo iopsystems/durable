@@ -921,7 +921,7 @@ dependencies = [
  "serde_json",
  "sha2",
  "sqlx",
- "wasmparser 0.216.0",
+ "wasmparser 0.224.0",
  "weak-table",
 ]
 
@@ -1503,6 +1503,7 @@ dependencies = [
  "allocator-api2",
  "equivalent",
  "foldhash",
+ "serde",
 ]
 
 [[package]]
@@ -4078,20 +4079,6 @@ dependencies = [
 
 [[package]]
 name = "wasmparser"
-version = "0.216.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bcdee6bea3619d311fb4b299721e89a986c3470f804b6d534340e412589028e3"
-dependencies = [
- "ahash",
- "bitflags 2.8.0",
- "hashbrown 0.14.5",
- "indexmap 2.7.1",
- "semver",
- "serde",
-]
-
-[[package]]
-name = "wasmparser"
 version = "0.218.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b09e46c7fceceaa72b2dd1a8a137ea7fd8f93dfaa69806010a709918e496c5dc"
@@ -4111,8 +4098,10 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "65881a664fdd43646b647bb27bf186ab09c05bf56779d40aed4c6dce47d423f5"
 dependencies = [
  "bitflags 2.8.0",
+ "hashbrown 0.15.2",
  "indexmap 2.7.1",
  "semver",
+ "serde",
 ]
 
 [[package]]
