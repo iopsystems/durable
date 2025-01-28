@@ -370,7 +370,7 @@ impl Worker {
             }
 
             let mut interval = shared.config.heartbeat_interval;
-            let jitter = rand::thread_rng().gen_range(0..(interval / 4).as_nanos());
+            let jitter = rand::rng().random_range(0..(interval / 4).as_nanos());
             interval -= Duration::from_nanos(jitter as u64);
 
             next += interval;

@@ -10,7 +10,7 @@ durable-bindgen = { workspace = true }
 durable-migrate = { workspace = true, features = ["migrate"] }
 
 anyhow = "1.0.86"
-cargo_metadata = "0.18.1"
+cargo_metadata = "0.19.1"
 clap = { version = "4.5.11", features = ["derive"] }
 dotenvy = "0.15.7"
 serde = { version = "1.0.204", features = ["derive"] }
