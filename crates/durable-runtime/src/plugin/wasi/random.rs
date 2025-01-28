@@ -56,7 +56,7 @@ impl wasi::random::insecure::Host for Task {
         self.state
             .maybe_do_transaction_sync(options, move |_| {
                 let mut data = vec![0u8; len as usize];
-                rand::thread_rng().fill_bytes(&mut data);
+                rand::rng().fill_bytes(&mut data);
                 Ok(data)
             })
             .await
@@ -65,7 +65,7 @@ impl wasi::random::insecure::Host for Task {
     async fn get_insecure_random_u64(&mut self) -> wasmtime::Result<u64> {
         let options = TransactionOptions::new("wasi:random/random.get-insecure-random-u64");
         self.state
-            .maybe_do_transaction_sync(options, move |_| Ok(rand::thread_rng().next_u64()))
+            .maybe_do_transaction_sync(options, move |_| Ok(rand::rng().next_u64()))
             .await
     }
 }

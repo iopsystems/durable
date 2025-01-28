@@ -38,7 +38,7 @@ humantime = "2.1.0"
 log = "0.4.22"
 parking_lot = "0.12.3"
 pin-project = "1.1.5"
-rand = "0.8.5"
+rand = "0.9.0"
 reqwest = "0.12.5"
 serde = { version = "1.0.204", features = ["derive"] }
 serde_json = { version = "1.0.120", features = ["raw_value"] }
