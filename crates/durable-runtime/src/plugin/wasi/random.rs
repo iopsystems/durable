@@ -16,7 +16,7 @@ impl wasi::random::random::Host for Task {
         self.state
             .maybe_do_transaction_sync(options, move |_| {
                 let mut data = Vec::with_capacity(len as usize);
-                getrandom::getrandom_uninit(data.spare_capacity_mut())
+                getrandom::fill_uninit(data.spare_capacity_mut())
                     .context("get-random-bytes: failed to call getrandom")?;
 
                 // SAFETY: getrandom_uninit returned successfully so all bytes in the spare
@@ -34,8 +34,7 @@ impl wasi::random::random::Host for Task {
             .maybe_do_transaction_sync(options, move |_| {
                 let mut data = [0u8; std::mem::size_of::<u64>()];
 
-                getrandom::getrandom(&mut data)
-                    .context("get-random-u64: failed to call getrandom")?;
+                getrandom::fill(&mut data).context("get-random-u64: failed to call getrandom")?;
 
                 Ok(u64::from_ne_bytes(data))
             })
