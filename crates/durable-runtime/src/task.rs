@@ -514,7 +514,7 @@ impl TaskState {
             logs = std::mem::take(&mut txn.logs);
 
             if self.config().debug_emit_task_logs {
-                print!("{logs}");
+                eprint!("{logs}");
             }
 
             Some(logs)
