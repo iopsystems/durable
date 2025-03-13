@@ -24,7 +24,7 @@ use crate::error::{ClonableAnyhowError, TaskStatus};
 use crate::event::{self, Event, EventSource, Notification};
 use crate::flag::{ShutdownFlag, ShutdownGuard};
 use crate::plugin::{DurablePlugin, Plugin};
-use crate::task::{Task, TaskState};
+use crate::task::{RecordedEvent, Task, TaskState};
 use crate::util::{IntoPgInterval, Mailbox, MetricSpan};
 use crate::Config;
 
@@ -1110,8 +1110,7 @@ impl Worker {
                     move || Component::new(&engine, &wasm)
                 })
                 .await
-                .context("component compilation panicked")?
-                .map_err(anyhow::Error::from)?;
+                .context("component compilation panicked")??;
 
                 let elapsed = start.elapsed();
                 tracing::debug!(
@@ -1127,9 +1126,27 @@ impl Worker {
             })
             .await?;
 
+        let events = sqlx::query_as!(
+            RecordedEvent,
+            r#"
+            SELECT
+                index,
+                label,
+                value as "value!: Json<Box<RawValue>>"
+             FROM durable.event
+            WHERE task_id = $1
+            ORDER BY index ASC
+            LIMIT 1000
+            "#,
+            task.id
+        )
+        .fetch_all(&shared.pool)
+        .await
+        .unwrap_or_default();
+
         let task_id = task.id;
         let mut task = Task {
-            state: TaskState::new(shared.clone(), task, worker_id),
+            state: TaskState::new(shared.clone(), task, worker_id, events),
             plugins: Default::default(),
             resources: crate::Resources::default(),
         };

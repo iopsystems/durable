@@ -37,7 +37,6 @@ impl wasi::clocks::wall_clock::Host for Task {
                 Ok(Datetime::from(duration))
             })
             .await
-            .map(From::from)
     }
 
     fn resolution(&mut self) -> wasmtime::Result<Datetime> {

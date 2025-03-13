@@ -43,13 +43,19 @@ impl Extend<Self> for QueryResult {
     }
 }
 
+pub(crate) struct RecordedEvent {
+    pub(crate) index: i32,
+    pub(crate) label: String,
+    pub(crate) value: Json<Box<RawValue>>,
+}
+
 /// A running workflow transaction.
 pub struct Transaction {
     label: Cow<'static, str>,
     index: i32,
 
     // SAFETY NOTE:
-    // When Some this strema contains a reference to conn. It must be cleared before it is safe to
+    // When Some this stream contains a reference to conn. It must be cleared before it is safe to
     // access conn.
     stream: Option<QueryStream<'static>>,
 
@@ -203,16 +209,28 @@ pub struct TaskState {
 
     txn_index: i32,
     txn: Option<Transaction>,
+
+    /// Recorded events that are known to have already completed.
+    events: Vec<RecordedEvent>,
 }
 
 impl TaskState {
-    pub(crate) fn new(shared: Arc<SharedState>, task: TaskData, worker_id: i64) -> Self {
+    pub(crate) fn new(
+        shared: Arc<SharedState>,
+        task: TaskData,
+        worker_id: i64,
+        mut events: Vec<RecordedEvent>,
+    ) -> Self {
+        // We want to pop items off the back of the events.
+        events.reverse();
+
         Self {
             shared,
             task,
             worker_id,
             txn_index: 0,
             txn: None,
+            events,
         }
     }
 }
@@ -330,6 +348,10 @@ impl TaskState {
     where
         T: DeserializeOwned,
     {
+        if let Some(value) = self.try_enter_cached(&options)? {
+            return Ok(Some(value));
+        }
+
         let is_db_txn = std::mem::take(&mut options.database);
         let mut tx = None;
         let mut conn;
@@ -351,6 +373,45 @@ impl TaskState {
         }
 
         Ok(None)
+    }
+
+    /// Attempt to load the transaction value from the cached event history.
+    fn try_enter_cached<T>(&mut self, options: &TransactionOptions) -> anyhow::Result<Option<T>>
+    where
+        T: DeserializeOwned,
+    {
+        let Some(record) = self.events.pop() else {
+            return Ok(None);
+        };
+
+        if record.index != self.txn_index {
+            self.events.clear();
+            return Ok(None);
+        }
+
+        if record.label != options.label {
+            self.events.clear();
+            anyhow::bail!(
+                "workflow execution is non-deterministic: stored event at index {} has label {:?} \
+                 but the workflow requested {:?}",
+                self.txn_index,
+                record.label,
+                options.label
+            );
+        }
+
+        match serde_json::from_str(record.value.get()).with_context(|| {
+            format!(
+                "internal error: failed to deserialize internal event data of type `{}`",
+                std::any::type_name::<T>()
+            )
+        }) {
+            Ok(value) => Ok(Some(value)),
+            Err(e) => {
+                self.events.clear();
+                Err(e)
+            }
+        }
     }
 
     async fn enter_impl<T>(
