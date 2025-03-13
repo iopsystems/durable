@@ -301,8 +301,10 @@ impl Worker {
             .instrument(tracing::info_span!("validate_workers"));
         let leader = Self::leader(self.shared.clone(), self.worker_id)
             .instrument(tracing::info_span!("leader"));
-        let cleanup = Self::task_cleanup(self.shared.clone(), worker_id)
+        let cleanup = Self::task_cleanup(self.shared.clone(), self.worker_id)
             .instrument(tracing::info_span!("task_cleanup"));
+        let stuck_notify = Self::stuck_notify(self.shared.clone(), self.worker_id)
+            .instrument(tracing::info_span!("stuck_notify"));
         let process = self
             .process_events()
             .instrument(tracing::info_span!("process"));
@@ -312,8 +314,8 @@ impl Worker {
         //
         // Spawned tasks are put into their own joinset because running everything in a
         // single task is not reasonable.
-        let (heartbeat, validate, leader, process, cleanup) =
-            (heartbeat, validate, leader, process, cleanup)
+        let (heartbeat, validate, leader, process, cleanup, stuck_notify) =
+            (heartbeat, validate, leader, process, cleanup, stuck_notify)
                 .join()
                 .instrument(tracing::info_span!("worker", worker_id))
                 .await;
@@ -331,6 +333,7 @@ impl Worker {
         heartbeat?;
         leader?;
         cleanup?;
+        stuck_notify?;
         result?;
 
         Ok(())
@@ -672,6 +675,68 @@ impl Worker {
                         break;
                     }
                 }
+            }
+        }
+
+        Ok(())
+    }
+
+    /// This task is responsible for re-activating any workers that get stuck.
+    async fn stuck_notify(shared: Arc<SharedState>, worker_id: i64) -> anyhow::Result<()> {
+        let _guard = ShutdownGuard::new(&shared.shutdown);
+        let mut shutdown = std::pin::pin!(shared.shutdown.wait());
+
+        let mut leader_id = shared.leader.get();
+        let mut leader_stream = std::pin::pin!(shared.leader.stream());
+
+        let mut interval = tokio::time::interval(Duration::from_secs(3600));
+        interval.set_missed_tick_behavior(MissedTickBehavior::Skip);
+
+        'outer: loop {
+            tokio::select! {
+                biased;
+
+                _ = shutdown.as_mut() => break 'outer,
+                _ = interval.tick(), if leader_id == worker_id => (),
+                new_leader = leader_stream.as_mut().next() => {
+                    leader_id = new_leader;
+                    continue 'outer;
+                }
+            }
+
+            let mut conn = match shared.pool.acquire().await {
+                Ok(conn) => conn,
+                Err(e) => {
+                    tracing::warn!("failed to acquire a connection to send notifications: {e}");
+                    continue;
+                }
+            };
+
+            let result = sqlx::query!(
+                r#"
+                UPDATE durable.task
+                  SET state = 'ready'
+                WHERE state = 'suspended'
+                  AND EXISTS((
+                    SELECT task_id
+                     FROM durable.notification
+                    WHERE task_id = task.id
+                      AND created_at < NOW() - '10 minutes'::interval
+                  ))
+                "#
+            )
+            .execute(&mut *conn)
+            .await;
+
+            match result {
+                Ok(res) if res.rows_affected() != 0 => {
+                    tracing::warn!(
+                        count = res.rows_affected(),
+                        "unwedged tasks with stuck notifications"
+                    );
+                }
+                Ok(_) => (),
+                Err(e) => tracing::error!("failed to notify stuck tasks: {e}"),
             }
         }
 
