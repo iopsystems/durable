@@ -143,13 +143,14 @@ impl Host for Task {
                 Err(e) => return Ok(Err(NotifyError::Other(e.to_string()))),
             };
 
-            // Note: we lock the row here so that other transactions running at the same
-            // time cannot modify the
+            // Note: We lock the row here so that concurrent notification polls
+            //       cannot barge in here.
             let state = sqlx::query_scalar!(
                 r#"
                 SELECT state as "state!: TaskState" 
                  FROM durable.task
                 WHERE task.id = $1
+                FOR UPDATE
                 "#,
                 task
             )

@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n                SELECT state as \"state!: TaskState\" \n                 FROM durable.task\n                WHERE task.id = $1\n                ",
+  "query": "\n                SELECT state as \"state!: TaskState\" \n                 FROM durable.task\n                WHERE task.id = $1\n                FOR UPDATE\n                ",
   "describe": {
     "columns": [
       {
@@ -31,5 +31,5 @@
       false
     ]
   },
-  "hash": "c1e9006975dae313eabd8f9a12869341660140754c034175a93e3b800f90444e"
+  "hash": "eda0e7e4a91f19b4098d3d5ed1160a3a997e7c7c05ce7adffa01d627e4f75422"
 }
