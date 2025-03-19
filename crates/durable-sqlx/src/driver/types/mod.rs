@@ -92,6 +92,7 @@ mod int;
 mod ipnetwork;
 #[cfg(feature = "json")]
 mod json;
+mod option;
 mod text;
 #[cfg(feature = "uuid")]
 mod uuid;
