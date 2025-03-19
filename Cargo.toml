@@ -3,7 +3,7 @@ members = ["crates/*", "examples"]
 resolver = "2"
 
 [workspace.package]
-version = "0.5.5"
+version = "0.5.6"
 license = "Apache-2.0 OR MIT"
 publish = ["iop-systems"]
 repository = "https://github.com/iopsystems/durable"
