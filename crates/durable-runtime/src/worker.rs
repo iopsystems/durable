@@ -309,6 +309,7 @@ impl Worker {
             .process_events()
             .instrument(tracing::info_span!("process"));
 
+        let span = tracing::info_span!("worker", id = worker_id);
         // We want to run these all in the same tokio task so that if it has problems
         // then the heartbeat will fail.
         //
@@ -317,10 +318,12 @@ impl Worker {
         let (heartbeat, validate, leader, process, cleanup, stuck_notify) =
             (heartbeat, validate, leader, process, cleanup, stuck_notify)
                 .join()
-                .instrument(tracing::info_span!("worker", worker_id))
+                .instrument(span.clone())
                 .await;
 
-        tracing::info!("deleting worker database entry");
+        span.in_scope(|| {
+            tracing::info!("deleting worker database entry");
+        });
         let result = sqlx::query!("DELETE FROM durable.worker WHERE id = $1", self.worker_id)
             .execute(&self.shared.pool)
             .await
