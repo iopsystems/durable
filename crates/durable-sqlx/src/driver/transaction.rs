@@ -1,3 +1,5 @@
+use std::borrow::Cow;
+
 use futures_core::future::BoxFuture;
 
 use crate::driver::{Connection, Durable};
@@ -46,7 +48,10 @@ impl TransactionManager {
 impl sqlx::TransactionManager for TransactionManager {
     type Database = Durable;
 
-    fn begin(conn: &mut Connection) -> BoxFuture<'_, Result<(), sqlx::Error>> {
+    fn begin<'conn>(
+        conn: &'conn mut Connection,
+        _statement: Option<Cow<'static, str>>,
+    ) -> BoxFuture<'conn, Result<(), sqlx::Error>> {
         Box::pin(Self::begin(conn))
     }
 
@@ -60,5 +65,9 @@ impl sqlx::TransactionManager for TransactionManager {
 
     fn start_rollback(conn: &mut Connection) {
         let _ = crate::util::block_on(Self::rollback(conn));
+    }
+
+    fn get_transaction_depth(conn: &Connection) -> usize {
+        conn.txn_depth as usize
     }
 }

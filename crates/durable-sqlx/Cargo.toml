@@ -28,8 +28,8 @@ ipnetwork = { version = "0.20.0", features = ["serde"], optional = true }
 log = "0.4.22"
 serde = "1.0.204"
 serde_json = { version = "1.0", features = ["raw_value"] }
-sqlx = { version = "0.8.0", default-features = false }
-sqlx-core = { version = "0.8.0", default-features = false }
+sqlx = { version = "0.8.5", default-features = false }
+sqlx-core = { version = "0.8.5", default-features = false }
 url = "2.5.2"
 wit-bindgen-rt = { workspace = true }
 thiserror = "2.0.0"
