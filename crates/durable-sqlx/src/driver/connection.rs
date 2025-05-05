@@ -104,7 +104,7 @@ impl sqlx::Connection for Connection {
     fn begin(
         &mut self,
     ) -> BoxFuture<'_, Result<sqlx::Transaction<'_, Self::Database>, sqlx::Error>> {
-        sqlx::Transaction::begin(self)
+        sqlx::Transaction::begin(self, None)
     }
 
     fn shrink_buffers(&mut self) {}
