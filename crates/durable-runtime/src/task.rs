@@ -597,7 +597,6 @@ impl TaskState {
                     SELECT id, running_on
                     FROM durable.task
                     WHERE id = $1
-                      AND running_on = $6
                     LIMIT 1
                 ),
                 insert_event AS (
@@ -627,8 +626,7 @@ impl TaskState {
             self.txn_index,
             &*txn.label,
             Json(data) as Json<&T>,
-            message,
-            self.worker_id
+            message
         )
         .fetch_one(&mut *conn)
         .await?
