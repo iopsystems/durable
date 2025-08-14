@@ -14,11 +14,11 @@ extern "C" {
 
 #[no_mangle]
 extern "C" fn durable_ctor() {
-    if cfg!(target_arch = "wasm32") {
-        std::panic::set_hook(Box::new(durable_panic_hook))
-    }
+    #[cfg(target_arch = "wasm")]
+    std::panic::set_hook(Box::new(durable_panic_hook))
 }
 
+#[cfg(target_arch = "wasm")]
 fn durable_panic_hook(info: &PanicInfo) {
     #[used]
     static __UNUSED_LINK_HACK: unsafe extern "C" fn() = durable_ctor_wrapper;
