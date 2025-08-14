@@ -1,10 +1,8 @@
-use std::io::Write;
-
 // PanicInfo has been deprecated and renamed to PanicHookInfo but only in 1.82
 // or newer.
 //
 // Use a type alias here to avoid the deprecation warning.
-#[allow(deprecated)]
+#[allow(deprecated, dead_code)]
 type PanicInfo<'a> = std::panic::PanicInfo<'a>;
 
 extern "C" {
@@ -14,12 +12,14 @@ extern "C" {
 
 #[no_mangle]
 extern "C" fn durable_ctor() {
-    if cfg!(target_arch = "wasm32") {
-        std::panic::set_hook(Box::new(durable_panic_hook))
-    }
+    #[cfg(target_arch = "wasm32")]
+    std::panic::set_hook(Box::new(durable_panic_hook))
 }
 
+#[cfg(target_arch = "wasm32")]
 fn durable_panic_hook(info: &PanicInfo) {
+    use std::io::Write;
+
     #[used]
     static __UNUSED_LINK_HACK: unsafe extern "C" fn() = durable_ctor_wrapper;
 
