@@ -47,7 +47,7 @@ impl<T: Copy> Mailbox<T> {
     /// Note that this stream does not include _all_ future values sent to the
     /// mailbox. The only guarantee is that if new values are sent to the stream
     /// then there will be a prompt wakeup.
-    pub fn stream(&self) -> MailboxStream<T> {
+    pub fn stream(&self) -> MailboxStream<'_, T> {
         let data = self.data.read();
 
         MailboxStream {

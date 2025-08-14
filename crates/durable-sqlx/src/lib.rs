@@ -206,7 +206,7 @@ where
 /// As an additional benefit, query parameters are usually sent in a compact
 /// binary encoding instead of a human-readable text encoding, which saves
 /// bandwidth.
-pub fn query(sql: &str) -> Query<driver::Arguments> {
+pub fn query(sql: &str) -> Query<'_, driver::Arguments> {
     Query(sqlx::query(sql))
 }
 
