@@ -24,7 +24,7 @@ mod worker;
 mod bindings {
     wasmtime::component::bindgen!({
         world: "durable:core/imports",
-        
+
         imports: {
             // "task-id": tracing,
 
