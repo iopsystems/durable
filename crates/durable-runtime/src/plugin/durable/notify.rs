@@ -37,7 +37,6 @@ async fn poll_notification(
     Ok(data)
 }
 
-#[async_trait::async_trait]
 impl Host for Task {
     async fn notification_blocking(&mut self) -> wasmtime::Result<Event> {
         if self.state.transaction().is_some() {

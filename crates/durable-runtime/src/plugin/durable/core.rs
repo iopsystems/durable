@@ -7,21 +7,20 @@ use crate::bindings::durable::core::core::Host;
 use crate::bindings::wasi::clocks::wall_clock::Datetime;
 use crate::task::{Task, TransactionOptions};
 
-#[async_trait::async_trait]
 impl Host for Task {
-    fn task_id(&mut self) -> anyhow::Result<i64> {
+    async fn task_id(&mut self) -> anyhow::Result<i64> {
         Ok(self.state.task_id())
     }
 
-    fn task_name(&mut self) -> anyhow::Result<String> {
+    async fn task_name(&mut self) -> anyhow::Result<String> {
         Ok(self.state.task_name().to_owned())
     }
 
-    fn task_data(&mut self) -> anyhow::Result<String> {
+    async fn task_data(&mut self) -> anyhow::Result<String> {
         Ok(self.state.task_data().get().to_owned())
     }
 
-    fn task_created_at(&mut self) -> anyhow::Result<Datetime> {
+    async fn task_created_at(&mut self) -> anyhow::Result<Datetime> {
         let created_at = self.state.task_created_at();
         let systime: SystemTime = created_at.into();
 

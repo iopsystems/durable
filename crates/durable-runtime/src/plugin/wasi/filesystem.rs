@@ -6,7 +6,6 @@ use crate::task::Task;
 
 // It is not possible to get access to a file handle within the workflow so all
 // of these are stubs.
-#[async_trait::async_trait]
 impl wasi::filesystem::types::HostDescriptor for Task {
     async fn read_via_stream(
         &mut self,
@@ -237,7 +236,6 @@ impl wasi::filesystem::types::HostDescriptor for Task {
     }
 }
 
-#[async_trait::async_trait]
 impl wasi::filesystem::types::HostDirectoryEntryStream for Task {
     async fn read_directory_entry(
         &mut self,
@@ -253,7 +251,6 @@ impl wasi::filesystem::types::HostDirectoryEntryStream for Task {
     }
 }
 
-#[async_trait::async_trait]
 impl wasi::filesystem::types::Host for Task {
     async fn filesystem_error_code(
         &mut self,
@@ -264,7 +261,6 @@ impl wasi::filesystem::types::Host for Task {
     }
 }
 
-#[async_trait::async_trait]
 impl wasi::filesystem::preopens::Host for Task {
     async fn get_directories(&mut self) -> wasmtime::Result<Vec<(Resource<Descriptor>, String)>> {
         Ok(Vec::new())

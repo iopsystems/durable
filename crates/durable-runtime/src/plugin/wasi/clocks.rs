@@ -23,7 +23,6 @@ impl From<SerializableDateTime> for Datetime {
     }
 }
 
-#[async_trait::async_trait]
 impl wasi::clocks::wall_clock::Host for Task {
     async fn now(&mut self) -> wasmtime::Result<Datetime> {
         let options = TransactionOptions::new("wasi:clocks/wall-clock.now");
@@ -39,7 +38,7 @@ impl wasi::clocks::wall_clock::Host for Task {
             .await
     }
 
-    fn resolution(&mut self) -> wasmtime::Result<Datetime> {
+    async fn resolution(&mut self) -> wasmtime::Result<Datetime> {
         // The underlying clocks on the host don't necessarily have a consistent
         // resolution. This is especially true since the workflow may move between
         // hosts.
@@ -49,7 +48,6 @@ impl wasi::clocks::wall_clock::Host for Task {
     }
 }
 
-#[async_trait::async_trait]
 impl wasi::clocks::monotonic_clock::Host for Task {
     async fn now(&mut self) -> wasmtime::Result<Instant> {
         let options = TransactionOptions::new("wasi:clocks/monotonic-clock.now");
@@ -64,7 +62,7 @@ impl wasi::clocks::monotonic_clock::Host for Task {
             .await
     }
 
-    fn resolution(&mut self) -> wasmtime::Result<monotonic::Duration> {
+    async fn resolution(&mut self) -> wasmtime::Result<monotonic::Duration> {
         // The underlying clocks on the host don't necessarily have a consistent
         // resolution. This is especially true since the workflow may move between
         // hosts.

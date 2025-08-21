@@ -6,6 +6,7 @@ use std::time::Duration;
 use durable_runtime::{Config, WorkerBuilder, WorkerHandle};
 use futures::FutureExt;
 use tokio::task::JoinHandle;
+use wasmtime::{Cache, CacheConfig};
 
 pub async fn spawn_worker(pool: sqlx::PgPool) -> anyhow::Result<WorkerShutdownGuard> {
     spawn_worker_with(
@@ -26,7 +27,7 @@ pub async fn spawn_worker_with(
         .wasm_backtrace_details(wasmtime::WasmBacktraceDetails::Enable)
         .cranelift_opt_level(wasmtime::OptLevel::None)
         .debug_info(true)
-        .cache_config_load_default()?;
+        .cache(CacheConfig::from_file(None).and_then(Cache::new).ok());
     let mut worker = WorkerBuilder::new(pool)
         .config(config.debug_emit_task_logs(true))
         .wasmtime_config(wasmconfig)

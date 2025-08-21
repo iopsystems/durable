@@ -7,6 +7,7 @@ use durable_runtime::{WorkerBuilder, WorkerHandle};
 use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
 use tracing_subscriber::Layer;
+use wasmtime::{Cache, CacheConfig};
 
 #[derive(Debug, clap::Parser)]
 struct Args {
@@ -49,7 +50,7 @@ async fn main() -> anyhow::Result<()> {
         .context("failed to connect to the database")?;
 
     let mut config = wasmtime::Config::new();
-    config.cache_config_load_default()?;
+    config.cache(CacheConfig::from_file(None).and_then(Cache::new).ok());
     config.cranelift_opt_level(wasmtime::OptLevel::Speed);
     config.profiler(wasmtime::ProfilingStrategy::PerfMap);
     config.debug_info(true);

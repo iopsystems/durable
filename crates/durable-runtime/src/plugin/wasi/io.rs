@@ -1,6 +1,5 @@
 use std::time::Duration;
 
-use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use wasi::io::poll::Pollable;
 use wasi::io::streams::{InputStream, OutputStream, StreamError};
@@ -16,9 +15,8 @@ use crate::Task;
 /// ready.
 const SUSPEND_PREWAKE: Duration = Duration::from_secs(10);
 
-#[async_trait]
 impl wasi::io::error::HostError for Task {
-    fn to_debug_string(
+    async fn to_debug_string(
         &mut self,
         res: Resource<wasi::io::error::Error>,
     ) -> wasmtime::Result<String> {
@@ -41,9 +39,8 @@ impl wasi::io::error::Host for Task {}
 //
 // Workflows have no input streams. However, in order to support the CLI
 // environment we
-#[async_trait]
 impl wasi::io::streams::HostInputStream for Task {
-    fn read(
+    async fn read(
         &mut self,
         _: Resource<InputStream>,
         _: u64,
@@ -53,7 +50,7 @@ impl wasi::io::streams::HostInputStream for Task {
         Ok(Err(StreamError::Closed))
     }
 
-    fn blocking_read(
+    async fn blocking_read(
         &mut self,
         _: Resource<InputStream>,
         _: u64,
@@ -61,7 +58,7 @@ impl wasi::io::streams::HostInputStream for Task {
         Ok(Err(StreamError::Closed))
     }
 
-    fn skip(
+    async fn skip(
         &mut self,
         _: Resource<InputStream>,
         _: u64,
@@ -69,7 +66,7 @@ impl wasi::io::streams::HostInputStream for Task {
         Ok(Err(StreamError::Closed))
     }
 
-    fn blocking_skip(
+    async fn blocking_skip(
         &mut self,
         _: Resource<InputStream>,
         _: u64,
@@ -77,7 +74,10 @@ impl wasi::io::streams::HostInputStream for Task {
         Ok(Err(StreamError::Closed))
     }
 
-    fn subscribe(&mut self, _: Resource<InputStream>) -> wasmtime::Result<Resource<Pollable>> {
+    async fn subscribe(
+        &mut self,
+        _: Resource<InputStream>,
+    ) -> wasmtime::Result<Resource<Pollable>> {
         Ok(Resource::new_own(u32::MAX))
     }
 
@@ -86,9 +86,8 @@ impl wasi::io::streams::HostInputStream for Task {
     }
 }
 
-#[async_trait]
 impl wasi::io::streams::HostOutputStream for Task {
-    fn check_write(
+    async fn check_write(
         &mut self,
         _: Resource<OutputStream>,
     ) -> wasmtime::Result<Result<u64, StreamError>> {
@@ -125,7 +124,7 @@ impl wasi::io::streams::HostOutputStream for Task {
         self.write(stream, contents).await
     }
 
-    fn flush(
+    async fn flush(
         &mut self,
         stream: Resource<OutputStream>,
     ) -> wasmtime::Result<Result<(), StreamError>> {
@@ -135,14 +134,17 @@ impl wasi::io::streams::HostOutputStream for Task {
         })
     }
 
-    fn blocking_flush(
+    async fn blocking_flush(
         &mut self,
         stream: Resource<OutputStream>,
     ) -> wasmtime::Result<Result<(), StreamError>> {
-        self.flush(stream)
+        self.flush(stream).await
     }
 
-    fn subscribe(&mut self, _: Resource<OutputStream>) -> wasmtime::Result<Resource<Pollable>> {
+    async fn subscribe(
+        &mut self,
+        _: Resource<OutputStream>,
+    ) -> wasmtime::Result<Resource<Pollable>> {
         Ok(Resource::new_own(u32::MAX))
     }
 
@@ -178,7 +180,7 @@ impl wasi::io::streams::HostOutputStream for Task {
         self.write_zeroes(stream, len).await
     }
 
-    fn splice(
+    async fn splice(
         &mut self,
         _dst: Resource<OutputStream>,
         _src: Resource<InputStream>,
@@ -187,7 +189,7 @@ impl wasi::io::streams::HostOutputStream for Task {
         Ok(Err(StreamError::Closed))
     }
 
-    fn blocking_splice(
+    async fn blocking_splice(
         &mut self,
         _dst: Resource<OutputStream>,
         _src: Resource<InputStream>,
@@ -203,7 +205,6 @@ impl wasi::io::streams::HostOutputStream for Task {
 
 impl wasi::io::streams::Host for Task {}
 
-#[async_trait]
 impl wasi::io::poll::HostPollable for Task {
     async fn ready(&mut self, pollable: Resource<Pollable>) -> wasmtime::Result<bool> {
         // Pollable is for a stream, so it is always ready.
@@ -306,7 +307,6 @@ impl wasi::io::poll::HostPollable for Task {
     }
 }
 
-#[async_trait]
 impl wasi::io::poll::Host for Task {
     async fn poll(&mut self, pollables: Vec<Resource<Pollable>>) -> wasmtime::Result<Vec<u32>> {
         if pollables.len() > u32::MAX as usize {

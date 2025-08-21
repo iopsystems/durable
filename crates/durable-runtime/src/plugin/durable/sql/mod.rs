@@ -44,7 +44,6 @@ where
     }
 }
 
-#[async_trait::async_trait]
 impl sql::HostTypeInfo for Task {
     async fn name(&mut self, res: Resource<sql::TypeInfo>) -> wasmtime::Result<String> {
         use sqlx::TypeInfo;
@@ -279,7 +278,6 @@ impl sql::HostTypeInfo for Task {
     }
 }
 
-#[async_trait::async_trait]
 impl sql::HostValue for Task {
     async fn is_null(&mut self, res: Resource<sql::Value>) -> wasmtime::Result<bool> {
         let value = self.resources.get(res)?;
@@ -967,7 +965,6 @@ impl sql::HostValue for Task {
     }
 }
 
-#[async_trait::async_trait]
 impl Host for Task {
     async fn query(
         &mut self,

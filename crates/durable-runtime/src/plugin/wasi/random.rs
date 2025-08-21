@@ -4,7 +4,6 @@ use rand::RngCore;
 use crate::bindings::wasi;
 use crate::task::{Task, TransactionOptions};
 
-#[async_trait::async_trait]
 impl wasi::random::random::Host for Task {
     async fn get_random_bytes(&mut self, len: u64) -> wasmtime::Result<Vec<u8>> {
         let config = self.state.config();
@@ -42,7 +41,6 @@ impl wasi::random::random::Host for Task {
     }
 }
 
-#[async_trait::async_trait]
 impl wasi::random::insecure::Host for Task {
     async fn get_insecure_random_bytes(&mut self, len: u64) -> wasmtime::Result<Vec<u8>> {
         let config = self.state.config();
@@ -70,7 +68,6 @@ impl wasi::random::insecure::Host for Task {
     }
 }
 
-#[async_trait::async_trait]
 impl wasi::random::insecure_seed::Host for Task {
     async fn insecure_seed(&mut self) -> wasmtime::Result<(u64, u64)> {
         // This needs to be something that is consistent between hosts so we

@@ -22,7 +22,27 @@ mod worker;
     unused_doc_comments
 )]
 mod bindings {
-    include!(concat!(env!("OUT_DIR"), "/bindings.rs"));
+    wasmtime::component::bindgen!({
+        world: "durable:core/imports",
+
+        imports: {
+            // "task-id": tracing,
+
+            default: async | trappable
+        },
+
+        exports: {
+            // Method implementations that should be sync
+
+            // "durable:core/imports/core.task-id": exact,
+
+            default: async | trappable
+        },
+
+        // include_generated_code_from_file: true
+    });
+
+    // include!(concat!(env!("OUT_DIR"), "/bindings.rs"));
 }
 
 pub use self::config::Config;

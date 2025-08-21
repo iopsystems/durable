@@ -18,17 +18,13 @@ durable-sqlx    = { version = "0.5.5", registry = "iop-systems", path = "crates/
 
 durable-client  = { version = "0.1.1", registry = "iop-systems", path = "crates/durable-client" }
 durable-migrate = { version = "0.1.0", registry = "iop-systems", path = "crates/durable-migrate" }
-durable-runtime = { version = "0.5.0", registry = "iop-systems", path = "crates/durable-runtime" }
+durable-runtime = { version = "0.6.0", registry = "iop-systems", path = "crates/durable-runtime" }
 durable-bindgen = { version = "0.1.2", registry = "iop-systems", path = "crates/durable-bindgen" }
 
-wit-bindgen-core = { version = "0.30.0" }
-wit-bindgen-rust = { version = "0.30.0" }
-wit-bindgen-rt   = { version = "0.30.0" }
-
-# These 3 need to be updated in sync.
-wasmtime             = { version = "26.0" }
-wasmtime-wit-bindgen = { version = "26.0" }
-wit-parser           = { version = "0.218" }
+wasmtime         = { version = "36.0" }
+wit-bindgen-core = { version = "0.44.0" }
+wit-bindgen-rust = { version = "0.44.0" }
+wit-bindgen-rt   = { version = "0.44.0" }
 
 [workspace.dependencies.durable-sqlx-macros]
 version = "0.8.1"
