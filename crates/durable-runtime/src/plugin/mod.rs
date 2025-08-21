@@ -1,5 +1,5 @@
 use wasi::WasiResources;
-use wasmtime::component::Linker;
+use wasmtime::component::{HasSelf, Linker};
 
 use crate::task::Task;
 
@@ -39,7 +39,7 @@ impl Plugin for DurablePlugin {
         use crate::bindings::Imports;
 
         task.plugins.insert(WasiResources::new());
-        Imports::add_to_linker(linker, |task| task)?;
+        Imports::add_to_linker::<_, HasSelf<_>>(linker, |task| task)?;
         Ok(())
     }
 }

@@ -53,7 +53,7 @@ fn _generate(source: &Path, out: &Path, world: &str, options: Options) -> anyhow
     let mut generator = options.0.build();
 
     if std::env::var_os("OUT_DIR").is_some() {
-        for path in paths.iter() {
+        for path in paths.paths() {
             println!("cargo::rerun-if-changed={}", path.display());
         }
     }

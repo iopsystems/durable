@@ -39,7 +39,6 @@ impl Task {
     }
 }
 
-#[async_trait::async_trait]
 impl HostHttpError2 for Task {
     async fn message(&mut self, res: Resource<HttpError2>) -> wasmtime::Result<String> {
         let error = self.resources.get(res)?;
@@ -119,7 +118,6 @@ impl HttpRequest2 {
     }
 }
 
-#[async_trait::async_trait]
 impl HostHttpRequest2 for Task {
     async fn new(
         &mut self,
@@ -202,7 +200,6 @@ impl HostHttpRequest2 for Task {
     }
 }
 
-#[async_trait::async_trait]
 impl Host for Task {
     async fn fetch(
         &mut self,
