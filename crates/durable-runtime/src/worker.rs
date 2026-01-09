@@ -692,7 +692,7 @@ impl Worker {
         let mut leader_id = shared.leader.get();
         let mut leader_stream = std::pin::pin!(shared.leader.stream());
 
-        let mut interval = tokio::time::interval(Duration::from_secs(3600));
+        let mut interval = tokio::time::interval(Duration::from_secs(600));
         interval.set_missed_tick_behavior(MissedTickBehavior::Skip);
 
         'outer: loop {
