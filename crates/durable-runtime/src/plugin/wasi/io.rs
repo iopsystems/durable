@@ -227,7 +227,7 @@ impl wasi::io::poll::HostPollable for Task {
                     _ => (),
                 }
 
-                let now = Utc::now();
+                let now = state.clock().now();
                 Ok(pollable.timeout <= now)
             })
             .await
@@ -256,6 +256,8 @@ impl wasi::io::poll::HostPollable for Task {
             }
         };
 
+        let now = self.state.clock().now();
+
         let txn = self.state.transaction_mut().unwrap();
         let is_external = match pollable.txn {
             Some(index) if index != txn.index() => anyhow::bail!(
@@ -265,7 +267,6 @@ impl wasi::io::poll::HostPollable for Task {
             None => true,
         };
 
-        let now = Utc::now();
         let delta = pollable
             .timeout
             .signed_duration_since(now)
@@ -285,7 +286,7 @@ impl wasi::io::poll::HostPollable for Task {
             return Err(status.into());
         }
 
-        tokio::time::sleep(delta).await;
+        self.state.clock().sleep(delta).await;
 
         if entered {
             self.state.exit(&()).await?;
@@ -336,31 +337,33 @@ impl wasi::io::poll::Host for Task {
 
         let suspend_timeout = self.state.config().suspend_timeout;
         let resources = self.plugins.expect::<WasiResources>();
-        let txn = self.state.transaction_mut().unwrap();
 
         // Check whether any of the pollables was created within the current
         // transaction. If this is the case then we can't suspend the task because it
         // might be sleeping based on an impure current time acquired from within the
         // transaction.
         let mut has_internal = false;
-        for pollable in pollables.iter() {
-            let pollable = resources.pollables[pollable.rep() as _];
+        {
+            let txn = self.state.transaction_mut().unwrap();
+            for pollable in pollables.iter() {
+                let pollable = resources.pollables[pollable.rep() as _];
 
-            match pollable.txn {
-                Some(index) if index != txn.index() => anyhow::bail!(
-                    "attempted to use a pollable outside the transaction it was created in"
-                ),
-                Some(_) => {
-                    has_internal = true;
-                    break;
+                match pollable.txn {
+                    Some(index) if index != txn.index() => anyhow::bail!(
+                        "attempted to use a pollable outside the transaction it was created in"
+                    ),
+                    Some(_) => {
+                        has_internal = true;
+                        break;
+                    }
+                    None => (),
                 }
-                None => (),
             }
         }
 
         let mut ready = Vec::new();
         loop {
-            let now = Utc::now();
+            let now = self.state.clock().now();
             let mut wakeup: Option<DateTime<Utc>> = None;
 
             for (idx, pollable) in pollables.iter().enumerate() {
@@ -397,7 +400,9 @@ impl wasi::io::poll::Host for Task {
 
             if !has_internal && duration > suspend_timeout + SUSPEND_PREWAKE {
                 // Avoid holding on to a db connection if we are suspending this task anyway
-                let _ = txn.take_conn();
+                if let Some(txn) = self.state.transaction_mut() {
+                    txn.take_conn();
+                }
 
                 let mut conn = self.state.pool().acquire().await?;
                 let status = self.state.suspend(&mut conn, Some(wakeup)).await?;
@@ -406,7 +411,7 @@ impl wasi::io::poll::Host for Task {
             }
 
             tracing::trace!("blocking poll for {}", humantime::format_duration(duration));
-            tokio::time::sleep(duration).await;
+            self.state.clock().sleep(duration).await;
         }
 
         if entered {

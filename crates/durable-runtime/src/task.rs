@@ -285,6 +285,16 @@ impl TaskState {
         &self.shared.config
     }
 
+    /// Access the clock used by the runtime.
+    pub fn clock(&self) -> &dyn crate::clock::Clock {
+        &*self.shared.clock
+    }
+
+    /// Access the scheduler used by the runtime.
+    pub fn scheduler(&self) -> &dyn crate::scheduler::Scheduler {
+        &*self.shared.scheduler
+    }
+
     /// Access the current transaction.
     pub fn transaction(&self) -> Option<&Transaction> {
         self.txn.as_ref()
