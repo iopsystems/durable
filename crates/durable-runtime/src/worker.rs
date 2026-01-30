@@ -354,9 +354,11 @@ impl Worker {
 
         tracing::info!("durable worker id is {}", self.worker_id);
 
-        self.shared.scheduler.notify(ScheduleEvent::WorkerRegistered {
-            worker_id: self.worker_id,
-        });
+        self.shared
+            .scheduler
+            .notify(ScheduleEvent::WorkerRegistered {
+                worker_id: self.worker_id,
+            });
 
         self.load_leader_id().await?;
 
@@ -426,7 +428,10 @@ impl Worker {
                 _ = shared.clock.sleep(sleep_duration) => ()
             }
 
-            let _guard = shared.scheduler.acquire(SchedulerComponent::Heartbeat { worker_id }).await;
+            let _guard = shared
+                .scheduler
+                .acquire(SchedulerComponent::Heartbeat { worker_id })
+                .await;
 
             let record = sqlx::query!(
                 "UPDATE durable.worker
@@ -487,7 +492,10 @@ impl Worker {
                 _ = shared.clock.sleep(sleep_duration) => ()
             }
 
-            let _guard = shared.scheduler.acquire(SchedulerComponent::ValidateWorkers { worker_id }).await;
+            let _guard = shared
+                .scheduler
+                .acquire(SchedulerComponent::ValidateWorkers { worker_id })
+                .await;
 
             let mut tx = shared.pool.begin().await?;
             let timeout = shared.config.heartbeat_timeout.into_pg_interval();
@@ -624,7 +632,10 @@ impl Worker {
                 continue;
             }
 
-            let _guard = shared.scheduler.acquire(SchedulerComponent::Leader { worker_id }).await;
+            let _guard = shared
+                .scheduler
+                .acquire(SchedulerComponent::Leader { worker_id })
+                .await;
 
             let mut conn = shared.pool.acquire().await?;
 
@@ -717,7 +728,10 @@ impl Worker {
                 }
             }
 
-            let _guard = shared.scheduler.acquire(SchedulerComponent::TaskCleanup { worker_id }).await;
+            let _guard = shared
+                .scheduler
+                .acquire(SchedulerComponent::TaskCleanup { worker_id })
+                .await;
 
             let limit = shared.config.cleanup_batch_limit as i64;
             let interval = cleanup_age.into_pg_interval();
@@ -785,7 +799,10 @@ impl Worker {
                 }
             }
 
-            let _guard = shared.scheduler.acquire(SchedulerComponent::StuckNotify { worker_id }).await;
+            let _guard = shared
+                .scheduler
+                .acquire(SchedulerComponent::StuckNotify { worker_id })
+                .await;
 
             let mut conn = match shared.pool.acquire().await {
                 Ok(conn) => conn,
@@ -848,9 +865,13 @@ impl Worker {
             // Clean up any tasks that have completed already.
             while self.tasks.try_join_next().is_some() {}
 
-            let _guard = self.shared.scheduler.acquire(SchedulerComponent::ProcessEvents {
-                worker_id: self.worker_id,
-            }).await;
+            let _guard = self
+                .shared
+                .scheduler
+                .acquire(SchedulerComponent::ProcessEvents {
+                    worker_id: self.worker_id,
+                })
+                .await;
 
             let event = match event {
                 LoopEvent::Event(event) => event,
@@ -947,9 +968,9 @@ impl Worker {
         };
 
         self.shared.leader.store(new_leader);
-        self.shared.scheduler.notify(ScheduleEvent::LeaderChanged {
-            new_leader,
-        });
+        self.shared
+            .scheduler
+            .notify(ScheduleEvent::LeaderChanged { new_leader });
 
         Ok(())
     }
@@ -963,9 +984,13 @@ impl Worker {
             return Ok(());
         }
 
-        let _guard = self.shared.scheduler.acquire(SchedulerComponent::SpawnTasks {
-            worker_id: self.worker_id,
-        }).await;
+        let _guard = self
+            .shared
+            .scheduler
+            .acquire(SchedulerComponent::SpawnTasks {
+                worker_id: self.worker_id,
+            })
+            .await;
 
         let mut tx = self.shared.pool.begin().await?;
         let tasks = sqlx::query_as!(

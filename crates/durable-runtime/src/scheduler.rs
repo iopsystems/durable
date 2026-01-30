@@ -36,7 +36,10 @@ pub enum Component {
     SpawnTasks { worker_id: i64 },
 
     /// A task is entering or exiting a transaction with the database.
-    TaskTransaction { task_id: i64, label: Cow<'static, str> },
+    TaskTransaction {
+        task_id: i64,
+        label: Cow<'static, str>,
+    },
 
     /// A user-defined component for downstream DST.
     ///

@@ -7,8 +7,9 @@
 //!
 //! ```rust,no_run
 //! use std::sync::Arc;
-//! use durable_runtime::{WorkerBuilder};
-//! use durable_runtime::dst::{DstScheduler, DstClock, DstEntropy};
+//!
+//! use durable_runtime::dst::{DstClock, DstEntropy, DstScheduler};
+//! use durable_runtime::WorkerBuilder;
 //!
 //! # async fn example(pool: sqlx::PgPool) -> anyhow::Result<()> {
 //! let seed = 42u64;
@@ -422,16 +423,11 @@ mod tests {
         let _guard = scheduler
             .acquire(Component::Heartbeat { worker_id: 1 })
             .await;
-        let _guard = scheduler
-            .acquire(Component::Leader { worker_id: 1 })
-            .await;
+        let _guard = scheduler.acquire(Component::Leader { worker_id: 1 }).await;
 
         assert_eq!(scheduler.acquire_count(), 2);
         let acquires = scheduler.acquires();
-        assert!(matches!(
-            acquires[0],
-            Component::Heartbeat { worker_id: 1 }
-        ));
+        assert!(matches!(acquires[0], Component::Heartbeat { worker_id: 1 }));
         assert!(matches!(acquires[1], Component::Leader { worker_id: 1 }));
     }
 

@@ -44,8 +44,6 @@ pub use self::config::Config;
 pub use self::entropy::{Entropy, SystemEntropy};
 pub use self::error::TaskStatus;
 pub use self::resource::{Resourceable, Resources};
-pub use self::scheduler::{
-    Component, NoopScheduler, ScheduleEvent, ScheduleGuard, Scheduler,
-};
+pub use self::scheduler::{Component, NoopScheduler, ScheduleEvent, ScheduleGuard, Scheduler};
 pub use self::task::Task;
 pub use self::worker::{Worker, WorkerBuilder, WorkerHandle};

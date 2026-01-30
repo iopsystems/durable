@@ -44,29 +44,39 @@ async fn worker_lifecycle_with_dst_hooks(pool: sqlx::PgPool) -> anyhow::Result<(
     // Verify WorkerRegistered event was emitted
     let events = scheduler.events();
     assert!(
-        events.iter().any(|e| matches!(e, ScheduleEvent::WorkerRegistered { .. })),
+        events
+            .iter()
+            .any(|e| matches!(e, ScheduleEvent::WorkerRegistered { .. })),
         "expected WorkerRegistered event, got: {events:?}"
     );
 
-    // Verify LeaderChanged event was emitted (worker becomes leader since it's the only one)
+    // Verify LeaderChanged event was emitted (worker becomes leader since it's the
+    // only one)
     assert!(
-        events.iter().any(|e| matches!(e, ScheduleEvent::LeaderChanged { .. })),
+        events
+            .iter()
+            .any(|e| matches!(e, ScheduleEvent::LeaderChanged { .. })),
         "expected LeaderChanged event, got: {events:?}"
     );
 
     // Verify that component acquire calls were recorded
     let acquires = scheduler.acquires();
-    assert!(
-        !acquires.is_empty(),
-        "expected at least some acquire calls"
-    );
+    assert!(!acquires.is_empty(), "expected at least some acquire calls");
 
     // Check that we see the expected component types
-    let has_heartbeat = acquires.iter().any(|c| matches!(c, Component::Heartbeat { .. }));
-    let has_process = acquires.iter().any(|c| matches!(c, Component::ProcessEvents { .. }));
+    let has_heartbeat = acquires
+        .iter()
+        .any(|c| matches!(c, Component::Heartbeat { .. }));
+    let has_process = acquires
+        .iter()
+        .any(|c| matches!(c, Component::ProcessEvents { .. }));
 
-    // The heartbeat should fire on the first iteration since sleep_duration starts at ZERO
-    assert!(has_heartbeat, "expected Heartbeat acquire, got: {acquires:?}");
+    // The heartbeat should fire on the first iteration since sleep_duration starts
+    // at ZERO
+    assert!(
+        has_heartbeat,
+        "expected Heartbeat acquire, got: {acquires:?}"
+    );
 
     // ProcessEvents should fire when event source delivers events
     // (may or may not have fired yet depending on timing)
@@ -144,7 +154,8 @@ async fn worker_uses_dst_clock(pool: sqlx::PgPool) -> anyhow::Result<()> {
     // Should have at least one more heartbeat after advancing the clock
     assert!(
         new_heartbeat_count > initial_heartbeat_count,
-        "expected more heartbeats after clock advance: initial={initial_heartbeat_count}, new={new_heartbeat_count}"
+        "expected more heartbeats after clock advance: initial={initial_heartbeat_count}, \
+         new={new_heartbeat_count}"
     );
 
     guard.handle().shutdown();
@@ -427,7 +438,8 @@ async fn dst_event_source_controls_notifications(pool: sqlx::PgPool) -> anyhow::
 
     assert!(
         new_process_count > initial_process_count,
-        "expected ProcessEvents acquire after injecting event: initial={initial_process_count}, new={new_process_count}"
+        "expected ProcessEvents acquire after injecting event: initial={initial_process_count}, \
+         new={new_process_count}"
     );
 
     // Simulate a connection loss — send Lagged.
