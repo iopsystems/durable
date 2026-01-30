@@ -3,13 +3,17 @@
 #[macro_use]
 extern crate serde;
 
+pub mod clock;
 mod config;
+pub mod dst;
+pub mod entropy;
 mod error;
 pub mod event;
 mod flag;
 pub mod migrate;
 pub mod plugin;
 mod resource;
+pub mod scheduler;
 pub mod task;
 pub mod util;
 mod worker;
@@ -35,8 +39,11 @@ mod bindings {
     });
 }
 
+pub use self::clock::{Clock, SystemClock};
 pub use self::config::Config;
+pub use self::entropy::{Entropy, SystemEntropy};
 pub use self::error::TaskStatus;
 pub use self::resource::{Resourceable, Resources};
+pub use self::scheduler::{Component, NoopScheduler, ScheduleEvent, ScheduleGuard, Scheduler};
 pub use self::task::Task;
 pub use self::worker::{Worker, WorkerBuilder, WorkerHandle};

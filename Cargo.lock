@@ -1120,6 +1120,7 @@ name = "durable-test"
 version = "0.0.0"
 dependencies = [
  "anyhow",
+ "chrono",
  "ctor",
  "dotenvy",
  "durable-client",

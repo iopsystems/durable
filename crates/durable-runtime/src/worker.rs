@@ -10,7 +10,6 @@ use chrono::{DateTime, Utc};
 use futures_concurrency::future::Join;
 use futures_util::FutureExt;
 use metrics::{Counter, Gauge, Histogram};
-use rand::Rng;
 use serde_json::value::RawValue;
 use sqlx::postgres::PgNotification;
 use sqlx::types::Json;
@@ -24,6 +23,7 @@ use crate::error::{ClonableAnyhowError, TaskStatus};
 use crate::event::{self, Event, EventSource, Notification};
 use crate::flag::{ShutdownFlag, ShutdownGuard};
 use crate::plugin::{DurablePlugin, Plugin};
+use crate::scheduler::{Component as SchedulerComponent, ScheduleEvent};
 use crate::task::{RecordedEvent, Task, TaskState};
 use crate::util::{IntoPgInterval, Mailbox, MetricSpan};
 use crate::Config;
@@ -38,6 +38,10 @@ pub(crate) struct SharedState {
     pub notifications: broadcast::Sender<Notification>,
     pub config: Config,
     pub plugins: Vec<Box<dyn Plugin>>,
+
+    pub scheduler: Arc<dyn crate::scheduler::Scheduler>,
+    pub clock: Arc<dyn crate::clock::Clock>,
+    pub entropy: Arc<dyn crate::entropy::Entropy>,
 
     leader: Mailbox<i64>,
     suspend: Notify,
@@ -89,6 +93,9 @@ pub struct WorkerBuilder {
     client: Option<reqwest::Client>,
     wasmtime_config: Option<wasmtime::Config>,
     plugins: Vec<Box<dyn Plugin>>,
+    scheduler: Option<Arc<dyn crate::scheduler::Scheduler>>,
+    clock: Option<Arc<dyn crate::clock::Clock>>,
+    entropy: Option<Arc<dyn crate::entropy::Entropy>>,
     migrate: bool,
     validate: bool,
 }
@@ -102,6 +109,9 @@ impl WorkerBuilder {
             client: None,
             wasmtime_config: None,
             plugins: vec![Box::new(DurablePlugin)],
+            scheduler: None,
+            clock: None,
+            entropy: None,
             migrate: false,
             validate: true,
         }
@@ -125,6 +135,49 @@ impl WorkerBuilder {
     /// Add a new API plugin to the runtime.
     pub fn plugin(mut self, plugin: Box<dyn Plugin>) -> Self {
         self.plugins.push(plugin);
+        self
+    }
+
+    /// Set a custom event source for receiving PostgreSQL LISTEN/NOTIFY
+    /// events.
+    ///
+    /// In production, the default [`PgEventSource`] is used, which connects
+    /// to PostgreSQL and listens on the `durable:*` channels. In deterministic
+    /// simulation testing, provide an event source that controls when and
+    /// whether notifications are delivered, and can simulate connection loss
+    /// via [`Event::Lagged`].
+    pub fn event_source(mut self, event_source: Box<dyn EventSource>) -> Self {
+        self.event_source = Some(event_source);
+        self
+    }
+
+    /// Set a custom scheduler for controlling component interleaving.
+    ///
+    /// In production, the default [`NoopScheduler`](crate::NoopScheduler) is
+    /// used. In deterministic simulation testing, provide a scheduler that
+    /// gates each component behind a permit to control execution order.
+    pub fn scheduler(mut self, scheduler: Arc<dyn crate::scheduler::Scheduler>) -> Self {
+        self.scheduler = Some(scheduler);
+        self
+    }
+
+    /// Set a custom clock for controlling the runtime's view of time.
+    ///
+    /// In production, the default [`SystemClock`](crate::SystemClock) is used.
+    /// In deterministic simulation testing, provide a clock that returns
+    /// controlled values.
+    pub fn clock(mut self, clock: Arc<dyn crate::clock::Clock>) -> Self {
+        self.clock = Some(clock);
+        self
+    }
+
+    /// Set a custom entropy source for controlling randomness.
+    ///
+    /// In production, the default [`SystemEntropy`](crate::SystemEntropy) is
+    /// used. In deterministic simulation testing, provide an entropy source
+    /// backed by a seeded RNG.
+    pub fn entropy(mut self, entropy: Arc<dyn crate::entropy::Entropy>) -> Self {
+        self.entropy = Some(entropy);
         self
     }
 
@@ -189,6 +242,15 @@ impl WorkerBuilder {
             shutdown: ShutdownFlag::new(),
             client: self.client.unwrap_or_default(),
             notifications: broadcast::channel(128).0,
+            scheduler: self
+                .scheduler
+                .unwrap_or_else(|| Arc::new(crate::scheduler::NoopScheduler)),
+            clock: self
+                .clock
+                .unwrap_or_else(|| Arc::new(crate::clock::SystemClock)),
+            entropy: self
+                .entropy
+                .unwrap_or_else(|| Arc::new(crate::entropy::SystemEntropy)),
             leader: Mailbox::new(-1),
             suspend: Notify::new(),
             cache: Mutex::new(uluru::LRUCache::new()),
@@ -292,6 +354,12 @@ impl Worker {
 
         tracing::info!("durable worker id is {}", self.worker_id);
 
+        self.shared
+            .scheduler
+            .notify(ScheduleEvent::WorkerRegistered {
+                worker_id: self.worker_id,
+            });
+
         self.load_leader_id().await?;
 
         let worker_id = self.worker_id;
@@ -329,6 +397,10 @@ impl Worker {
             .await
             .context("failed to delete the worker entry from the database");
 
+        self.shared.scheduler.notify(ScheduleEvent::WorkerDeleted {
+            worker_id: self.worker_id,
+        });
+
         self.tasks.abort_all();
 
         process?;
@@ -346,15 +418,20 @@ impl Worker {
     async fn heartbeat(shared: Arc<SharedState>, worker_id: i64) -> anyhow::Result<()> {
         let _guard = ShutdownGuard::new(&shared.shutdown);
         let mut shutdown = std::pin::pin!(shared.shutdown.wait());
-        let mut next = Instant::now();
+        let mut sleep_duration = Duration::ZERO;
 
         'outer: loop {
             tokio::select! {
                 biased;
 
                 _ = shutdown.as_mut() => break 'outer,
-                _ = tokio::time::sleep_until(next) => ()
+                _ = shared.clock.sleep(sleep_duration) => ()
             }
+
+            let _guard = shared
+                .scheduler
+                .acquire(SchedulerComponent::Heartbeat { worker_id })
+                .await;
 
             let record = sqlx::query!(
                 "UPDATE durable.worker
@@ -376,10 +453,10 @@ impl Worker {
             }
 
             let mut interval = shared.config.heartbeat_interval;
-            let jitter = rand::rng().random_range(0..(interval / 4).as_nanos());
+            let jitter = shared.entropy.random_range(0..(interval / 4).as_nanos());
             interval -= Duration::from_nanos(jitter as u64);
 
-            next += interval;
+            sleep_duration = interval;
         }
 
         Ok(())
@@ -403,7 +480,7 @@ impl Worker {
 
         let _guard = ShutdownGuard::new(&shared.shutdown);
         let mut shutdown = std::pin::pin!(shared.shutdown.wait());
-        let mut next = Instant::now();
+        let mut sleep_duration = Duration::ZERO;
 
         let mut following: Option<i64> = None;
 
@@ -412,8 +489,13 @@ impl Worker {
                 biased;
 
                 _ = shutdown.as_mut() => break 'outer,
-                _ = tokio::time::sleep_until(next) => ()
+                _ = shared.clock.sleep(sleep_duration) => ()
             }
+
+            let _guard = shared
+                .scheduler
+                .acquire(SchedulerComponent::ValidateWorkers { worker_id })
+                .await;
 
             let mut tx = shared.pool.begin().await?;
             let timeout = shared.config.heartbeat_timeout.into_pg_interval();
@@ -505,7 +587,7 @@ impl Worker {
 
                 let expires =
                     record.heartbeat_at + shared.config.heartbeat_timeout + Duration::from_secs(1);
-                interval = (expires - Utc::now()).to_std().unwrap_or_default();
+                interval = (expires - shared.clock.now()).to_std().unwrap_or_default();
             } else {
                 interval = shared.config.heartbeat_interval;
             }
@@ -516,7 +598,7 @@ impl Worker {
                 interval.as_secs_f32()
             );
 
-            next += interval;
+            sleep_duration = interval;
         }
 
         Ok(())
@@ -526,8 +608,7 @@ impl Worker {
         let _guard = ShutdownGuard::new(&shared.shutdown);
         let mut shutdown = std::pin::pin!(shared.shutdown.wait());
 
-        // Start with the instant at the current time so we do an immediate
-        let mut instant = Instant::now();
+        let mut sleep_duration = Duration::ZERO;
         let mut leader_id = shared.leader.get();
         let mut leader_stream = std::pin::pin!(shared.leader.stream());
 
@@ -543,13 +624,18 @@ impl Worker {
                     leader_id = id
                 },
                 _ = shared.suspend.notified(), if leader_id == worker_id => (),
-                _ = tokio::time::sleep_until(instant) => ()
+                _ = shared.clock.sleep(sleep_duration) => ()
             }
 
             if leader_id != worker_id {
-                instant += Duration::from_secs(3600);
+                sleep_duration = Duration::from_secs(3600);
                 continue;
             }
+
+            let _guard = shared
+                .scheduler
+                .acquire(SchedulerComponent::Leader { worker_id })
+                .await;
 
             let mut conn = shared.pool.acquire().await?;
 
@@ -579,6 +665,7 @@ impl Worker {
             let count = result.rows_affected();
             if count > 0 {
                 tracing::info!("woke up {count} tasks");
+                shared.scheduler.notify(ScheduleEvent::TasksWoken { count });
             }
 
             let wakeup_at = sqlx::query!(
@@ -595,7 +682,7 @@ impl Worker {
             .await?
             .map(|record| record.wakeup_at);
 
-            let now = Utc::now();
+            let now = shared.clock.now();
             let delay = match wakeup_at {
                 Some(wakeup_at) => now
                     .signed_duration_since(wakeup_at)
@@ -604,7 +691,7 @@ impl Worker {
                 None => Duration::from_secs(60),
             };
 
-            instant += delay;
+            sleep_duration = delay;
         }
 
         Ok(())
@@ -640,6 +727,11 @@ impl Worker {
                     continue 'outer;
                 }
             }
+
+            let _guard = shared
+                .scheduler
+                .acquire(SchedulerComponent::TaskCleanup { worker_id })
+                .await;
 
             let limit = shared.config.cleanup_batch_limit as i64;
             let interval = cleanup_age.into_pg_interval();
@@ -707,6 +799,11 @@ impl Worker {
                 }
             }
 
+            let _guard = shared
+                .scheduler
+                .acquire(SchedulerComponent::StuckNotify { worker_id })
+                .await;
+
             let mut conn = match shared.pool.acquire().await {
                 Ok(conn) => conn,
                 Err(e) => {
@@ -767,6 +864,14 @@ impl Worker {
 
             // Clean up any tasks that have completed already.
             while self.tasks.try_join_next().is_some() {}
+
+            let _guard = self
+                .shared
+                .scheduler
+                .acquire(SchedulerComponent::ProcessEvents {
+                    worker_id: self.worker_id,
+                })
+                .await;
 
             let event = match event {
                 LoopEvent::Event(event) => event,
@@ -863,6 +968,9 @@ impl Worker {
         };
 
         self.shared.leader.store(new_leader);
+        self.shared
+            .scheduler
+            .notify(ScheduleEvent::LeaderChanged { new_leader });
 
         Ok(())
     }
@@ -875,6 +983,14 @@ impl Worker {
         if allowed == 0 {
             return Ok(());
         }
+
+        let _guard = self
+            .shared
+            .scheduler
+            .acquire(SchedulerComponent::SpawnTasks {
+                worker_id: self.worker_id,
+            })
+            .await;
 
         let mut tx = self.shared.pool.begin().await?;
         let tasks = sqlx::query_as!(
@@ -927,6 +1043,13 @@ impl Worker {
 
         if !tasks.is_empty() {
             tracing::debug!("launching {} tasks", tasks.len());
+        }
+
+        for task in &tasks {
+            self.shared.scheduler.notify(ScheduleEvent::TaskClaimed {
+                worker_id: self.worker_id,
+                task_id: task.id,
+            });
         }
 
         for task in tasks {
@@ -1089,6 +1212,10 @@ impl Worker {
                 // The task should have set itself to the suspended state before
                 // returning this error code. Nothing we need to do here.
                 shared.metrics.task_suspend.increment(1);
+                shared.scheduler.notify(ScheduleEvent::TaskSuspended {
+                    task_id,
+                    wakeup_at: None,
+                });
             }
             TaskStatus::ExitSuccess => {
                 sqlx::query!(
@@ -1105,6 +1232,10 @@ impl Worker {
                 .await?;
 
                 shared.metrics.task_complete.increment(1);
+                shared.scheduler.notify(ScheduleEvent::TaskCompleted {
+                    task_id,
+                    success: true,
+                });
             }
             TaskStatus::ExitFailure => {
                 sqlx::query!(
@@ -1120,6 +1251,10 @@ impl Worker {
                 .await?;
 
                 shared.metrics.task_failed.increment(1);
+                shared.scheduler.notify(ScheduleEvent::TaskCompleted {
+                    task_id,
+                    success: false,
+                });
             }
         }
 

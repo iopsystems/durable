@@ -1,5 +1,6 @@
 use std::future::Future;
 use std::pin::Pin;
+use std::sync::Arc;
 use std::task::{Context, Poll};
 use std::time::Duration;
 
@@ -22,18 +23,64 @@ pub async fn spawn_worker_with(
     pool: sqlx::PgPool,
     config: Config,
 ) -> anyhow::Result<WorkerShutdownGuard> {
+    let builder = make_worker_builder(pool, config);
+    spawn_from_builder(builder).await
+}
+
+/// Spawn a worker with DST hooks injected.
+///
+/// Returns the guard for the worker. The caller retains access to the
+/// scheduler, clock, and entropy for test-side inspection and control.
+pub async fn spawn_worker_with_dst(
+    pool: sqlx::PgPool,
+    config: Config,
+    scheduler: Arc<dyn durable_runtime::Scheduler>,
+    clock: Arc<dyn durable_runtime::Clock>,
+    entropy: Arc<dyn durable_runtime::Entropy>,
+) -> anyhow::Result<WorkerShutdownGuard> {
+    let builder = make_worker_builder(pool, config)
+        .scheduler(scheduler)
+        .clock(clock)
+        .entropy(entropy);
+    spawn_from_builder(builder).await
+}
+
+/// Spawn a worker with DST hooks and a custom event source.
+///
+/// This variant also accepts a custom
+/// [`EventSource`](durable_runtime::event::EventSource) for controlling when
+/// and whether PostgreSQL LISTEN/NOTIFY events are delivered.
+pub async fn spawn_worker_with_dst_events(
+    pool: sqlx::PgPool,
+    config: Config,
+    scheduler: Arc<dyn durable_runtime::Scheduler>,
+    clock: Arc<dyn durable_runtime::Clock>,
+    entropy: Arc<dyn durable_runtime::Entropy>,
+    event_source: Box<dyn durable_runtime::event::EventSource>,
+) -> anyhow::Result<WorkerShutdownGuard> {
+    let builder = make_worker_builder(pool, config)
+        .scheduler(scheduler)
+        .clock(clock)
+        .entropy(entropy)
+        .event_source(event_source);
+    spawn_from_builder(builder).await
+}
+
+fn make_worker_builder(pool: sqlx::PgPool, config: Config) -> WorkerBuilder {
     let mut wasmconfig = wasmtime::Config::new();
     wasmconfig
         .wasm_backtrace_details(wasmtime::WasmBacktraceDetails::Enable)
         .cranelift_opt_level(wasmtime::OptLevel::None)
         .debug_info(true)
         .cache(CacheConfig::from_file(None).and_then(Cache::new).ok());
-    let mut worker = WorkerBuilder::new(pool)
+    WorkerBuilder::new(pool)
         .config(config.debug_emit_task_logs(true))
         .wasmtime_config(wasmconfig)
         .validate_database(false)
-        .build()
-        .await?;
+}
+
+async fn spawn_from_builder(builder: WorkerBuilder) -> anyhow::Result<WorkerShutdownGuard> {
+    let mut worker = builder.build().await?;
 
     let handle = worker.handle();
     let task = tokio::spawn(async move { worker.run().await });

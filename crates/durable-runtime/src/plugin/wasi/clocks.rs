@@ -27,8 +27,8 @@ impl wasi::clocks::wall_clock::Host for Task {
     async fn now(&mut self) -> wasmtime::Result<Datetime> {
         let options = TransactionOptions::new("wasi:clocks/wall-clock.now");
         self.state
-            .maybe_do_transaction_sync(options, |_| {
-                let now = SystemTime::now();
+            .maybe_do_transaction_sync(options, |state| {
+                let now = state.clock().system_time_now();
                 let duration = now
                     .duration_since(SystemTime::UNIX_EPOCH)
                     .unwrap_or(Duration::ZERO);
@@ -52,8 +52,8 @@ impl wasi::clocks::monotonic_clock::Host for Task {
     async fn now(&mut self) -> wasmtime::Result<Instant> {
         let options = TransactionOptions::new("wasi:clocks/monotonic-clock.now");
         self.state
-            .maybe_do_transaction_sync(options, |_| {
-                let now = Utc::now();
+            .maybe_do_transaction_sync(options, |state| {
+                let now = state.clock().now();
                 let timestamp = now.timestamp() as u64;
                 let nanos = timestamp * NS_PER_S + now.timestamp_subsec_nanos() as u64;
 
