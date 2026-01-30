@@ -138,6 +138,19 @@ impl WorkerBuilder {
         self
     }
 
+    /// Set a custom event source for receiving PostgreSQL LISTEN/NOTIFY
+    /// events.
+    ///
+    /// In production, the default [`PgEventSource`] is used, which connects
+    /// to PostgreSQL and listens on the `durable:*` channels. In deterministic
+    /// simulation testing, provide an event source that controls when and
+    /// whether notifications are delivered, and can simulate connection loss
+    /// via [`Event::Lagged`].
+    pub fn event_source(mut self, event_source: Box<dyn EventSource>) -> Self {
+        self.event_source = Some(event_source);
+        self
+    }
+
     /// Set a custom scheduler for controlling component interleaving.
     ///
     /// In production, the default [`NoopScheduler`](crate::NoopScheduler) is

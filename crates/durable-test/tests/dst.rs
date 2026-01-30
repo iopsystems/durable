@@ -8,7 +8,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use chrono::Utc;
-use durable_runtime::dst::{DstClock, DstEntropy, DstScheduler};
+use durable_runtime::dst::{DstClock, DstEntropy, DstEventSource, DstScheduler};
 use durable_runtime::scheduler::{Component, ScheduleEvent};
 use durable_runtime::Config;
 
@@ -368,6 +368,83 @@ async fn validate_workers_uses_dst_clock(pool: sqlx::PgPool) -> anyhow::Result<(
     })
     .await
     .expect("should see ValidateWorkers acquire within 5 seconds");
+
+    guard.handle().shutdown();
+    Ok(())
+}
+
+/// Test that the DstEventSource controls when notifications are delivered
+/// to the worker, and that Event::Lagged can simulate connection loss.
+#[sqlx::test]
+async fn dst_event_source_controls_notifications(pool: sqlx::PgPool) -> anyhow::Result<()> {
+    let scheduler = Arc::new(DstScheduler::new(42));
+    let clock = Arc::new(DstClock::new(Utc::now()));
+    let entropy = Arc::new(DstEntropy::new(42));
+    let (event_source, event_handle) = DstEventSource::new();
+
+    let config = Config::new()
+        .suspend_margin(Duration::from_secs(1))
+        .suspend_timeout(Duration::from_secs(1));
+
+    let guard = durable_test::spawn_worker_with_dst_events(
+        pool,
+        config,
+        scheduler.clone(),
+        clock.clone(),
+        entropy.clone(),
+        Box::new(event_source),
+    )
+    .await?;
+
+    // Wait for the worker to register (heartbeat fires immediately).
+    tokio::time::timeout(Duration::from_secs(5), async {
+        scheduler
+            .wait_for_event(|e| matches!(e, ScheduleEvent::WorkerRegistered { .. }))
+            .await;
+    })
+    .await
+    .expect("worker should register within 5 seconds");
+
+    // Record how many ProcessEvents acquires we have so far.
+    let initial_process_count = scheduler
+        .acquires()
+        .iter()
+        .filter(|c| matches!(c, Component::ProcessEvents { .. }))
+        .count();
+
+    // Now inject a worker event through the DST event handle.
+    // This should cause the worker to process it via the event loop.
+    event_handle.send_worker(999);
+
+    // Give the worker time to process
+    tokio::time::sleep(Duration::from_millis(500)).await;
+
+    let new_process_count = scheduler
+        .acquires()
+        .iter()
+        .filter(|c| matches!(c, Component::ProcessEvents { .. }))
+        .count();
+
+    assert!(
+        new_process_count > initial_process_count,
+        "expected ProcessEvents acquire after injecting event: initial={initial_process_count}, new={new_process_count}"
+    );
+
+    // Simulate a connection loss — send Lagged.
+    event_handle.send_lagged();
+    tokio::time::sleep(Duration::from_millis(200)).await;
+
+    // The worker should still be running after a lagged event.
+    // Inject another event to verify it's still processing.
+    let count_before = scheduler.acquire_count();
+    event_handle.send_worker(1000);
+    tokio::time::sleep(Duration::from_millis(500)).await;
+    let count_after = scheduler.acquire_count();
+
+    assert!(
+        count_after > count_before,
+        "worker should still be processing after Lagged event"
+    );
 
     guard.handle().shutdown();
     Ok(())

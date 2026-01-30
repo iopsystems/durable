@@ -45,6 +45,27 @@ pub async fn spawn_worker_with_dst(
     spawn_from_builder(builder).await
 }
 
+/// Spawn a worker with DST hooks and a custom event source.
+///
+/// This variant also accepts a custom [`EventSource`](durable_runtime::event::EventSource)
+/// for controlling when and whether PostgreSQL LISTEN/NOTIFY events are
+/// delivered.
+pub async fn spawn_worker_with_dst_events(
+    pool: sqlx::PgPool,
+    config: Config,
+    scheduler: Arc<dyn durable_runtime::Scheduler>,
+    clock: Arc<dyn durable_runtime::Clock>,
+    entropy: Arc<dyn durable_runtime::Entropy>,
+    event_source: Box<dyn durable_runtime::event::EventSource>,
+) -> anyhow::Result<WorkerShutdownGuard> {
+    let builder = make_worker_builder(pool, config)
+        .scheduler(scheduler)
+        .clock(clock)
+        .entropy(entropy)
+        .event_source(event_source);
+    spawn_from_builder(builder).await
+}
+
 fn make_worker_builder(pool: sqlx::PgPool, config: Config) -> WorkerBuilder {
     let mut wasmconfig = wasmtime::Config::new();
     wasmconfig

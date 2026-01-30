@@ -37,6 +37,7 @@ use tokio::sync::Notify;
 
 use crate::clock::Clock;
 use crate::entropy::Entropy;
+use crate::event::{Event, EventSource};
 use crate::scheduler::{Component, ScheduleEvent, ScheduleGuard, Scheduler};
 
 /// A deterministic scheduler that records all acquire/notify calls and allows
@@ -232,6 +233,107 @@ impl Entropy for DstEntropy {
     }
 }
 
+/// A deterministic event source for controlling when and whether PostgreSQL
+/// LISTEN/NOTIFY events are delivered to the worker.
+///
+/// This wraps a real [`PgEventSource`] (or any other `EventSource`) and
+/// interposes a channel through which the test harness can:
+///
+/// - **Inject events** directly via [`send`](DstEventSource::send), without
+///   waiting for PostgreSQL notifications.
+/// - **Simulate connection loss** by sending [`Event::Lagged`].
+/// - **Block event delivery** by not sending any events, pausing the worker's
+///   event loop until the test is ready.
+///
+/// # Architecture
+///
+/// `DstEventSource` is split into two parts:
+/// - [`DstEventSource`] implements [`EventSource`] and is given to the worker.
+/// - [`DstEventHandle`] is retained by the test harness to inject events.
+///
+/// Create both with [`DstEventSource::new`].
+///
+/// [`PgEventSource`]: crate::worker::PgEventSource
+pub struct DstEventSource {
+    rx: tokio::sync::mpsc::UnboundedReceiver<Event>,
+}
+
+/// Handle for injecting events into a [`DstEventSource`].
+///
+/// This is the test-side half of the event source. Use [`send`](Self::send) to
+/// deliver events to the worker, or [`send_lagged`](Self::send_lagged) to
+/// simulate a connection loss.
+#[derive(Clone)]
+pub struct DstEventHandle {
+    tx: tokio::sync::mpsc::UnboundedSender<Event>,
+}
+
+impl DstEventSource {
+    /// Create a new DST event source and its corresponding handle.
+    ///
+    /// The returned `DstEventSource` should be passed to
+    /// [`WorkerBuilder::event_source`]. The `DstEventHandle` is retained by
+    /// the test harness.
+    pub fn new() -> (Self, DstEventHandle) {
+        let (tx, rx) = tokio::sync::mpsc::unbounded_channel();
+        (Self { rx }, DstEventHandle { tx })
+    }
+}
+
+#[async_trait::async_trait]
+impl EventSource for DstEventSource {
+    async fn next(&mut self) -> anyhow::Result<Event> {
+        match self.rx.recv().await {
+            Some(event) => Ok(event),
+            None => {
+                // Channel closed — the test handle was dropped. Return Lagged
+                // and then pend forever so the worker doesn't spin.
+                std::future::pending().await
+            }
+        }
+    }
+}
+
+impl DstEventHandle {
+    /// Send an event to the worker.
+    pub fn send(&self, event: Event) {
+        let _ = self.tx.send(event);
+    }
+
+    /// Simulate a connection loss by sending [`Event::Lagged`].
+    pub fn send_lagged(&self) {
+        let _ = self.tx.send(Event::Lagged);
+    }
+
+    /// Send a task event (new task or task became ready).
+    pub fn send_task(&self, id: i64, running_on: Option<i64>) {
+        self.send(Event::Task(crate::event::Task { id, running_on }));
+    }
+
+    /// Send a worker event (worker inserted or deleted).
+    pub fn send_worker(&self, worker_id: i64) {
+        self.send(Event::Worker(crate::event::Worker { worker_id }));
+    }
+
+    /// Send a notification event.
+    pub fn send_notification(&self, task_id: i64, event: String) {
+        self.send(Event::Notification(crate::event::Notification {
+            task_id,
+            event,
+        }));
+    }
+
+    /// Send a task suspend event.
+    pub fn send_task_suspend(&self, id: i64) {
+        self.send(Event::TaskSuspend(crate::event::TaskSuspend { id }));
+    }
+
+    /// Check whether the worker-side receiver has been dropped.
+    pub fn is_closed(&self) -> bool {
+        self.tx.is_closed()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use std::sync::Arc;
@@ -375,6 +477,59 @@ mod tests {
         assert_eq!(scheduler.events().len(), 0);
         assert_eq!(scheduler.acquires().len(), 0);
         assert_eq!(scheduler.acquire_count(), 0);
+    }
+
+    #[tokio::test]
+    async fn dst_event_source_delivers_events() {
+        let (mut source, handle) = DstEventSource::new();
+
+        handle.send_task(42, None);
+        handle.send_worker(1);
+        handle.send_lagged();
+
+        let e1 = source.next().await.unwrap();
+        assert!(matches!(e1, Event::Task(ref t) if t.id == 42));
+
+        let e2 = source.next().await.unwrap();
+        assert!(matches!(e2, Event::Worker(ref w) if w.worker_id == 1));
+
+        let e3 = source.next().await.unwrap();
+        assert!(matches!(e3, Event::Lagged));
+    }
+
+    #[tokio::test]
+    async fn dst_event_source_blocks_until_sent() {
+        let (mut source, handle) = DstEventSource::new();
+
+        // next() should block until we send something
+        let recv = tokio::spawn(async move { source.next().await.unwrap() });
+
+        // Yield to let recv start waiting
+        tokio::task::yield_now().await;
+
+        handle.send_notification(10, "wakeup".into());
+
+        let event = tokio::time::timeout(Duration::from_secs(1), recv)
+            .await
+            .expect("should complete")
+            .unwrap();
+
+        assert!(matches!(event, Event::Notification(ref n) if n.task_id == 10));
+    }
+
+    #[tokio::test]
+    async fn dst_event_handle_is_clone() {
+        let (mut source, handle) = DstEventSource::new();
+        let handle2 = handle.clone();
+
+        handle.send_task(1, None);
+        handle2.send_task(2, None);
+
+        let e1 = source.next().await.unwrap();
+        let e2 = source.next().await.unwrap();
+
+        assert!(matches!(e1, Event::Task(ref t) if t.id == 1));
+        assert!(matches!(e2, Event::Task(ref t) if t.id == 2));
     }
 
     #[tokio::test]
