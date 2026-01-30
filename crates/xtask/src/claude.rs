@@ -97,9 +97,7 @@ impl Setup {
         tracing::info!("starting PostgreSQL cluster {version}/{name}");
         xshell::cmd!(sh, "pg_ctlcluster {version} {name} restart")
             .run()
-            .with_context(|| {
-                format!("failed to start PostgreSQL cluster {version}/{name}")
-            })?;
+            .with_context(|| format!("failed to start PostgreSQL cluster {version}/{name}"))?;
 
         Ok(())
     }
@@ -107,11 +105,7 @@ impl Setup {
     /// Rewrite pg_hba.conf to use trust authentication for local and TCP
     /// connections. This mirrors the `POSTGRES_HOST_AUTH_METHOD=trust` setting
     /// used by the Docker-based `xtask dev` command.
-    fn configure_trust_auth(
-        _sh: &xshell::Shell,
-        version: &str,
-        name: &str,
-    ) -> anyhow::Result<()> {
+    fn configure_trust_auth(_sh: &xshell::Shell, version: &str, name: &str) -> anyhow::Result<()> {
         let hba_path = format!("/etc/postgresql/{version}/{name}/pg_hba.conf");
 
         let contents = std::fs::read_to_string(&hba_path)
