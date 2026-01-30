@@ -4,6 +4,7 @@ use anyhow::Context;
 use clap::Parser;
 use tracing_subscriber::prelude::*;
 
+mod claude;
 mod dev;
 mod gen;
 mod migrate;
@@ -18,6 +19,7 @@ pub struct Args {
 
 #[derive(Debug, clap::Subcommand)]
 pub enum Command {
+    Claude(self::claude::Claude),
     Generate(self::gen::Gen),
     Migrate(self::migrate::Migrate),
     Dev(self::dev::Dev),
@@ -38,6 +40,7 @@ fn main() -> anyhow::Result<()> {
         .init();
 
     match args.command {
+        Command::Claude(cmd) => cmd.run(),
         Command::Generate(cmd) => cmd.run(),
         Command::Migrate(cmd) => cmd.run(),
         Command::Dev(cmd) => cmd.run(),
