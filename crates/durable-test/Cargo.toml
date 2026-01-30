@@ -10,6 +10,7 @@ durable-client = { workspace = true }
 durable-runtime = { workspace = true }
 
 anyhow = "1.0"
+chrono = "0.4"
 dotenvy = "0.15.7"
 serde_json = "1.0.125"
 sqlx = { version = "0.8", features = ["postgres", "runtime-tokio-rustls"] }

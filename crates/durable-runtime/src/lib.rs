@@ -5,6 +5,7 @@ extern crate serde;
 
 pub mod clock;
 mod config;
+pub mod dst;
 pub mod entropy;
 mod error;
 pub mod event;
