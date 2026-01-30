@@ -160,7 +160,7 @@ impl DstClock {
     /// Advance the clock by the given duration, waking any expired sleepers.
     pub fn advance(&self, duration: Duration) {
         let mut now = self.now.lock();
-        *now = *now + duration;
+        *now += duration;
         drop(now);
         self.notify.notify_waiters();
     }
