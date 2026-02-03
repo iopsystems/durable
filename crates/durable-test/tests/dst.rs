@@ -384,6 +384,252 @@ async fn validate_workers_uses_dst_clock(pool: sqlx::PgPool) -> anyhow::Result<(
     Ok(())
 }
 
+/// Helper to load a test binary and launch a task via the DurableClient.
+async fn launch_task(
+    pool: &sqlx::PgPool,
+    binary_name: &str,
+    task_name: &str,
+) -> anyhow::Result<(durable_client::DurableClient, durable_client::Task)> {
+    let client = durable_client::DurableClient::new(pool.clone())?;
+    let program = client
+        .program(
+            durable_client::ProgramOptions::from_file(test_binary(binary_name))?,
+        )
+        .await?;
+    let task = client
+        .launch(task_name, &program, &serde_json::json!(null))
+        .await?;
+    Ok((client, task))
+}
+
+fn test_binary(name: &str) -> std::path::PathBuf {
+    let bindir = std::env::var_os("DURABLE_TEST_BIN_DIR")
+        .expect("DURABLE_TEST_BIN_DIR env var is not set");
+    let mut path = std::path::PathBuf::from(bindir);
+    path.push(name);
+    path
+}
+
+/// Test that a notification is delivered promptly when the worker for the
+/// target task is already running and waiting for a notification.
+///
+/// Scenario: launch a task that calls `notify::wait()`, then send a
+/// notification from the test side. The task should complete quickly without
+/// needing to suspend/wake.
+#[sqlx::test]
+async fn notification_delivered_while_worker_running(pool: sqlx::PgPool) -> anyhow::Result<()> {
+    let scheduler = Arc::new(DstScheduler::new(42));
+    let clock = Arc::new(DstClock::new(Utc::now()));
+    let entropy = Arc::new(DstEntropy::new(42));
+
+    // Use a long suspend timeout so the task stays in the wait loop rather than
+    // suspending. This ensures we're testing the "worker running" path.
+    let config = Config::new()
+        .suspend_margin(Duration::from_secs(1))
+        .suspend_timeout(Duration::from_secs(300));
+
+    let _guard = durable_test::spawn_worker_with_dst(
+        pool.clone(),
+        config,
+        scheduler.clone(),
+        clock.clone(),
+        entropy.clone(),
+    )
+    .await?;
+
+    let (client, task) = launch_task(&pool, "notify-wait.wasm", "dst-notify-running").await?;
+
+    // Wait for the task to be claimed by the worker.
+    tokio::time::timeout(Duration::from_secs(10), async {
+        scheduler
+            .wait_for_event(|e| matches!(e, ScheduleEvent::TaskClaimed { .. }))
+            .await;
+    })
+    .await
+    .expect("task should be claimed within 10 seconds");
+
+    // Give the task a moment to reach the notify::wait() call.
+    tokio::time::sleep(Duration::from_millis(500)).await;
+
+    // Send the notification while the worker is running.
+    task.notify("notification", &(), &client).await?;
+
+    // The task should complete promptly — no suspension needed.
+    let status = tokio::time::timeout(Duration::from_secs(10), task.wait(&client))
+        .await
+        .expect("task should complete within 10 seconds")?;
+    assert!(status.success(), "task should have succeeded");
+
+    // Verify the task did NOT suspend (it received the notification in-line).
+    let suspended = scheduler
+        .events()
+        .iter()
+        .any(|e| matches!(e, ScheduleEvent::TaskSuspended { task_id, .. } if *task_id == task.id()));
+    assert!(
+        !suspended,
+        "task should not have suspended since the notification arrived while running"
+    );
+
+    Ok(())
+}
+
+/// Test that a notification is delivered in a timely manner when the worker
+/// has already suspended the task.
+///
+/// Scenario: launch a task that calls `notify::wait()` with a short suspend
+/// timeout so it suspends quickly. Then send a notification and advance the
+/// DST clock so the leader wakes the task. The task should resume and complete.
+#[sqlx::test]
+async fn notification_delivered_after_task_suspended(pool: sqlx::PgPool) -> anyhow::Result<()> {
+    let scheduler = Arc::new(DstScheduler::new(42));
+    let clock = Arc::new(DstClock::new(Utc::now()));
+    let entropy = Arc::new(DstEntropy::new(42));
+
+    let config = Config::new()
+        .suspend_margin(Duration::ZERO)
+        .suspend_timeout(Duration::ZERO);
+
+    let _guard = durable_test::spawn_worker_with_dst(
+        pool.clone(),
+        config,
+        scheduler.clone(),
+        clock.clone(),
+        entropy.clone(),
+    )
+    .await?;
+
+    let (client, task) = launch_task(&pool, "notify-wait.wasm", "dst-notify-suspended").await?;
+
+    // Wait for the task to suspend.
+    tokio::time::timeout(Duration::from_secs(10), async {
+        scheduler
+            .wait_for_event(|e| matches!(e, ScheduleEvent::TaskSuspended { .. }))
+            .await;
+    })
+    .await
+    .expect("task should suspend within 10 seconds");
+
+    // Send the notification after the task has suspended.
+    task.notify("notification", &(), &client).await?;
+
+    // Advance the clock so the leader's wakeup check fires and transitions
+    // the task from suspended back to ready.
+    clock.advance(Duration::from_secs(5));
+
+    // The task should be woken, re-claimed, and complete.
+    let status = tokio::time::timeout(Duration::from_secs(10), task.wait(&client))
+        .await
+        .expect("task should complete within 10 seconds after notification")?;
+    assert!(status.success(), "task should have succeeded after wakeup");
+
+    // Verify the task DID suspend and then was woken.
+    let events = scheduler.events();
+    assert!(
+        events
+            .iter()
+            .any(|e| matches!(e, ScheduleEvent::TaskSuspended { .. })),
+        "expected TaskSuspended event"
+    );
+    assert!(
+        events
+            .iter()
+            .any(|e| matches!(e, ScheduleEvent::TasksWoken { count } if *count > 0)),
+        "expected TasksWoken event after notification"
+    );
+
+    Ok(())
+}
+
+/// Test that a notification is delivered in a timely manner even when the
+/// PgListener loses its connection (simulated via Event::Lagged) before the
+/// notification event is received.
+///
+/// Scenario: use a DstEventSource so we control exactly which events the
+/// worker sees. Launch a task, let it suspend, then send the DB notification
+/// but inject a Lagged event instead of the real notification event. The
+/// worker should recover from the lag and the task should still complete.
+#[sqlx::test]
+async fn notification_delivered_after_pglistener_lag(pool: sqlx::PgPool) -> anyhow::Result<()> {
+    let scheduler = Arc::new(DstScheduler::new(42));
+    let clock = Arc::new(DstClock::new(Utc::now()));
+    let entropy = Arc::new(DstEntropy::new(42));
+    let (event_source, event_handle) = DstEventSource::new();
+
+    let config = Config::new()
+        .suspend_margin(Duration::ZERO)
+        .suspend_timeout(Duration::ZERO);
+
+    let _guard = durable_test::spawn_worker_with_dst_events(
+        pool.clone(),
+        config,
+        scheduler.clone(),
+        clock.clone(),
+        entropy.clone(),
+        Box::new(event_source),
+    )
+    .await?;
+
+    // Wait for worker registration.
+    tokio::time::timeout(Duration::from_secs(5), async {
+        scheduler
+            .wait_for_event(|e| matches!(e, ScheduleEvent::WorkerRegistered { .. }))
+            .await;
+    })
+    .await
+    .expect("worker should register within 5 seconds");
+
+    let (client, task) = launch_task(&pool, "notify-wait.wasm", "dst-notify-lagged").await?;
+
+    // Inject a task event so the worker picks up the newly launched task.
+    let worker_id = scheduler
+        .events()
+        .iter()
+        .find_map(|e| match e {
+            ScheduleEvent::WorkerRegistered { worker_id } => Some(*worker_id),
+            _ => None,
+        })
+        .expect("should have a registered worker");
+    event_handle.send_task(task.id(), Some(worker_id));
+
+    // Wait for task to be claimed and then suspend.
+    tokio::time::timeout(Duration::from_secs(10), async {
+        scheduler
+            .wait_for_event(|e| matches!(e, ScheduleEvent::TaskSuspended { .. }))
+            .await;
+    })
+    .await
+    .expect("task should suspend within 10 seconds");
+
+    // Now send the notification into the database (the real delivery path).
+    task.notify("notification", &(), &client).await?;
+
+    // Instead of delivering the notification event, simulate a PgListener
+    // connection loss. The worker should handle this gracefully.
+    event_handle.send_lagged();
+
+    // Advance the clock so the leader wakes the suspended task.
+    clock.advance(Duration::from_secs(5));
+
+    // Also need to prod the leader — send a task-suspend event so it re-checks.
+    event_handle.send_task_suspend(task.id());
+
+    // The task should be woken, re-claimed, and complete.
+    // Send the task event so the worker spawns it after it transitions to ready.
+    tokio::time::sleep(Duration::from_millis(500)).await;
+    clock.advance(Duration::from_secs(5));
+    event_handle.send_task(task.id(), Some(worker_id));
+
+    let status = tokio::time::timeout(Duration::from_secs(15), task.wait(&client))
+        .await
+        .expect("task should complete even after PgListener lag")?;
+    assert!(
+        status.success(),
+        "task should have succeeded after lag recovery"
+    );
+
+    Ok(())
+}
+
 /// Test that the DstEventSource controls when notifications are delivered
 /// to the worker, and that Event::Lagged can simulate connection loss.
 #[sqlx::test]
