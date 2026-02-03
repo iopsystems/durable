@@ -188,3 +188,45 @@ async fn notify_wait_timeout(pool: sqlx::PgPool) -> anyhow::Result<()> {
 
     Ok(())
 }
+
+/// Verify that `wait_with_timeout` wakes up promptly when a notification
+/// arrives mid-wait, rather than sleeping until the timeout expires.
+#[sqlx::test]
+async fn notify_wait_timeout_wakeup(pool: sqlx::PgPool) -> anyhow::Result<()> {
+    let _guard = durable_test::spawn_worker(pool.clone()).await?;
+    let client = DurableClient::new(pool)?;
+    let program = crate::load_binary(&client, "notify-wait-timeout-wakeup.wasm").await?;
+
+    let task = client
+        .launch(
+            "notify wait timeout wakeup test",
+            &program,
+            &serde_json::json!(null),
+        )
+        .await?;
+
+    // Give the task a moment to start waiting, then deliver the notification.
+    tokio::time::sleep(Duration::from_secs(2)).await;
+    task.notify("wakeup", &(), &client).await?;
+
+    // The workflow has a 120s timeout. If wake-up works, it should complete
+    // well within 15s of us sending the notification.
+    let start = tokio::time::Instant::now();
+    let status = match timeout(Duration::from_secs(15), task.wait(&client)).await {
+        Ok(result) => result?,
+        Err(_) => anyhow::bail!(
+            "task did not complete within 15s of notification — wake-up is not timely"
+        ),
+    };
+    let elapsed = start.elapsed();
+    assert!(status.success());
+
+    // Sanity check: it should have completed in a few seconds, not anywhere
+    // near the 120s timeout the workflow specified.
+    assert!(
+        elapsed < Duration::from_secs(10),
+        "task took {elapsed:?} to complete after notification, expected < 10s"
+    );
+
+    Ok(())
+}
