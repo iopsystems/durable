@@ -302,3 +302,149 @@ async fn dst_notify_timeout_records_scheduler_events(
 
     Ok(())
 }
+
+/// When the worker's internal notification broadcast channel lags (more than
+/// 128 events buffered before the task's receiver drains them), the
+/// `notification_blocking_timeout` implementation handles `RecvError::Lagged`
+/// by breaking out of the inner select loop and re-polling the database.
+///
+/// This test floods the broadcast channel with notifications for *other*
+/// tasks, inserts the real notification into the database, then sends one
+/// more event to tip the channel past capacity. The task should recover from
+/// the lag, find its notification in the DB, and complete successfully.
+#[sqlx::test]
+async fn dst_notify_timeout_recovers_from_lag(pool: sqlx::PgPool) -> anyhow::Result<()> {
+    let scheduler = Arc::new(DstScheduler::new(42));
+    let clock = Arc::new(DstClock::new(Utc::now()));
+    let entropy = Arc::new(DstEntropy::new(42));
+    let (event_source, event_handle) = DstEventSource::new();
+
+    // Long suspend timeout so the task stays active (no suspension).
+    let config = Config::new()
+        .suspend_margin(Duration::from_secs(1))
+        .suspend_timeout(Duration::from_secs(300));
+
+    let _guard = durable_test::spawn_worker_with_dst_events(
+        pool.clone(),
+        config,
+        scheduler.clone(),
+        clock.clone(),
+        entropy.clone(),
+        Box::new(event_source),
+    )
+    .await?;
+
+    let client = DurableClient::new(pool.clone())?;
+    let program = crate::load_binary(&client, "notify-wait-timeout-wakeup.wasm").await?;
+
+    let task = client
+        .launch("dst lag recovery", &program, &serde_json::json!(null))
+        .await?;
+
+    // Tell the worker about the new task.
+    event_handle.send_task(task.id(), None);
+
+    // Give the task time to start and enter the wait loop, subscribing to
+    // the broadcast channel.
+    tokio::time::sleep(Duration::from_secs(2)).await;
+
+    // Insert the real notification into the database so it will be found
+    // when the task re-polls after recovering from the lag.
+    task.notify("wakeup", &(), &client).await?;
+
+    // Flood the broadcast channel with 200 notification events for a
+    // non-existent task. The channel capacity is 128, so the task's
+    // receiver will lag and return RecvError::Lagged on its next recv().
+    for i in 0..200 {
+        event_handle.send_notification(999_999 + i, format!("flood-{i}"));
+    }
+
+    // The task should recover: the Lagged error causes it to break out of
+    // the inner select loop, re-poll the database, find the notification we
+    // inserted above, and complete.
+    let start = tokio::time::Instant::now();
+    let status = timeout(Duration::from_secs(15), task.wait(&client))
+        .await
+        .context("task did not complete within 15s — lag recovery may have failed")??;
+    let elapsed = start.elapsed();
+
+    assert!(status.success(), "task should have succeeded");
+    assert!(
+        elapsed < Duration::from_secs(10),
+        "task took {elapsed:?} after lag flood, expected < 10s"
+    );
+
+    Ok(())
+}
+
+/// Similar to the lag recovery test above, but the notification arrives
+/// *after* the lag event. This exercises the path where lag causes a re-poll
+/// that finds nothing, the task loops back into the select, and then the
+/// real notification arrives normally.
+#[sqlx::test]
+async fn dst_notify_timeout_recovers_from_lag_then_notified(
+    pool: sqlx::PgPool,
+) -> anyhow::Result<()> {
+    let scheduler = Arc::new(DstScheduler::new(42));
+    let clock = Arc::new(DstClock::new(Utc::now()));
+    let entropy = Arc::new(DstEntropy::new(42));
+    let (event_source, event_handle) = DstEventSource::new();
+
+    let config = Config::new()
+        .suspend_margin(Duration::from_secs(1))
+        .suspend_timeout(Duration::from_secs(300));
+
+    let _guard = durable_test::spawn_worker_with_dst_events(
+        pool.clone(),
+        config,
+        scheduler.clone(),
+        clock.clone(),
+        entropy.clone(),
+        Box::new(event_source),
+    )
+    .await?;
+
+    let client = DurableClient::new(pool.clone())?;
+    let program = crate::load_binary(&client, "notify-wait-timeout-wakeup.wasm").await?;
+
+    let task = client
+        .launch(
+            "dst lag then notify",
+            &program,
+            &serde_json::json!(null),
+        )
+        .await?;
+
+    event_handle.send_task(task.id(), None);
+
+    // Let the task enter the wait loop.
+    tokio::time::sleep(Duration::from_secs(2)).await;
+
+    // Flood the broadcast channel to cause lag — but do NOT insert the
+    // notification into the DB yet.
+    for i in 0..200 {
+        event_handle.send_notification(999_999 + i, format!("flood-{i}"));
+    }
+
+    // Give the task a moment to process the lag and re-poll (finding nothing).
+    tokio::time::sleep(Duration::from_millis(500)).await;
+
+    // Now insert the real notification and deliver it through the event
+    // source so the broadcast channel fires normally.
+    task.notify("wakeup", &(), &client).await?;
+    event_handle.send_notification(task.id(), "wakeup".into());
+
+    let start = tokio::time::Instant::now();
+    let status = timeout(Duration::from_secs(15), task.wait(&client))
+        .await
+        .context("task did not complete within 15s — recovery after lag may have failed")??;
+    let elapsed = start.elapsed();
+
+    assert!(status.success(), "task should have succeeded");
+    assert!(
+        elapsed < Duration::from_secs(10),
+        "task took {elapsed:?} after notification, expected < 10s"
+    );
+
+    Ok(())
+}
