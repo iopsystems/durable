@@ -45,6 +45,10 @@ pub(crate) struct SharedState {
 
     leader: Mailbox<i64>,
     suspend: Notify,
+    /// Notified when an event lag occurs and tasks waiting for notifications
+    /// should re-poll the database. This handles the case where pg_notify
+    /// events are lost during a PgListener reconnect.
+    pub(crate) notification_repoll: Notify,
     cache: Mutex<uluru::LRUCache<ProgramCache, 32>>,
 
     /// Limit how many task compilations are allowed to be ongoing at the same
@@ -253,6 +257,7 @@ impl WorkerBuilder {
                 .unwrap_or_else(|| Arc::new(crate::entropy::SystemEntropy)),
             leader: Mailbox::new(-1),
             suspend: Notify::new(),
+            notification_repoll: Notify::new(),
             cache: Mutex::new(uluru::LRUCache::new()),
             compile_sema: Semaphore::new(self.config.max_concurrent_compilations),
             pool: self.pool,
@@ -915,6 +920,11 @@ impl Worker {
 
             match event {
                 Event::Notification(notif) => {
+                    tracing::trace!(
+                        task_id = notif.task_id,
+                        event = %notif.event,
+                        "broadcasting notification to waiting tasks"
+                    );
                     let _ = self.shared.notifications.send(notif);
                 }
                 // Check if the task is scheduled to another worker. Don't do anything in that case.
@@ -943,6 +953,11 @@ impl Worker {
                     self.spawn_new_tasks(&tx).await?;
                     self.load_leader_id().await?;
                     self.shared.suspend.notify_waiters();
+                    // Wake up any tasks waiting for notifications so they
+                    // re-poll the database. Missed pg_notify events during a
+                    // PgListener reconnect could leave active tasks waiting
+                    // for a broadcast that will never come.
+                    self.shared.notification_repoll.notify_waiters();
                 }
             }
         }

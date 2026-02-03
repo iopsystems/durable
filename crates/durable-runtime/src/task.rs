@@ -270,6 +270,15 @@ impl TaskState {
         self.shared.notifications.subscribe()
     }
 
+    /// Get a clone of the shared state, for accessing the notification repoll
+    /// [`Notify`] without borrowing the task state.
+    ///
+    /// This is used to listen for PgListener lag events so that tasks waiting
+    /// for notifications can re-poll the database.
+    pub(crate) fn shared(&self) -> Arc<SharedState> {
+        self.shared.clone()
+    }
+
     /// Access the database connection pool for the worker.
     pub fn pool(&self) -> &sqlx::PgPool {
         &self.shared.pool

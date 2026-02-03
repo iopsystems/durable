@@ -54,12 +54,14 @@ impl Host for Task {
         let deadline = Instant::now() + self.state.config().suspend_timeout;
         let task_id = self.state.task_id();
         let mut rx = self.state.subscribe_notifications();
+        let shared = self.state.shared();
 
         let data = loop {
             let mut tx = self.state.pool().begin().await?;
             let data = poll_notification(&mut *self, &mut tx).await?;
 
             if let Some(data) = data {
+                tracing::debug!(task_id, event = %data.event, "received notification");
                 let txn = self.state.transaction_mut().unwrap();
                 txn.set_conn(tx)?;
 
@@ -73,17 +75,28 @@ impl Host for Task {
                     biased;
 
                     result = rx.recv() => match result {
-                        Ok(notif) if notif.task_id == task_id => break 'inner,
+                        Ok(notif) if notif.task_id == task_id => {
+                            tracing::trace!(task_id, "woke by broadcast notification");
+                            break 'inner;
+                        }
                         Ok(_) => continue 'inner,
-                        Err(RecvError::Lagged(_)) => break 'inner,
+                        Err(RecvError::Lagged(_)) => {
+                            tracing::trace!(task_id, "notification channel lagged, re-polling");
+                            break 'inner;
+                        }
                         Err(RecvError::Closed) => {
                             return Err(anyhow::Error::new(TaskStatus::NotScheduledOnWorker))
                         }
+                    },
+                    _ = shared.notification_repoll.notified() => {
+                        tracing::trace!(task_id, "notification repoll requested (event lag recovery)");
+                        break 'inner;
                     },
                     _ = tokio::time::sleep_until(deadline) => ()
                 }
 
                 // The timer expired, so we need to attempt to suspend.
+                tracing::trace!(task_id, "suspend timeout expired, attempting to suspend");
                 let mut tx = self.state.pool().begin().await?;
 
                 sqlx::query!(
@@ -100,6 +113,7 @@ impl Host for Task {
                 if poll_notification(&mut *self, &mut tx).await?.is_some() {
                     // A new notification barged in while we were updating. Roll back the
                     // transaction and go through the main loop again.
+                    tracing::debug!(task_id, "notification barged in during suspend, rolling back");
                     tx.rollback().await?;
                     break 'inner;
                 }
