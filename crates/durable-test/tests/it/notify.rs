@@ -4,6 +4,7 @@ use anyhow::Context;
 use durable_client::DurableClient;
 use durable_runtime::Config;
 use sqlx::postgres::PgListener;
+use tokio::time::timeout;
 
 #[sqlx::test]
 async fn notify_self(pool: sqlx::PgPool) -> anyhow::Result<()> {
@@ -164,6 +165,25 @@ async fn notify_multiple_workers(pool: sqlx::PgPool) -> anyhow::Result<()> {
     let status = tokio::time::timeout(Duration::from_secs(30), task.wait(&client))
         .await
         .context("task failed to complete in under 30s")??;
+    assert!(status.success());
+
+    Ok(())
+}
+
+#[sqlx::test]
+async fn notify_wait_timeout(pool: sqlx::PgPool) -> anyhow::Result<()> {
+    let _guard = durable_test::spawn_worker(pool.clone()).await?;
+    let client = DurableClient::new(pool)?;
+    let program = crate::load_binary(&client, "notify-wait-timeout.wasm").await?;
+
+    let task = client
+        .launch("notify wait timeout test", &program, &serde_json::json!(null))
+        .await?;
+
+    let status = match timeout(Duration::from_secs(60), task.wait(&client)).await {
+        Ok(result) => result?,
+        Err(_) => anyhow::bail!("task failed to complete in under 60s"),
+    };
     assert!(status.success());
 
     Ok(())

@@ -20,6 +20,12 @@ interface notify {
     /// Read the next available notification, blocking until one is available.
     notification-blocking: func() -> event;
 
+    /// Read the next available notification, blocking until one is available or
+    /// the timeout expires. Returns `none` if the timeout expired without
+    /// receiving a notification.
+    @since(version = 2.7.0)
+    notification-blocking-timeout: func(timeout-ns: u64) -> option<event>;
+
     /// Errors that can occur as when attempting to notify another task.
     @since(version = 2.2.0)
     variant notify-error {

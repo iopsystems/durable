@@ -297,6 +297,54 @@ pub mod durable {
                 }
             }
             #[allow(unused_unsafe, clippy::all)]
+            /// Read the next available notification, blocking until one is available
+            /// or the timeout (in nanoseconds) expires. Returns `None` if the
+            /// timeout expired without receiving a notification.
+            pub fn notification_blocking_timeout(timeout_ns: u64) -> Option<Event> {
+                unsafe {
+                    #[repr(align(8))]
+                    struct RetArea([::core::mem::MaybeUninit<u8>; 40]);
+                    let mut ret_area = RetArea([::core::mem::MaybeUninit::uninit(); 40]);
+                    let ptr0 = ret_area.0.as_mut_ptr().cast::<u8>();
+                    #[cfg(target_arch = "wasm32")]
+                    #[link(wasm_import_module = "durable:core/notify@2.5.0")]
+                    extern "C" {
+                        #[link_name = "notification-blocking-timeout"]
+                        fn wit_import(_: i64, _: *mut u8);
+                    }
+                    #[cfg(not(target_arch = "wasm32"))]
+                    fn wit_import(_: i64, _: *mut u8) {
+                        unreachable!()
+                    }
+                    wit_import(_rt::as_i64(&(timeout_ns as i64)), ptr0);
+                    let l1 = i32::from(*ptr0.add(0).cast::<u8>());
+                    match l1 {
+                        0 => None,
+                        1 => {
+                            let l2 = *ptr0.add(8).cast::<i64>();
+                            let l3 = *ptr0.add(16).cast::<i32>();
+                            let l4 = *ptr0.add(20).cast::<*mut u8>();
+                            let l5 = *ptr0.add(24).cast::<usize>();
+                            let len6 = l5;
+                            let bytes6 = _rt::Vec::from_raw_parts(l4.cast(), len6, len6);
+                            let l7 = *ptr0.add(28).cast::<*mut u8>();
+                            let l8 = *ptr0.add(32).cast::<usize>();
+                            let len9 = l8;
+                            let bytes9 = _rt::Vec::from_raw_parts(l7.cast(), len9, len9);
+                            Some(Event {
+                                created_at: super::super::super::wasi::clocks::wall_clock::Datetime {
+                                    seconds: l2 as u64,
+                                    nanoseconds: l3 as u32,
+                                },
+                                event: _rt::string_lift(bytes6),
+                                data: _rt::string_lift(bytes9),
+                            })
+                        }
+                        _ => _rt::invalid_enum_discriminant(),
+                    }
+                }
+            }
+            #[allow(unused_unsafe, clippy::all)]
             /// Emit a notification for a task.
             pub fn notify(
                 task: i64,

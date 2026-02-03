@@ -118,6 +118,80 @@ impl Host for Task {
         Ok(data.into())
     }
 
+    async fn notification_blocking_timeout(
+        &mut self,
+        timeout_ns: u64,
+    ) -> wasmtime::Result<Option<Event>> {
+        if self.state.transaction().is_some() {
+            anyhow::bail!(
+                "durable:core/notify.notification-blocking-timeout cannot be called from within a \
+                 transaction"
+            );
+        }
+
+        let options =
+            TransactionOptions::new("durable:core/notify.notification-blocking-timeout");
+        if let Some(event) = self.state.enter::<Option<EventData>>(options).await? {
+            return Ok(event.map(Into::into));
+        }
+
+        let timeout = std::time::Duration::from_nanos(timeout_ns);
+        let deadline = Instant::now() + timeout;
+        let task_id = self.state.task_id();
+        let mut rx = self.state.subscribe_notifications();
+
+        let data = loop {
+            let mut tx = self.state.pool().begin().await?;
+            let data = poll_notification(&mut *self, &mut tx).await?;
+
+            if let Some(data) = data {
+                let txn = self.state.transaction_mut().unwrap();
+                txn.set_conn(tx)?;
+
+                break Some(data);
+            }
+
+            tx.rollback().await?;
+
+            let timed_out = 'inner: loop {
+                tokio::select! {
+                    biased;
+
+                    result = rx.recv() => match result {
+                        Ok(notif) if notif.task_id == task_id => break 'inner false,
+                        Ok(_) => continue 'inner,
+                        Err(RecvError::Lagged(_)) => break 'inner false,
+                        Err(RecvError::Closed) => {
+                            return Err(anyhow::Error::new(TaskStatus::NotScheduledOnWorker))
+                        }
+                    },
+                    _ = tokio::time::sleep_until(deadline) => break 'inner true,
+                }
+            };
+
+            if timed_out {
+                // Check one more time for a notification that may have arrived.
+                let mut tx = self.state.pool().begin().await?;
+                let data = poll_notification(&mut *self, &mut tx).await?;
+
+                if let Some(data) = data {
+                    let txn = self.state.transaction_mut().unwrap();
+                    txn.set_conn(tx)?;
+                    break Some(data);
+                }
+
+                tx.rollback().await?;
+
+                // No notification arrived, return None.
+                break None;
+            }
+        };
+
+        self.exit(&data).await?;
+
+        Ok(data.map(Into::into))
+    }
+
     async fn notify(
         &mut self,
         task: i64,

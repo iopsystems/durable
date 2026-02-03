@@ -13,6 +13,7 @@
 #[doc(inline)]
 pub use durable_core::notify::{Notification, NotifyError, NotifyErrorKind};
 use serde::Serialize;
+use std::time::Duration;
 
 /// Block this workflow until a new notification arrives, and return that
 /// notification.
@@ -27,6 +28,18 @@ use serde::Serialize;
 /// that instantly kills the workflow.
 pub fn wait() -> Notification {
     durable_core::notify::wait()
+}
+
+/// Block this workflow until a new notification arrives or the timeout expires.
+///
+/// Returns `Some(notification)` if a notification was received before the
+/// timeout, or `None` if the timeout expired without receiving a notification.
+///
+/// # Traps
+/// Attempting to call this function within a transaction will result in a trap
+/// that instantly kills the workflow.
+pub fn wait_with_timeout(timeout: Duration) -> Option<Notification> {
+    durable_core::notify::wait_with_timeout(timeout)
 }
 
 /// Send a notification to another durable task.

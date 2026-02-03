@@ -53,6 +53,39 @@ pub fn wait() -> Notification {
     }
 }
 
+/// Block this task until a new notification arrives or the timeout expires.
+///
+/// Returns `Some(notification)` if a notification was received, or `None` if
+/// the timeout expired without receiving a notification.
+///
+/// # Traps
+/// Attempting to call this function within a transaction will result in a trap
+/// that instantly kills the workflow.
+pub fn wait_with_timeout(timeout: Duration) -> Option<Notification> {
+    let timeout_ns = timeout.as_nanos().min(u64::MAX as u128) as u64;
+    let event =
+        crate::bindings::durable::core::notify::notification_blocking_timeout(timeout_ns);
+
+    event.map(|event| {
+        let data = event.data.into_boxed_str();
+
+        let _: &RawValue = serde_json::from_str(&data).expect(
+            "durable:core/notify.notification_blocking_timeout returned an event containing \
+             invalid json data",
+        );
+
+        // SAFETY: Same as in wait() - RawValue is #[repr(transparent)] around str.
+        let data = unsafe { std::mem::transmute::<Box<str>, Box<RawValue>>(data) };
+
+        Notification {
+            created_at: SystemTime::UNIX_EPOCH
+                + Duration::new(event.created_at.seconds, event.created_at.nanoseconds),
+            event: event.event,
+            data,
+        }
+    })
+}
+
 /// Send a notification to another task.
 ///
 /// # Errors
