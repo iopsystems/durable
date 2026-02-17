@@ -476,8 +476,10 @@ async fn notification_delivered_while_worker_running(pool: sqlx::PgPool) -> anyh
 /// has already suspended the task.
 ///
 /// Scenario: launch a task that calls `notify::wait()` with a short suspend
-/// timeout so it suspends quickly. Then send a notification and advance the
-/// DST clock so the leader wakes the task. The task should resume and complete.
+/// timeout so it suspends quickly. Then send a notification. The DB trigger
+/// `notify_notification()` immediately transitions the task back to `ready`
+/// and assigns it to a worker, so the task should be re-claimed and complete
+/// without needing the leader to wake it.
 #[sqlx::test]
 async fn notification_delivered_after_task_suspended(pool: sqlx::PgPool) -> anyhow::Result<()> {
     let scheduler = Arc::new(DstScheduler::new(42));
@@ -508,32 +510,25 @@ async fn notification_delivered_after_task_suspended(pool: sqlx::PgPool) -> anyh
     .await
     .expect("task should suspend within 10 seconds");
 
-    // Send the notification after the task has suspended.
+    // Send the notification after the task has suspended. The DB trigger
+    // transitions the task back to 'ready' and fires pg_notify on
+    // durable:notification + durable:task, which the worker picks up via
+    // its PgEventSource.
     task.notify("notification", &(), &client).await?;
 
-    // Advance the clock so the leader's wakeup check fires and transitions
-    // the task from suspended back to ready.
-    clock.advance(Duration::from_secs(5));
-
-    // The task should be woken, re-claimed, and complete.
+    // The task should be re-claimed and complete.
     let status = tokio::time::timeout(Duration::from_secs(10), task.wait(&client))
         .await
         .expect("task should complete within 10 seconds after notification")?;
     assert!(status.success(), "task should have succeeded after wakeup");
 
-    // Verify the task DID suspend and then was woken.
-    let events = scheduler.events();
+    // Verify the task DID suspend before completing.
     assert!(
-        events
+        scheduler
+            .events()
             .iter()
             .any(|e| matches!(e, ScheduleEvent::TaskSuspended { .. })),
         "expected TaskSuspended event"
-    );
-    assert!(
-        events
-            .iter()
-            .any(|e| matches!(e, ScheduleEvent::TasksWoken { count } if *count > 0)),
-        "expected TasksWoken event after notification"
     );
 
     Ok(())
@@ -545,8 +540,9 @@ async fn notification_delivered_after_task_suspended(pool: sqlx::PgPool) -> anyh
 ///
 /// Scenario: use a DstEventSource so we control exactly which events the
 /// worker sees. Launch a task, let it suspend, then send the DB notification
-/// but inject a Lagged event instead of the real notification event. The
-/// worker should recover from the lag and the task should still complete.
+/// but inject a Lagged event instead of the real `durable:task` event. The
+/// worker's Lagged handler calls `spawn_new_tasks()` which re-polls the
+/// database and discovers the now-ready task.
 #[sqlx::test]
 async fn notification_delivered_after_pglistener_lag(pool: sqlx::PgPool) -> anyhow::Result<()> {
     let scheduler = Arc::new(DstScheduler::new(42));
@@ -599,26 +595,18 @@ async fn notification_delivered_after_pglistener_lag(pool: sqlx::PgPool) -> anyh
     .await
     .expect("task should suspend within 10 seconds");
 
-    // Now send the notification into the database (the real delivery path).
+    // Insert the notification into the database. The DB trigger
+    // `notify_notification()` sets the task back to 'ready' and assigns
+    // `running_on` to a worker. Normally the worker would also receive a
+    // pg_notify event on `durable:task`, but we're simulating a PgListener
+    // connection loss — send Lagged instead.
     task.notify("notification", &(), &client).await?;
-
-    // Instead of delivering the notification event, simulate a PgListener
-    // connection loss. The worker should handle this gracefully.
     event_handle.send_lagged();
 
-    // Advance the clock so the leader wakes the suspended task.
-    clock.advance(Duration::from_secs(5));
-
-    // Also need to prod the leader — send a task-suspend event so it re-checks.
-    event_handle.send_task_suspend(task.id());
-
-    // The task should be woken, re-claimed, and complete.
-    // Send the task event so the worker spawns it after it transitions to ready.
-    tokio::time::sleep(Duration::from_millis(500)).await;
-    clock.advance(Duration::from_secs(5));
-    event_handle.send_task(task.id(), Some(worker_id));
-
-    let status = tokio::time::timeout(Duration::from_secs(15), task.wait(&client))
+    // The worker's Event::Lagged handler calls spawn_new_tasks(), which
+    // re-polls the database and discovers the task is now 'ready'. The task
+    // should be re-claimed and complete.
+    let status = tokio::time::timeout(Duration::from_secs(10), task.wait(&client))
         .await
         .expect("task should complete even after PgListener lag")?;
     assert!(
