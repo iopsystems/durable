@@ -63,8 +63,7 @@ pub fn wait() -> Notification {
 /// that instantly kills the workflow.
 pub fn wait_with_timeout(timeout: Duration) -> Option<Notification> {
     let timeout_ns = timeout.as_nanos().min(u64::MAX as u128) as u64;
-    let event =
-        crate::bindings::durable::core::notify::notification_blocking_timeout(timeout_ns);
+    let event = crate::bindings::durable::core::notify::notification_blocking_timeout(timeout_ns);
 
     event.map(|event| {
         let data = event.data.into_boxed_str();

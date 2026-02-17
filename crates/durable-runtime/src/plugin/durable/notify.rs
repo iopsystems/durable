@@ -129,8 +129,7 @@ impl Host for Task {
             );
         }
 
-        let options =
-            TransactionOptions::new("durable:core/notify.notification-blocking-timeout");
+        let options = TransactionOptions::new("durable:core/notify.notification-blocking-timeout");
         if let Some(event) = self.state.enter::<Option<EventData>>(options).await? {
             return Ok(event.map(Into::into));
         }

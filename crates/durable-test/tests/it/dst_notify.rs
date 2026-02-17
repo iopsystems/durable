@@ -46,11 +46,7 @@ async fn dst_notify_timeout_suspend_then_wake(pool: sqlx::PgPool) -> anyhow::Res
     let program = crate::load_binary(&client, "notify-wait-timeout-wakeup.wasm").await?;
 
     let task = client
-        .launch(
-            "dst suspend then wake",
-            &program,
-            &serde_json::json!(null),
-        )
+        .launch("dst suspend then wake", &program, &serde_json::json!(null))
         .await?;
 
     // Inject a task event so the worker picks up the new task.
@@ -196,9 +192,7 @@ async fn dst_notify_timeout_wake_before_suspend(pool: sqlx::PgPool) -> anyhow::R
 /// suspend → notification → resume → complete cycle, and that the
 /// DstScheduler records the expected sequence of events.
 #[sqlx::test]
-async fn dst_notify_timeout_records_scheduler_events(
-    pool: sqlx::PgPool,
-) -> anyhow::Result<()> {
+async fn dst_notify_timeout_records_scheduler_events(pool: sqlx::PgPool) -> anyhow::Result<()> {
     let scheduler = Arc::new(DstScheduler::new(42));
     let clock = Arc::new(DstClock::new(Utc::now()));
     let entropy = Arc::new(DstEntropy::new(42));
@@ -408,11 +402,7 @@ async fn dst_notify_timeout_recovers_from_lag_then_notified(
     let program = crate::load_binary(&client, "notify-wait-timeout-wakeup.wasm").await?;
 
     let task = client
-        .launch(
-            "dst lag then notify",
-            &program,
-            &serde_json::json!(null),
-        )
+        .launch("dst lag then notify", &program, &serde_json::json!(null))
         .await?;
 
     event_handle.send_task(task.id(), None);

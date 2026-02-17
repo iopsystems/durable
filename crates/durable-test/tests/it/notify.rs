@@ -177,7 +177,11 @@ async fn notify_wait_timeout(pool: sqlx::PgPool) -> anyhow::Result<()> {
     let program = crate::load_binary(&client, "notify-wait-timeout.wasm").await?;
 
     let task = client
-        .launch("notify wait timeout test", &program, &serde_json::json!(null))
+        .launch(
+            "notify wait timeout test",
+            &program,
+            &serde_json::json!(null),
+        )
         .await?;
 
     let status = match timeout(Duration::from_secs(60), task.wait(&client)).await {
