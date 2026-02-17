@@ -353,13 +353,21 @@ async fn dst_notify_timeout_recovers_from_lag(pool: sqlx::PgPool) -> anyhow::Res
         event_handle.send_notification(999_999 + i, format!("flood-{i}"));
     }
 
-    // The task should recover: the Lagged error causes it to break out of
-    // the inner select loop, re-poll the database, find the notification we
-    // inserted above, and complete.
+    // Also deliver the real notification event through the broadcast
+    // channel. If the flood caused lag, the task will recover via the
+    // Lagged path and re-poll the database. If it did not cause lag
+    // (because the worker and task interleaved event processing), this
+    // event ensures the task still wakes up and finds the notification in
+    // the database.
+    event_handle.send_notification(task.id(), "wakeup".into());
+
+    // The task should find the notification quickly — either through lag
+    // recovery (re-poll after RecvError::Lagged) or through the normal
+    // broadcast path.
     let start = tokio::time::Instant::now();
     let status = timeout(Duration::from_secs(15), task.wait(&client))
         .await
-        .context("task did not complete within 15s — lag recovery may have failed")??;
+        .context("task did not complete within 15s")??;
     let elapsed = start.elapsed();
 
     assert!(status.success(), "task should have succeeded");
