@@ -392,9 +392,9 @@ async fn launch_task(
 ) -> anyhow::Result<(durable_client::DurableClient, durable_client::Task)> {
     let client = durable_client::DurableClient::new(pool.clone())?;
     let program = client
-        .program(
-            durable_client::ProgramOptions::from_file(test_binary(binary_name))?,
-        )
+        .program(durable_client::ProgramOptions::from_file(test_binary(
+            binary_name,
+        ))?)
         .await?;
     let task = client
         .launch(task_name, &program, &serde_json::json!(null))
@@ -403,8 +403,8 @@ async fn launch_task(
 }
 
 fn test_binary(name: &str) -> std::path::PathBuf {
-    let bindir = std::env::var_os("DURABLE_TEST_BIN_DIR")
-        .expect("DURABLE_TEST_BIN_DIR env var is not set");
+    let bindir =
+        std::env::var_os("DURABLE_TEST_BIN_DIR").expect("DURABLE_TEST_BIN_DIR env var is not set");
     let mut path = std::path::PathBuf::from(bindir);
     path.push(name);
     path
@@ -461,10 +461,9 @@ async fn notification_delivered_while_worker_running(pool: sqlx::PgPool) -> anyh
     assert!(status.success(), "task should have succeeded");
 
     // Verify the task did NOT suspend (it received the notification in-line).
-    let suspended = scheduler
-        .events()
-        .iter()
-        .any(|e| matches!(e, ScheduleEvent::TaskSuspended { task_id, .. } if *task_id == task.id()));
+    let suspended = scheduler.events().iter().any(
+        |e| matches!(e, ScheduleEvent::TaskSuspended { task_id, .. } if *task_id == task.id()),
+    );
     assert!(
         !suspended,
         "task should not have suspended since the notification arrived while running"
