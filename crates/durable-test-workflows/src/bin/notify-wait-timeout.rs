@@ -18,6 +18,4 @@ fn main() {
 
     let data: String = notif.json().expect("invalid json data");
     assert_eq!(data, "hello timeout");
-
-    print!("ok\n");
 }

@@ -9,6 +9,4 @@ fn main() {
     let result = notify::wait_with_timeout(Duration::from_secs(120));
     let notif = result.expect("expected to receive a notification before timeout");
     assert_eq!(notif.event, "wakeup");
-
-    print!("ok\n");
 }
