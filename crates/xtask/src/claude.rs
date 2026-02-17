@@ -1,3 +1,4 @@
+use std::path::PathBuf;
 use std::time::Duration;
 
 use anyhow::Context;
@@ -42,6 +43,9 @@ impl Setup {
         let migrator = Migrator::from_dir(root.join("crates/durable-runtime/migrations"))?;
         let sh = xshell::Shell::new()?;
 
+        // Install required tools (cargo-nextest, cargo-component, wasm target).
+        Self::install_tools(&sh)?;
+
         // Ensure PostgreSQL is running with the right auth config.
         Self::ensure_postgres(&sh)?;
 
@@ -71,6 +75,62 @@ impl Setup {
 
         tracing::info!("database setup complete");
         Ok(())
+    }
+
+    /// Install cargo-nextest, cargo-component, and the wasm32-wasip1 target
+    /// if they are not already present.
+    fn install_tools(sh: &xshell::Shell) -> anyhow::Result<()> {
+        let cargo_bin = Self::cargo_bin_dir();
+
+        // cargo-nextest: install from pre-built tarball for speed.
+        let nextest_bin = cargo_bin.join("cargo-nextest");
+        if !nextest_bin.exists() {
+            tracing::info!("installing cargo-nextest");
+            let tarball = "/tmp/nextest.tar.gz";
+            xshell::cmd!(
+                sh,
+                "curl -LsSf https://get.nexte.st/latest/linux -o {tarball}"
+            )
+            .run()
+            .context("failed to download cargo-nextest")?;
+            xshell::cmd!(sh, "tar xzf {tarball} -C {cargo_bin}")
+                .run()
+                .context("failed to extract cargo-nextest")?;
+            let _ = std::fs::remove_file(tarball);
+        }
+
+        // cargo-component: install via cargo install.
+        let component_bin = cargo_bin.join("cargo-component");
+        if !component_bin.exists() {
+            tracing::info!("installing cargo-component");
+            xshell::cmd!(sh, "cargo install cargo-component --locked")
+                .run()
+                .context("failed to install cargo-component")?;
+        }
+
+        // wasm32-wasip1 target.
+        let installed = xshell::cmd!(sh, "rustup target list --installed")
+            .quiet()
+            .read()
+            .unwrap_or_default();
+        if !installed.lines().any(|l| l.trim() == "wasm32-wasip1") {
+            tracing::info!("adding wasm32-wasip1 rustup target");
+            xshell::cmd!(sh, "rustup target add wasm32-wasip1")
+                .run()
+                .context("failed to add wasm32-wasip1 target")?;
+        }
+
+        Ok(())
+    }
+
+    fn cargo_bin_dir() -> PathBuf {
+        if let Ok(home) = std::env::var("CARGO_HOME") {
+            PathBuf::from(home).join("bin")
+        } else if let Ok(home) = std::env::var("HOME") {
+            PathBuf::from(home).join(".cargo/bin")
+        } else {
+            PathBuf::from("/root/.cargo/bin")
+        }
     }
 
     fn ensure_postgres(sh: &xshell::Shell) -> anyhow::Result<()> {
