@@ -1,6 +1,6 @@
 experimental = ["setup-scripts"]
 
-[script.build-test-bins]
+[scripts.setup.build-test-bins]
 command = "bash crates/durable-test/setup.sh"
 
 [[profile.default.scripts]]
