@@ -918,7 +918,7 @@ checksum = "7454e41ff9012c00d53cf7f475c5e3afa3b91b7c90568495495e8d9bf47a1055"
 
 [[package]]
 name = "durable"
-version = "0.5.8"
+version = "0.5.9"
 dependencies = [
  "durable-core",
  "durable-http",
@@ -974,7 +974,7 @@ dependencies = [
 
 [[package]]
 name = "durable-core"
-version = "0.5.8"
+version = "0.5.9"
 dependencies = [
  "cc",
  "serde",
@@ -992,7 +992,7 @@ dependencies = [
 
 [[package]]
 name = "durable-http"
-version = "0.5.8"
+version = "0.5.9"
 dependencies = [
  "chrono",
  "durable",
@@ -1018,7 +1018,7 @@ dependencies = [
 
 [[package]]
 name = "durable-runtime"
-version = "0.6.2"
+version = "0.6.3"
 dependencies = [
  "ahash",
  "anyhow",
@@ -1063,7 +1063,7 @@ dependencies = [
 
 [[package]]
 name = "durable-sqlx"
-version = "0.5.8"
+version = "0.5.9"
 dependencies = [
  "async-stream",
  "chrono",
