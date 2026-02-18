@@ -118,6 +118,123 @@ impl Host for Task {
         Ok(data.into())
     }
 
+    async fn notification_blocking_timeout(
+        &mut self,
+        timeout_ns: u64,
+    ) -> wasmtime::Result<Option<Event>> {
+        if self.state.transaction().is_some() {
+            anyhow::bail!(
+                "durable:core/notify.notification-blocking-timeout cannot be called from within a \
+                 transaction"
+            );
+        }
+
+        let options = TransactionOptions::new("durable:core/notify.notification-blocking-timeout");
+        if let Some(event) = self.state.enter::<Option<EventData>>(options).await? {
+            return Ok(event.map(Into::into));
+        }
+
+        let timeout = std::time::Duration::from_nanos(timeout_ns);
+        let user_deadline = Instant::now() + timeout;
+        let suspend_deadline = Instant::now() + self.state.config().suspend_timeout;
+        let task_id = self.state.task_id();
+        let mut rx = self.state.subscribe_notifications();
+
+        let data = loop {
+            let mut tx = self.state.pool().begin().await?;
+            let data = poll_notification(&mut *self, &mut tx).await?;
+
+            if let Some(data) = data {
+                let txn = self.state.transaction_mut().unwrap();
+                txn.set_conn(tx)?;
+
+                break Some(data);
+            }
+
+            tx.rollback().await?;
+
+            // Wait for either a notification, the user timeout, or the suspend
+            // timeout — whichever comes first.
+            enum Expired {
+                User,
+                Suspend,
+            }
+
+            let expired = 'inner: loop {
+                tokio::select! {
+                    biased;
+
+                    result = rx.recv() => match result {
+                        Ok(notif) if notif.task_id == task_id => break 'inner None,
+                        Ok(_) => continue 'inner,
+                        Err(RecvError::Lagged(_)) => break 'inner None,
+                        Err(RecvError::Closed) => {
+                            return Err(anyhow::Error::new(TaskStatus::NotScheduledOnWorker))
+                        }
+                    },
+                    _ = tokio::time::sleep_until(user_deadline) => {
+                        break 'inner Some(Expired::User)
+                    },
+                    _ = tokio::time::sleep_until(suspend_deadline) => {
+                        break 'inner Some(Expired::Suspend)
+                    },
+                }
+            };
+
+            match expired {
+                // A notification signal arrived — go back to the top and poll.
+                None => continue,
+
+                // The user's timeout expired. Check one more time for a
+                // notification that may have arrived concurrently.
+                Some(Expired::User) => {
+                    let mut tx = self.state.pool().begin().await?;
+                    let data = poll_notification(&mut *self, &mut tx).await?;
+
+                    if let Some(data) = data {
+                        let txn = self.state.transaction_mut().unwrap();
+                        txn.set_conn(tx)?;
+                        break Some(data);
+                    }
+
+                    tx.rollback().await?;
+                    break None;
+                }
+
+                // The suspend timeout expired. Attempt to suspend the task so
+                // we free up the worker slot, just like notification_blocking.
+                Some(Expired::Suspend) => {
+                    let mut tx = self.state.pool().begin().await?;
+
+                    sqlx::query!(
+                        "UPDATE durable.task
+                      SET state = 'suspended',
+                          running_on = NULL
+                    WHERE id = $1
+                    ",
+                        self.task_id()
+                    )
+                    .execute(&mut *tx)
+                    .await?;
+
+                    if poll_notification(&mut *self, &mut tx).await?.is_some() {
+                        // A new notification barged in while we were updating.
+                        // Roll back the suspend and go through the main loop.
+                        tx.rollback().await?;
+                        continue;
+                    }
+
+                    tx.commit().await?;
+                    return Err(anyhow::Error::new(TaskStatus::Suspend));
+                }
+            }
+        };
+
+        self.exit(&data).await?;
+
+        Ok(data.map(Into::into))
+    }
+
     async fn notify(
         &mut self,
         task: i64,

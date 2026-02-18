@@ -1,8 +1,8 @@
-#[allow(dead_code)]
+#[rustfmt::skip]
+#[allow(dead_code, clippy::all)]
 pub mod durable {
-    #[allow(dead_code)]
     pub mod core {
-        #[allow(dead_code, clippy::all)]
+        #[allow(dead_code, async_fn_in_trait, unused_imports, clippy::all)]
         pub mod sql {
             #[used]
             #[doc(hidden)]
@@ -21,7 +21,7 @@ pub mod durable {
                 #[doc(hidden)]
                 pub unsafe fn from_handle(handle: u32) -> Self {
                     Self {
-                        handle: _rt::Resource::from_handle(handle),
+                        handle: unsafe { _rt::Resource::from_handle(handle) },
                     }
                 }
                 #[doc(hidden)]
@@ -36,16 +36,18 @@ pub mod durable {
             unsafe impl _rt::WasmResource for TypeInfo {
                 #[inline]
                 unsafe fn drop(_handle: u32) {
-                    #[cfg(not(target_arch = "wasm32"))]
-                    unreachable!();
                     #[cfg(target_arch = "wasm32")]
-                    {
-                        #[link(wasm_import_module = "durable:core/sql@2.5.0")]
-                        extern "C" {
-                            #[link_name = "[resource-drop]type-info"]
-                            fn drop(_: u32);
-                        }
-                        drop(_handle);
+                    #[link(wasm_import_module = "durable:core/sql@2.7.0")]
+                    unsafe extern "C" {
+                        #[link_name = "[resource-drop]type-info"]
+                        fn drop(_: i32);
+                    }
+                    #[cfg(not(target_arch = "wasm32"))]
+                    unsafe extern "C" fn drop(_: i32) {
+                        unreachable!()
+                    }
+                    unsafe {
+                        drop(_handle as i32);
                     }
                 }
             }
@@ -194,7 +196,7 @@ pub mod durable {
                 #[doc(hidden)]
                 pub unsafe fn from_handle(handle: u32) -> Self {
                     Self {
-                        handle: _rt::Resource::from_handle(handle),
+                        handle: unsafe { _rt::Resource::from_handle(handle) },
                     }
                 }
                 #[doc(hidden)]
@@ -209,16 +211,18 @@ pub mod durable {
             unsafe impl _rt::WasmResource for Value {
                 #[inline]
                 unsafe fn drop(_handle: u32) {
-                    #[cfg(not(target_arch = "wasm32"))]
-                    unreachable!();
                     #[cfg(target_arch = "wasm32")]
-                    {
-                        #[link(wasm_import_module = "durable:core/sql@2.5.0")]
-                        extern "C" {
-                            #[link_name = "[resource-drop]value"]
-                            fn drop(_: u32);
-                        }
-                        drop(_handle);
+                    #[link(wasm_import_module = "durable:core/sql@2.7.0")]
+                    unsafe extern "C" {
+                        #[link_name = "[resource-drop]value"]
+                        fn drop(_: i32);
+                    }
+                    #[cfg(not(target_arch = "wasm32"))]
+                    unsafe extern "C" fn drop(_: i32) {
+                        unreachable!()
+                    }
+                    unsafe {
+                        drop(_handle as i32);
                     }
                 }
             }
@@ -315,7 +319,16 @@ pub mod durable {
                 }
             }
             #[repr(u8)]
-            #[derive(Clone, Copy, Eq, PartialEq, serde::Deserialize, serde::Serialize)]
+            #[derive(
+                Clone,
+                Copy,
+                Eq,
+                Ord,
+                PartialEq,
+                PartialOrd,
+                serde::Deserialize,
+                serde::Serialize
+            )]
             pub enum DatabaseErrorKind {
                 UniqueViolation,
                 ForeignKeyViolation,
@@ -352,7 +365,7 @@ pub mod durable {
                 #[doc(hidden)]
                 pub unsafe fn _lift(val: u8) -> DatabaseErrorKind {
                     if !cfg!(debug_assertions) {
-                        return ::core::mem::transmute(val);
+                        return unsafe { ::core::mem::transmute(val) };
                     }
                     match val {
                         0 => DatabaseErrorKind::UniqueViolation,
@@ -429,49 +442,60 @@ pub mod durable {
                 /// This will not include length specifiers. The type name returned
                 /// is a rough approximation of how it would be written in SQL for the
                 /// database.
+                #[allow(async_fn_in_trait)]
                 pub fn name(&self) -> _rt::String {
                     unsafe {
-                        #[repr(align(4))]
-                        struct RetArea([::core::mem::MaybeUninit<u8>; 8]);
+                        #[cfg_attr(target_pointer_width = "64", repr(align(8)))]
+                        #[cfg_attr(target_pointer_width = "32", repr(align(4)))]
+                        struct RetArea(
+                            [::core::mem::MaybeUninit<
+                                u8,
+                            >; 2 * ::core::mem::size_of::<*const u8>()],
+                        );
                         let mut ret_area = RetArea(
-                            [::core::mem::MaybeUninit::uninit(); 8],
+                            [::core::mem::MaybeUninit::uninit(); 2
+                                * ::core::mem::size_of::<*const u8>()],
                         );
                         let ptr0 = ret_area.0.as_mut_ptr().cast::<u8>();
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.5.0")]
-                        extern "C" {
+                        #[link(wasm_import_module = "durable:core/sql@2.7.0")]
+                        unsafe extern "C" {
                             #[link_name = "[method]type-info.name"]
-                            fn wit_import(_: i32, _: *mut u8);
+                            fn wit_import1(_: i32, _: *mut u8);
                         }
                         #[cfg(not(target_arch = "wasm32"))]
-                        fn wit_import(_: i32, _: *mut u8) {
+                        unsafe extern "C" fn wit_import1(_: i32, _: *mut u8) {
                             unreachable!()
                         }
-                        wit_import((self).handle() as i32, ptr0);
-                        let l1 = *ptr0.add(0).cast::<*mut u8>();
-                        let l2 = *ptr0.add(4).cast::<usize>();
-                        let len3 = l2;
-                        let bytes3 = _rt::Vec::from_raw_parts(l1.cast(), len3, len3);
-                        _rt::string_lift(bytes3)
+                        wit_import1((self).handle() as i32, ptr0);
+                        let l2 = *ptr0.add(0).cast::<*mut u8>();
+                        let l3 = *ptr0
+                            .add(::core::mem::size_of::<*const u8>())
+                            .cast::<usize>();
+                        let len4 = l3;
+                        let bytes4 = _rt::Vec::from_raw_parts(l2.cast(), len4, len4);
+                        let result5 = _rt::string_lift(bytes4);
+                        result5
                     }
                 }
             }
             impl TypeInfo {
                 #[allow(unused_unsafe, clippy::all)]
                 /// Whether `self` and `other` represent mutually compatible types.
+                #[allow(async_fn_in_trait)]
                 pub fn compatible(&self, other: &TypeInfo) -> bool {
                     unsafe {
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.5.0")]
-                        extern "C" {
+                        #[link(wasm_import_module = "durable:core/sql@2.7.0")]
+                        unsafe extern "C" {
                             #[link_name = "[method]type-info.compatible"]
-                            fn wit_import(_: i32, _: i32) -> i32;
+                            fn wit_import0(_: i32, _: i32) -> i32;
                         }
                         #[cfg(not(target_arch = "wasm32"))]
-                        fn wit_import(_: i32, _: i32) -> i32 {
+                        unsafe extern "C" fn wit_import0(_: i32, _: i32) -> i32 {
                             unreachable!()
                         }
-                        let ret = wit_import(
+                        let ret = wit_import0(
                             (self).handle() as i32,
                             (other).handle() as i32,
                         );
@@ -482,19 +506,20 @@ pub mod durable {
             impl TypeInfo {
                 #[allow(unused_unsafe, clippy::all)]
                 /// Whether `self` and `other` represent exactly the same type.
+                #[allow(async_fn_in_trait)]
                 pub fn equal(&self, other: &TypeInfo) -> bool {
                     unsafe {
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.5.0")]
-                        extern "C" {
+                        #[link(wasm_import_module = "durable:core/sql@2.7.0")]
+                        unsafe extern "C" {
                             #[link_name = "[method]type-info.equal"]
-                            fn wit_import(_: i32, _: i32) -> i32;
+                            fn wit_import0(_: i32, _: i32) -> i32;
                         }
                         #[cfg(not(target_arch = "wasm32"))]
-                        fn wit_import(_: i32, _: i32) -> i32 {
+                        unsafe extern "C" fn wit_import0(_: i32, _: i32) -> i32 {
                             unreachable!()
                         }
-                        let ret = wit_import(
+                        let ret = wit_import0(
                             (self).handle() as i32,
                             (other).handle() as i32,
                         );
@@ -505,19 +530,20 @@ pub mod durable {
             impl TypeInfo {
                 #[allow(unused_unsafe, clippy::all)]
                 /// Create a clone of this type-info.
+                #[allow(async_fn_in_trait)]
                 pub fn clone(&self) -> TypeInfo {
                     unsafe {
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.5.0")]
-                        extern "C" {
+                        #[link(wasm_import_module = "durable:core/sql@2.7.0")]
+                        unsafe extern "C" {
                             #[link_name = "[method]type-info.clone"]
-                            fn wit_import(_: i32) -> i32;
+                            fn wit_import0(_: i32) -> i32;
                         }
                         #[cfg(not(target_arch = "wasm32"))]
-                        fn wit_import(_: i32) -> i32 {
+                        unsafe extern "C" fn wit_import0(_: i32) -> i32 {
                             unreachable!()
                         }
-                        let ret = wit_import((self).handle() as i32);
+                        let ret = wit_import0((self).handle() as i32);
                         TypeInfo::from_handle(ret as u32)
                     }
                 }
@@ -527,45 +553,131 @@ pub mod durable {
                 /// Serialize this type-info to json.
                 ///
                 /// The actual json returned by this function is not meant to be introspected.
+                #[allow(async_fn_in_trait)]
                 pub fn serialize(&self) -> Result<_rt::String, _rt::String> {
                     unsafe {
-                        #[repr(align(4))]
-                        struct RetArea([::core::mem::MaybeUninit<u8>; 12]);
+                        #[cfg_attr(target_pointer_width = "64", repr(align(8)))]
+                        #[cfg_attr(target_pointer_width = "32", repr(align(4)))]
+                        struct RetArea(
+                            [::core::mem::MaybeUninit<
+                                u8,
+                            >; 3 * ::core::mem::size_of::<*const u8>()],
+                        );
                         let mut ret_area = RetArea(
-                            [::core::mem::MaybeUninit::uninit(); 12],
+                            [::core::mem::MaybeUninit::uninit(); 3
+                                * ::core::mem::size_of::<*const u8>()],
                         );
                         let ptr0 = ret_area.0.as_mut_ptr().cast::<u8>();
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.5.0")]
-                        extern "C" {
+                        #[link(wasm_import_module = "durable:core/sql@2.7.0")]
+                        unsafe extern "C" {
                             #[link_name = "[method]type-info.serialize"]
-                            fn wit_import(_: i32, _: *mut u8);
+                            fn wit_import1(_: i32, _: *mut u8);
                         }
                         #[cfg(not(target_arch = "wasm32"))]
-                        fn wit_import(_: i32, _: *mut u8) {
+                        unsafe extern "C" fn wit_import1(_: i32, _: *mut u8) {
                             unreachable!()
                         }
-                        wit_import((self).handle() as i32, ptr0);
-                        let l1 = i32::from(*ptr0.add(0).cast::<u8>());
-                        match l1 {
+                        wit_import1((self).handle() as i32, ptr0);
+                        let l2 = i32::from(*ptr0.add(0).cast::<u8>());
+                        let result9 = match l2 {
                             0 => {
                                 let e = {
-                                    let l2 = *ptr0.add(4).cast::<*mut u8>();
-                                    let l3 = *ptr0.add(8).cast::<usize>();
-                                    let len4 = l3;
-                                    let bytes4 = _rt::Vec::from_raw_parts(
-                                        l2.cast(),
-                                        len4,
-                                        len4,
+                                    let l3 = *ptr0
+                                        .add(::core::mem::size_of::<*const u8>())
+                                        .cast::<*mut u8>();
+                                    let l4 = *ptr0
+                                        .add(2 * ::core::mem::size_of::<*const u8>())
+                                        .cast::<usize>();
+                                    let len5 = l4;
+                                    let bytes5 = _rt::Vec::from_raw_parts(
+                                        l3.cast(),
+                                        len5,
+                                        len5,
                                     );
-                                    _rt::string_lift(bytes4)
+                                    _rt::string_lift(bytes5)
                                 };
                                 Ok(e)
                             }
                             1 => {
                                 let e = {
-                                    let l5 = *ptr0.add(4).cast::<*mut u8>();
-                                    let l6 = *ptr0.add(8).cast::<usize>();
+                                    let l6 = *ptr0
+                                        .add(::core::mem::size_of::<*const u8>())
+                                        .cast::<*mut u8>();
+                                    let l7 = *ptr0
+                                        .add(2 * ::core::mem::size_of::<*const u8>())
+                                        .cast::<usize>();
+                                    let len8 = l7;
+                                    let bytes8 = _rt::Vec::from_raw_parts(
+                                        l6.cast(),
+                                        len8,
+                                        len8,
+                                    );
+                                    _rt::string_lift(bytes8)
+                                };
+                                Err(e)
+                            }
+                            _ => _rt::invalid_enum_discriminant(),
+                        };
+                        result9
+                    }
+                }
+            }
+            impl TypeInfo {
+                #[allow(unused_unsafe, clippy::all)]
+                /// Deserialize the type-info from json.
+                #[allow(async_fn_in_trait)]
+                pub fn deserialize(json: &str) -> Result<TypeInfo, _rt::String> {
+                    unsafe {
+                        #[cfg_attr(target_pointer_width = "64", repr(align(8)))]
+                        #[cfg_attr(target_pointer_width = "32", repr(align(4)))]
+                        struct RetArea(
+                            [::core::mem::MaybeUninit<
+                                u8,
+                            >; 3 * ::core::mem::size_of::<*const u8>()],
+                        );
+                        let mut ret_area = RetArea(
+                            [::core::mem::MaybeUninit::uninit(); 3
+                                * ::core::mem::size_of::<*const u8>()],
+                        );
+                        let vec0 = json;
+                        let ptr0 = vec0.as_ptr().cast::<u8>();
+                        let len0 = vec0.len();
+                        let ptr1 = ret_area.0.as_mut_ptr().cast::<u8>();
+                        #[cfg(target_arch = "wasm32")]
+                        #[link(wasm_import_module = "durable:core/sql@2.7.0")]
+                        unsafe extern "C" {
+                            #[link_name = "[static]type-info.deserialize"]
+                            fn wit_import2(_: *mut u8, _: usize, _: *mut u8);
+                        }
+                        #[cfg(not(target_arch = "wasm32"))]
+                        unsafe extern "C" fn wit_import2(
+                            _: *mut u8,
+                            _: usize,
+                            _: *mut u8,
+                        ) {
+                            unreachable!()
+                        }
+                        wit_import2(ptr0.cast_mut(), len0, ptr1);
+                        let l3 = i32::from(*ptr1.add(0).cast::<u8>());
+                        let result8 = match l3 {
+                            0 => {
+                                let e = {
+                                    let l4 = *ptr1
+                                        .add(::core::mem::size_of::<*const u8>())
+                                        .cast::<i32>();
+                                    TypeInfo::from_handle(l4 as u32)
+                                };
+                                Ok(e)
+                            }
+                            1 => {
+                                let e = {
+                                    let l5 = *ptr1
+                                        .add(::core::mem::size_of::<*const u8>())
+                                        .cast::<*mut u8>();
+                                    let l6 = *ptr1
+                                        .add(2 * ::core::mem::size_of::<*const u8>())
+                                        .cast::<usize>();
                                     let len7 = l6;
                                     let bytes7 = _rt::Vec::from_raw_parts(
                                         l5.cast(),
@@ -577,60 +689,8 @@ pub mod durable {
                                 Err(e)
                             }
                             _ => _rt::invalid_enum_discriminant(),
-                        }
-                    }
-                }
-            }
-            impl TypeInfo {
-                #[allow(unused_unsafe, clippy::all)]
-                /// Deserialize the type-info from json.
-                pub fn deserialize(json: &str) -> Result<TypeInfo, _rt::String> {
-                    unsafe {
-                        #[repr(align(4))]
-                        struct RetArea([::core::mem::MaybeUninit<u8>; 12]);
-                        let mut ret_area = RetArea(
-                            [::core::mem::MaybeUninit::uninit(); 12],
-                        );
-                        let vec0 = json;
-                        let ptr0 = vec0.as_ptr().cast::<u8>();
-                        let len0 = vec0.len();
-                        let ptr1 = ret_area.0.as_mut_ptr().cast::<u8>();
-                        #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.5.0")]
-                        extern "C" {
-                            #[link_name = "[static]type-info.deserialize"]
-                            fn wit_import(_: *mut u8, _: usize, _: *mut u8);
-                        }
-                        #[cfg(not(target_arch = "wasm32"))]
-                        fn wit_import(_: *mut u8, _: usize, _: *mut u8) {
-                            unreachable!()
-                        }
-                        wit_import(ptr0.cast_mut(), len0, ptr1);
-                        let l2 = i32::from(*ptr1.add(0).cast::<u8>());
-                        match l2 {
-                            0 => {
-                                let e = {
-                                    let l3 = *ptr1.add(4).cast::<i32>();
-                                    TypeInfo::from_handle(l3 as u32)
-                                };
-                                Ok(e)
-                            }
-                            1 => {
-                                let e = {
-                                    let l4 = *ptr1.add(4).cast::<*mut u8>();
-                                    let l5 = *ptr1.add(8).cast::<usize>();
-                                    let len6 = l5;
-                                    let bytes6 = _rt::Vec::from_raw_parts(
-                                        l4.cast(),
-                                        len6,
-                                        len6,
-                                    );
-                                    _rt::string_lift(bytes6)
-                                };
-                                Err(e)
-                            }
-                            _ => _rt::invalid_enum_discriminant(),
-                        }
+                        };
+                        result8
                     }
                 }
             }
@@ -644,700 +704,58 @@ pub mod durable {
                 ///
                 /// This returns an error if there is no type with the provided name
                 /// within the database.
+                #[allow(async_fn_in_trait)]
                 pub fn with_name(name: &str) -> Result<TypeInfo, _rt::String> {
                     unsafe {
-                        #[repr(align(4))]
-                        struct RetArea([::core::mem::MaybeUninit<u8>; 12]);
+                        #[cfg_attr(target_pointer_width = "64", repr(align(8)))]
+                        #[cfg_attr(target_pointer_width = "32", repr(align(4)))]
+                        struct RetArea(
+                            [::core::mem::MaybeUninit<
+                                u8,
+                            >; 3 * ::core::mem::size_of::<*const u8>()],
+                        );
                         let mut ret_area = RetArea(
-                            [::core::mem::MaybeUninit::uninit(); 12],
+                            [::core::mem::MaybeUninit::uninit(); 3
+                                * ::core::mem::size_of::<*const u8>()],
                         );
                         let vec0 = name;
                         let ptr0 = vec0.as_ptr().cast::<u8>();
                         let len0 = vec0.len();
                         let ptr1 = ret_area.0.as_mut_ptr().cast::<u8>();
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.5.0")]
-                        extern "C" {
+                        #[link(wasm_import_module = "durable:core/sql@2.7.0")]
+                        unsafe extern "C" {
                             #[link_name = "[static]type-info.with-name"]
-                            fn wit_import(_: *mut u8, _: usize, _: *mut u8);
+                            fn wit_import2(_: *mut u8, _: usize, _: *mut u8);
                         }
                         #[cfg(not(target_arch = "wasm32"))]
-                        fn wit_import(_: *mut u8, _: usize, _: *mut u8) {
+                        unsafe extern "C" fn wit_import2(
+                            _: *mut u8,
+                            _: usize,
+                            _: *mut u8,
+                        ) {
                             unreachable!()
                         }
-                        wit_import(ptr0.cast_mut(), len0, ptr1);
-                        let l2 = i32::from(*ptr1.add(0).cast::<u8>());
-                        match l2 {
+                        wit_import2(ptr0.cast_mut(), len0, ptr1);
+                        let l3 = i32::from(*ptr1.add(0).cast::<u8>());
+                        let result8 = match l3 {
                             0 => {
                                 let e = {
-                                    let l3 = *ptr1.add(4).cast::<i32>();
-                                    TypeInfo::from_handle(l3 as u32)
+                                    let l4 = *ptr1
+                                        .add(::core::mem::size_of::<*const u8>())
+                                        .cast::<i32>();
+                                    TypeInfo::from_handle(l4 as u32)
                                 };
                                 Ok(e)
                             }
                             1 => {
                                 let e = {
-                                    let l4 = *ptr1.add(4).cast::<*mut u8>();
-                                    let l5 = *ptr1.add(8).cast::<usize>();
-                                    let len6 = l5;
-                                    let bytes6 = _rt::Vec::from_raw_parts(
-                                        l4.cast(),
-                                        len6,
-                                        len6,
-                                    );
-                                    _rt::string_lift(bytes6)
-                                };
-                                Err(e)
-                            }
-                            _ => _rt::invalid_enum_discriminant(),
-                        }
-                    }
-                }
-            }
-            impl TypeInfo {
-                #[allow(unused_unsafe, clippy::all)]
-                /// Attempt to create an array of the named type.
-                ///
-                /// This provides no guarantee that there is actually a type with that
-                /// name within the database. Attempting to use a type that doesn't
-                /// exist will result in a failure when making a query.
-                /// with-array-of: static func(name: string) -> result<type-info>;
-                pub fn boolean() -> TypeInfo {
-                    unsafe {
-                        #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.5.0")]
-                        extern "C" {
-                            #[link_name = "[static]type-info.boolean"]
-                            fn wit_import() -> i32;
-                        }
-                        #[cfg(not(target_arch = "wasm32"))]
-                        fn wit_import() -> i32 {
-                            unreachable!()
-                        }
-                        let ret = wit_import();
-                        TypeInfo::from_handle(ret as u32)
-                    }
-                }
-            }
-            impl TypeInfo {
-                #[allow(unused_unsafe, clippy::all)]
-                pub fn float4() -> TypeInfo {
-                    unsafe {
-                        #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.5.0")]
-                        extern "C" {
-                            #[link_name = "[static]type-info.float4"]
-                            fn wit_import() -> i32;
-                        }
-                        #[cfg(not(target_arch = "wasm32"))]
-                        fn wit_import() -> i32 {
-                            unreachable!()
-                        }
-                        let ret = wit_import();
-                        TypeInfo::from_handle(ret as u32)
-                    }
-                }
-            }
-            impl TypeInfo {
-                #[allow(unused_unsafe, clippy::all)]
-                pub fn float8() -> TypeInfo {
-                    unsafe {
-                        #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.5.0")]
-                        extern "C" {
-                            #[link_name = "[static]type-info.float8"]
-                            fn wit_import() -> i32;
-                        }
-                        #[cfg(not(target_arch = "wasm32"))]
-                        fn wit_import() -> i32 {
-                            unreachable!()
-                        }
-                        let ret = wit_import();
-                        TypeInfo::from_handle(ret as u32)
-                    }
-                }
-            }
-            impl TypeInfo {
-                #[allow(unused_unsafe, clippy::all)]
-                pub fn int1() -> TypeInfo {
-                    unsafe {
-                        #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.5.0")]
-                        extern "C" {
-                            #[link_name = "[static]type-info.int1"]
-                            fn wit_import() -> i32;
-                        }
-                        #[cfg(not(target_arch = "wasm32"))]
-                        fn wit_import() -> i32 {
-                            unreachable!()
-                        }
-                        let ret = wit_import();
-                        TypeInfo::from_handle(ret as u32)
-                    }
-                }
-            }
-            impl TypeInfo {
-                #[allow(unused_unsafe, clippy::all)]
-                pub fn int2() -> TypeInfo {
-                    unsafe {
-                        #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.5.0")]
-                        extern "C" {
-                            #[link_name = "[static]type-info.int2"]
-                            fn wit_import() -> i32;
-                        }
-                        #[cfg(not(target_arch = "wasm32"))]
-                        fn wit_import() -> i32 {
-                            unreachable!()
-                        }
-                        let ret = wit_import();
-                        TypeInfo::from_handle(ret as u32)
-                    }
-                }
-            }
-            impl TypeInfo {
-                #[allow(unused_unsafe, clippy::all)]
-                pub fn int4() -> TypeInfo {
-                    unsafe {
-                        #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.5.0")]
-                        extern "C" {
-                            #[link_name = "[static]type-info.int4"]
-                            fn wit_import() -> i32;
-                        }
-                        #[cfg(not(target_arch = "wasm32"))]
-                        fn wit_import() -> i32 {
-                            unreachable!()
-                        }
-                        let ret = wit_import();
-                        TypeInfo::from_handle(ret as u32)
-                    }
-                }
-            }
-            impl TypeInfo {
-                #[allow(unused_unsafe, clippy::all)]
-                pub fn int8() -> TypeInfo {
-                    unsafe {
-                        #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.5.0")]
-                        extern "C" {
-                            #[link_name = "[static]type-info.int8"]
-                            fn wit_import() -> i32;
-                        }
-                        #[cfg(not(target_arch = "wasm32"))]
-                        fn wit_import() -> i32 {
-                            unreachable!()
-                        }
-                        let ret = wit_import();
-                        TypeInfo::from_handle(ret as u32)
-                    }
-                }
-            }
-            impl TypeInfo {
-                #[allow(unused_unsafe, clippy::all)]
-                pub fn text() -> TypeInfo {
-                    unsafe {
-                        #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.5.0")]
-                        extern "C" {
-                            #[link_name = "[static]type-info.text"]
-                            fn wit_import() -> i32;
-                        }
-                        #[cfg(not(target_arch = "wasm32"))]
-                        fn wit_import() -> i32 {
-                            unreachable!()
-                        }
-                        let ret = wit_import();
-                        TypeInfo::from_handle(ret as u32)
-                    }
-                }
-            }
-            impl TypeInfo {
-                #[allow(unused_unsafe, clippy::all)]
-                pub fn bytea() -> TypeInfo {
-                    unsafe {
-                        #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.5.0")]
-                        extern "C" {
-                            #[link_name = "[static]type-info.bytea"]
-                            fn wit_import() -> i32;
-                        }
-                        #[cfg(not(target_arch = "wasm32"))]
-                        fn wit_import() -> i32 {
-                            unreachable!()
-                        }
-                        let ret = wit_import();
-                        TypeInfo::from_handle(ret as u32)
-                    }
-                }
-            }
-            impl TypeInfo {
-                #[allow(unused_unsafe, clippy::all)]
-                pub fn timestamptz() -> TypeInfo {
-                    unsafe {
-                        #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.5.0")]
-                        extern "C" {
-                            #[link_name = "[static]type-info.timestamptz"]
-                            fn wit_import() -> i32;
-                        }
-                        #[cfg(not(target_arch = "wasm32"))]
-                        fn wit_import() -> i32 {
-                            unreachable!()
-                        }
-                        let ret = wit_import();
-                        TypeInfo::from_handle(ret as u32)
-                    }
-                }
-            }
-            impl TypeInfo {
-                #[allow(unused_unsafe, clippy::all)]
-                pub fn timestamp() -> TypeInfo {
-                    unsafe {
-                        #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.5.0")]
-                        extern "C" {
-                            #[link_name = "[static]type-info.timestamp"]
-                            fn wit_import() -> i32;
-                        }
-                        #[cfg(not(target_arch = "wasm32"))]
-                        fn wit_import() -> i32 {
-                            unreachable!()
-                        }
-                        let ret = wit_import();
-                        TypeInfo::from_handle(ret as u32)
-                    }
-                }
-            }
-            impl TypeInfo {
-                #[allow(unused_unsafe, clippy::all)]
-                pub fn uuid() -> TypeInfo {
-                    unsafe {
-                        #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.5.0")]
-                        extern "C" {
-                            #[link_name = "[static]type-info.uuid"]
-                            fn wit_import() -> i32;
-                        }
-                        #[cfg(not(target_arch = "wasm32"))]
-                        fn wit_import() -> i32 {
-                            unreachable!()
-                        }
-                        let ret = wit_import();
-                        TypeInfo::from_handle(ret as u32)
-                    }
-                }
-            }
-            impl TypeInfo {
-                #[allow(unused_unsafe, clippy::all)]
-                pub fn jsonb() -> TypeInfo {
-                    unsafe {
-                        #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.5.0")]
-                        extern "C" {
-                            #[link_name = "[static]type-info.jsonb"]
-                            fn wit_import() -> i32;
-                        }
-                        #[cfg(not(target_arch = "wasm32"))]
-                        fn wit_import() -> i32 {
-                            unreachable!()
-                        }
-                        let ret = wit_import();
-                        TypeInfo::from_handle(ret as u32)
-                    }
-                }
-            }
-            impl TypeInfo {
-                #[allow(unused_unsafe, clippy::all)]
-                pub fn inet() -> TypeInfo {
-                    unsafe {
-                        #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.5.0")]
-                        extern "C" {
-                            #[link_name = "[static]type-info.inet"]
-                            fn wit_import() -> i32;
-                        }
-                        #[cfg(not(target_arch = "wasm32"))]
-                        fn wit_import() -> i32 {
-                            unreachable!()
-                        }
-                        let ret = wit_import();
-                        TypeInfo::from_handle(ret as u32)
-                    }
-                }
-            }
-            impl TypeInfo {
-                #[allow(unused_unsafe, clippy::all)]
-                pub fn boolean_array() -> TypeInfo {
-                    unsafe {
-                        #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.5.0")]
-                        extern "C" {
-                            #[link_name = "[static]type-info.boolean-array"]
-                            fn wit_import() -> i32;
-                        }
-                        #[cfg(not(target_arch = "wasm32"))]
-                        fn wit_import() -> i32 {
-                            unreachable!()
-                        }
-                        let ret = wit_import();
-                        TypeInfo::from_handle(ret as u32)
-                    }
-                }
-            }
-            impl TypeInfo {
-                #[allow(unused_unsafe, clippy::all)]
-                pub fn float4_array() -> TypeInfo {
-                    unsafe {
-                        #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.5.0")]
-                        extern "C" {
-                            #[link_name = "[static]type-info.float4-array"]
-                            fn wit_import() -> i32;
-                        }
-                        #[cfg(not(target_arch = "wasm32"))]
-                        fn wit_import() -> i32 {
-                            unreachable!()
-                        }
-                        let ret = wit_import();
-                        TypeInfo::from_handle(ret as u32)
-                    }
-                }
-            }
-            impl TypeInfo {
-                #[allow(unused_unsafe, clippy::all)]
-                pub fn float8_array() -> TypeInfo {
-                    unsafe {
-                        #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.5.0")]
-                        extern "C" {
-                            #[link_name = "[static]type-info.float8-array"]
-                            fn wit_import() -> i32;
-                        }
-                        #[cfg(not(target_arch = "wasm32"))]
-                        fn wit_import() -> i32 {
-                            unreachable!()
-                        }
-                        let ret = wit_import();
-                        TypeInfo::from_handle(ret as u32)
-                    }
-                }
-            }
-            impl TypeInfo {
-                #[allow(unused_unsafe, clippy::all)]
-                pub fn int1_array() -> TypeInfo {
-                    unsafe {
-                        #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.5.0")]
-                        extern "C" {
-                            #[link_name = "[static]type-info.int1-array"]
-                            fn wit_import() -> i32;
-                        }
-                        #[cfg(not(target_arch = "wasm32"))]
-                        fn wit_import() -> i32 {
-                            unreachable!()
-                        }
-                        let ret = wit_import();
-                        TypeInfo::from_handle(ret as u32)
-                    }
-                }
-            }
-            impl TypeInfo {
-                #[allow(unused_unsafe, clippy::all)]
-                pub fn int2_array() -> TypeInfo {
-                    unsafe {
-                        #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.5.0")]
-                        extern "C" {
-                            #[link_name = "[static]type-info.int2-array"]
-                            fn wit_import() -> i32;
-                        }
-                        #[cfg(not(target_arch = "wasm32"))]
-                        fn wit_import() -> i32 {
-                            unreachable!()
-                        }
-                        let ret = wit_import();
-                        TypeInfo::from_handle(ret as u32)
-                    }
-                }
-            }
-            impl TypeInfo {
-                #[allow(unused_unsafe, clippy::all)]
-                pub fn int4_array() -> TypeInfo {
-                    unsafe {
-                        #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.5.0")]
-                        extern "C" {
-                            #[link_name = "[static]type-info.int4-array"]
-                            fn wit_import() -> i32;
-                        }
-                        #[cfg(not(target_arch = "wasm32"))]
-                        fn wit_import() -> i32 {
-                            unreachable!()
-                        }
-                        let ret = wit_import();
-                        TypeInfo::from_handle(ret as u32)
-                    }
-                }
-            }
-            impl TypeInfo {
-                #[allow(unused_unsafe, clippy::all)]
-                pub fn int8_array() -> TypeInfo {
-                    unsafe {
-                        #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.5.0")]
-                        extern "C" {
-                            #[link_name = "[static]type-info.int8-array"]
-                            fn wit_import() -> i32;
-                        }
-                        #[cfg(not(target_arch = "wasm32"))]
-                        fn wit_import() -> i32 {
-                            unreachable!()
-                        }
-                        let ret = wit_import();
-                        TypeInfo::from_handle(ret as u32)
-                    }
-                }
-            }
-            impl TypeInfo {
-                #[allow(unused_unsafe, clippy::all)]
-                pub fn text_array() -> TypeInfo {
-                    unsafe {
-                        #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.5.0")]
-                        extern "C" {
-                            #[link_name = "[static]type-info.text-array"]
-                            fn wit_import() -> i32;
-                        }
-                        #[cfg(not(target_arch = "wasm32"))]
-                        fn wit_import() -> i32 {
-                            unreachable!()
-                        }
-                        let ret = wit_import();
-                        TypeInfo::from_handle(ret as u32)
-                    }
-                }
-            }
-            impl TypeInfo {
-                #[allow(unused_unsafe, clippy::all)]
-                pub fn bytea_array() -> TypeInfo {
-                    unsafe {
-                        #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.5.0")]
-                        extern "C" {
-                            #[link_name = "[static]type-info.bytea-array"]
-                            fn wit_import() -> i32;
-                        }
-                        #[cfg(not(target_arch = "wasm32"))]
-                        fn wit_import() -> i32 {
-                            unreachable!()
-                        }
-                        let ret = wit_import();
-                        TypeInfo::from_handle(ret as u32)
-                    }
-                }
-            }
-            impl TypeInfo {
-                #[allow(unused_unsafe, clippy::all)]
-                pub fn timestamptz_array() -> TypeInfo {
-                    unsafe {
-                        #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.5.0")]
-                        extern "C" {
-                            #[link_name = "[static]type-info.timestamptz-array"]
-                            fn wit_import() -> i32;
-                        }
-                        #[cfg(not(target_arch = "wasm32"))]
-                        fn wit_import() -> i32 {
-                            unreachable!()
-                        }
-                        let ret = wit_import();
-                        TypeInfo::from_handle(ret as u32)
-                    }
-                }
-            }
-            impl TypeInfo {
-                #[allow(unused_unsafe, clippy::all)]
-                pub fn timestamp_array() -> TypeInfo {
-                    unsafe {
-                        #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.5.0")]
-                        extern "C" {
-                            #[link_name = "[static]type-info.timestamp-array"]
-                            fn wit_import() -> i32;
-                        }
-                        #[cfg(not(target_arch = "wasm32"))]
-                        fn wit_import() -> i32 {
-                            unreachable!()
-                        }
-                        let ret = wit_import();
-                        TypeInfo::from_handle(ret as u32)
-                    }
-                }
-            }
-            impl TypeInfo {
-                #[allow(unused_unsafe, clippy::all)]
-                pub fn uuid_array() -> TypeInfo {
-                    unsafe {
-                        #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.5.0")]
-                        extern "C" {
-                            #[link_name = "[static]type-info.uuid-array"]
-                            fn wit_import() -> i32;
-                        }
-                        #[cfg(not(target_arch = "wasm32"))]
-                        fn wit_import() -> i32 {
-                            unreachable!()
-                        }
-                        let ret = wit_import();
-                        TypeInfo::from_handle(ret as u32)
-                    }
-                }
-            }
-            impl TypeInfo {
-                #[allow(unused_unsafe, clippy::all)]
-                pub fn jsonb_array() -> TypeInfo {
-                    unsafe {
-                        #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.5.0")]
-                        extern "C" {
-                            #[link_name = "[static]type-info.jsonb-array"]
-                            fn wit_import() -> i32;
-                        }
-                        #[cfg(not(target_arch = "wasm32"))]
-                        fn wit_import() -> i32 {
-                            unreachable!()
-                        }
-                        let ret = wit_import();
-                        TypeInfo::from_handle(ret as u32)
-                    }
-                }
-            }
-            impl TypeInfo {
-                #[allow(unused_unsafe, clippy::all)]
-                pub fn inet_array() -> TypeInfo {
-                    unsafe {
-                        #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.5.0")]
-                        extern "C" {
-                            #[link_name = "[static]type-info.inet-array"]
-                            fn wit_import() -> i32;
-                        }
-                        #[cfg(not(target_arch = "wasm32"))]
-                        fn wit_import() -> i32 {
-                            unreachable!()
-                        }
-                        let ret = wit_import();
-                        TypeInfo::from_handle(ret as u32)
-                    }
-                }
-            }
-            impl Value {
-                #[allow(unused_unsafe, clippy::all)]
-                /// Whether this value is NULL.
-                ///
-                /// If this is true then all of the `as-*` methods will return none.
-                pub fn is_null(&self) -> bool {
-                    unsafe {
-                        #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.5.0")]
-                        extern "C" {
-                            #[link_name = "[method]value.is-null"]
-                            fn wit_import(_: i32) -> i32;
-                        }
-                        #[cfg(not(target_arch = "wasm32"))]
-                        fn wit_import(_: i32) -> i32 {
-                            unreachable!()
-                        }
-                        let ret = wit_import((self).handle() as i32);
-                        _rt::bool_lift(ret as u8)
-                    }
-                }
-            }
-            impl Value {
-                #[allow(unused_unsafe, clippy::all)]
-                /// The type of this value.
-                pub fn type_info(&self) -> TypeInfo {
-                    unsafe {
-                        #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.5.0")]
-                        extern "C" {
-                            #[link_name = "[method]value.type-info"]
-                            fn wit_import(_: i32) -> i32;
-                        }
-                        #[cfg(not(target_arch = "wasm32"))]
-                        fn wit_import(_: i32) -> i32 {
-                            unreachable!()
-                        }
-                        let ret = wit_import((self).handle() as i32);
-                        TypeInfo::from_handle(ret as u32)
-                    }
-                }
-            }
-            impl Value {
-                #[allow(unused_unsafe, clippy::all)]
-                /// Create a clone of this value.
-                pub fn clone(&self) -> Value {
-                    unsafe {
-                        #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.5.0")]
-                        extern "C" {
-                            #[link_name = "[method]value.clone"]
-                            fn wit_import(_: i32) -> i32;
-                        }
-                        #[cfg(not(target_arch = "wasm32"))]
-                        fn wit_import(_: i32) -> i32 {
-                            unreachable!()
-                        }
-                        let ret = wit_import((self).handle() as i32);
-                        Value::from_handle(ret as u32)
-                    }
-                }
-            }
-            impl Value {
-                #[allow(unused_unsafe, clippy::all)]
-                /// Serialize this type-info to json.
-                ///
-                /// The actual json returned by this function is not meant to be introspected.
-                pub fn serialize(&self) -> Result<_rt::String, _rt::String> {
-                    unsafe {
-                        #[repr(align(4))]
-                        struct RetArea([::core::mem::MaybeUninit<u8>; 12]);
-                        let mut ret_area = RetArea(
-                            [::core::mem::MaybeUninit::uninit(); 12],
-                        );
-                        let ptr0 = ret_area.0.as_mut_ptr().cast::<u8>();
-                        #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.5.0")]
-                        extern "C" {
-                            #[link_name = "[method]value.serialize"]
-                            fn wit_import(_: i32, _: *mut u8);
-                        }
-                        #[cfg(not(target_arch = "wasm32"))]
-                        fn wit_import(_: i32, _: *mut u8) {
-                            unreachable!()
-                        }
-                        wit_import((self).handle() as i32, ptr0);
-                        let l1 = i32::from(*ptr0.add(0).cast::<u8>());
-                        match l1 {
-                            0 => {
-                                let e = {
-                                    let l2 = *ptr0.add(4).cast::<*mut u8>();
-                                    let l3 = *ptr0.add(8).cast::<usize>();
-                                    let len4 = l3;
-                                    let bytes4 = _rt::Vec::from_raw_parts(
-                                        l2.cast(),
-                                        len4,
-                                        len4,
-                                    );
-                                    _rt::string_lift(bytes4)
-                                };
-                                Ok(e)
-                            }
-                            1 => {
-                                let e = {
-                                    let l5 = *ptr0.add(4).cast::<*mut u8>();
-                                    let l6 = *ptr0.add(8).cast::<usize>();
+                                    let l5 = *ptr1
+                                        .add(::core::mem::size_of::<*const u8>())
+                                        .cast::<*mut u8>();
+                                    let l6 = *ptr1
+                                        .add(2 * ::core::mem::size_of::<*const u8>())
+                                        .cast::<usize>();
                                     let len7 = l6;
                                     let bytes7 = _rt::Vec::from_raw_parts(
                                         l5.cast(),
@@ -1349,65 +767,791 @@ pub mod durable {
                                 Err(e)
                             }
                             _ => _rt::invalid_enum_discriminant(),
+                        };
+                        result8
+                    }
+                }
+            }
+            impl TypeInfo {
+                #[allow(unused_unsafe, clippy::all)]
+                /// Attempt to create an array of the named type.
+                ///
+                /// This provides no guarantee that there is actually a type with that
+                /// name within the database. Attempting to use a type that doesn't
+                /// exist will result in a failure when making a query.
+                /// with-array-of: static func(name: string) -> result<type-info>;
+                #[allow(async_fn_in_trait)]
+                pub fn boolean() -> TypeInfo {
+                    unsafe {
+                        #[cfg(target_arch = "wasm32")]
+                        #[link(wasm_import_module = "durable:core/sql@2.7.0")]
+                        unsafe extern "C" {
+                            #[link_name = "[static]type-info.boolean"]
+                            fn wit_import0() -> i32;
                         }
+                        #[cfg(not(target_arch = "wasm32"))]
+                        unsafe extern "C" fn wit_import0() -> i32 {
+                            unreachable!()
+                        }
+                        let ret = wit_import0();
+                        TypeInfo::from_handle(ret as u32)
+                    }
+                }
+            }
+            impl TypeInfo {
+                #[allow(unused_unsafe, clippy::all)]
+                #[allow(async_fn_in_trait)]
+                pub fn float4() -> TypeInfo {
+                    unsafe {
+                        #[cfg(target_arch = "wasm32")]
+                        #[link(wasm_import_module = "durable:core/sql@2.7.0")]
+                        unsafe extern "C" {
+                            #[link_name = "[static]type-info.float4"]
+                            fn wit_import0() -> i32;
+                        }
+                        #[cfg(not(target_arch = "wasm32"))]
+                        unsafe extern "C" fn wit_import0() -> i32 {
+                            unreachable!()
+                        }
+                        let ret = wit_import0();
+                        TypeInfo::from_handle(ret as u32)
+                    }
+                }
+            }
+            impl TypeInfo {
+                #[allow(unused_unsafe, clippy::all)]
+                #[allow(async_fn_in_trait)]
+                pub fn float8() -> TypeInfo {
+                    unsafe {
+                        #[cfg(target_arch = "wasm32")]
+                        #[link(wasm_import_module = "durable:core/sql@2.7.0")]
+                        unsafe extern "C" {
+                            #[link_name = "[static]type-info.float8"]
+                            fn wit_import0() -> i32;
+                        }
+                        #[cfg(not(target_arch = "wasm32"))]
+                        unsafe extern "C" fn wit_import0() -> i32 {
+                            unreachable!()
+                        }
+                        let ret = wit_import0();
+                        TypeInfo::from_handle(ret as u32)
+                    }
+                }
+            }
+            impl TypeInfo {
+                #[allow(unused_unsafe, clippy::all)]
+                #[allow(async_fn_in_trait)]
+                pub fn int1() -> TypeInfo {
+                    unsafe {
+                        #[cfg(target_arch = "wasm32")]
+                        #[link(wasm_import_module = "durable:core/sql@2.7.0")]
+                        unsafe extern "C" {
+                            #[link_name = "[static]type-info.int1"]
+                            fn wit_import0() -> i32;
+                        }
+                        #[cfg(not(target_arch = "wasm32"))]
+                        unsafe extern "C" fn wit_import0() -> i32 {
+                            unreachable!()
+                        }
+                        let ret = wit_import0();
+                        TypeInfo::from_handle(ret as u32)
+                    }
+                }
+            }
+            impl TypeInfo {
+                #[allow(unused_unsafe, clippy::all)]
+                #[allow(async_fn_in_trait)]
+                pub fn int2() -> TypeInfo {
+                    unsafe {
+                        #[cfg(target_arch = "wasm32")]
+                        #[link(wasm_import_module = "durable:core/sql@2.7.0")]
+                        unsafe extern "C" {
+                            #[link_name = "[static]type-info.int2"]
+                            fn wit_import0() -> i32;
+                        }
+                        #[cfg(not(target_arch = "wasm32"))]
+                        unsafe extern "C" fn wit_import0() -> i32 {
+                            unreachable!()
+                        }
+                        let ret = wit_import0();
+                        TypeInfo::from_handle(ret as u32)
+                    }
+                }
+            }
+            impl TypeInfo {
+                #[allow(unused_unsafe, clippy::all)]
+                #[allow(async_fn_in_trait)]
+                pub fn int4() -> TypeInfo {
+                    unsafe {
+                        #[cfg(target_arch = "wasm32")]
+                        #[link(wasm_import_module = "durable:core/sql@2.7.0")]
+                        unsafe extern "C" {
+                            #[link_name = "[static]type-info.int4"]
+                            fn wit_import0() -> i32;
+                        }
+                        #[cfg(not(target_arch = "wasm32"))]
+                        unsafe extern "C" fn wit_import0() -> i32 {
+                            unreachable!()
+                        }
+                        let ret = wit_import0();
+                        TypeInfo::from_handle(ret as u32)
+                    }
+                }
+            }
+            impl TypeInfo {
+                #[allow(unused_unsafe, clippy::all)]
+                #[allow(async_fn_in_trait)]
+                pub fn int8() -> TypeInfo {
+                    unsafe {
+                        #[cfg(target_arch = "wasm32")]
+                        #[link(wasm_import_module = "durable:core/sql@2.7.0")]
+                        unsafe extern "C" {
+                            #[link_name = "[static]type-info.int8"]
+                            fn wit_import0() -> i32;
+                        }
+                        #[cfg(not(target_arch = "wasm32"))]
+                        unsafe extern "C" fn wit_import0() -> i32 {
+                            unreachable!()
+                        }
+                        let ret = wit_import0();
+                        TypeInfo::from_handle(ret as u32)
+                    }
+                }
+            }
+            impl TypeInfo {
+                #[allow(unused_unsafe, clippy::all)]
+                #[allow(async_fn_in_trait)]
+                pub fn text() -> TypeInfo {
+                    unsafe {
+                        #[cfg(target_arch = "wasm32")]
+                        #[link(wasm_import_module = "durable:core/sql@2.7.0")]
+                        unsafe extern "C" {
+                            #[link_name = "[static]type-info.text"]
+                            fn wit_import0() -> i32;
+                        }
+                        #[cfg(not(target_arch = "wasm32"))]
+                        unsafe extern "C" fn wit_import0() -> i32 {
+                            unreachable!()
+                        }
+                        let ret = wit_import0();
+                        TypeInfo::from_handle(ret as u32)
+                    }
+                }
+            }
+            impl TypeInfo {
+                #[allow(unused_unsafe, clippy::all)]
+                #[allow(async_fn_in_trait)]
+                pub fn bytea() -> TypeInfo {
+                    unsafe {
+                        #[cfg(target_arch = "wasm32")]
+                        #[link(wasm_import_module = "durable:core/sql@2.7.0")]
+                        unsafe extern "C" {
+                            #[link_name = "[static]type-info.bytea"]
+                            fn wit_import0() -> i32;
+                        }
+                        #[cfg(not(target_arch = "wasm32"))]
+                        unsafe extern "C" fn wit_import0() -> i32 {
+                            unreachable!()
+                        }
+                        let ret = wit_import0();
+                        TypeInfo::from_handle(ret as u32)
+                    }
+                }
+            }
+            impl TypeInfo {
+                #[allow(unused_unsafe, clippy::all)]
+                #[allow(async_fn_in_trait)]
+                pub fn timestamptz() -> TypeInfo {
+                    unsafe {
+                        #[cfg(target_arch = "wasm32")]
+                        #[link(wasm_import_module = "durable:core/sql@2.7.0")]
+                        unsafe extern "C" {
+                            #[link_name = "[static]type-info.timestamptz"]
+                            fn wit_import0() -> i32;
+                        }
+                        #[cfg(not(target_arch = "wasm32"))]
+                        unsafe extern "C" fn wit_import0() -> i32 {
+                            unreachable!()
+                        }
+                        let ret = wit_import0();
+                        TypeInfo::from_handle(ret as u32)
+                    }
+                }
+            }
+            impl TypeInfo {
+                #[allow(unused_unsafe, clippy::all)]
+                #[allow(async_fn_in_trait)]
+                pub fn timestamp() -> TypeInfo {
+                    unsafe {
+                        #[cfg(target_arch = "wasm32")]
+                        #[link(wasm_import_module = "durable:core/sql@2.7.0")]
+                        unsafe extern "C" {
+                            #[link_name = "[static]type-info.timestamp"]
+                            fn wit_import0() -> i32;
+                        }
+                        #[cfg(not(target_arch = "wasm32"))]
+                        unsafe extern "C" fn wit_import0() -> i32 {
+                            unreachable!()
+                        }
+                        let ret = wit_import0();
+                        TypeInfo::from_handle(ret as u32)
+                    }
+                }
+            }
+            impl TypeInfo {
+                #[allow(unused_unsafe, clippy::all)]
+                #[allow(async_fn_in_trait)]
+                pub fn uuid() -> TypeInfo {
+                    unsafe {
+                        #[cfg(target_arch = "wasm32")]
+                        #[link(wasm_import_module = "durable:core/sql@2.7.0")]
+                        unsafe extern "C" {
+                            #[link_name = "[static]type-info.uuid"]
+                            fn wit_import0() -> i32;
+                        }
+                        #[cfg(not(target_arch = "wasm32"))]
+                        unsafe extern "C" fn wit_import0() -> i32 {
+                            unreachable!()
+                        }
+                        let ret = wit_import0();
+                        TypeInfo::from_handle(ret as u32)
+                    }
+                }
+            }
+            impl TypeInfo {
+                #[allow(unused_unsafe, clippy::all)]
+                #[allow(async_fn_in_trait)]
+                pub fn jsonb() -> TypeInfo {
+                    unsafe {
+                        #[cfg(target_arch = "wasm32")]
+                        #[link(wasm_import_module = "durable:core/sql@2.7.0")]
+                        unsafe extern "C" {
+                            #[link_name = "[static]type-info.jsonb"]
+                            fn wit_import0() -> i32;
+                        }
+                        #[cfg(not(target_arch = "wasm32"))]
+                        unsafe extern "C" fn wit_import0() -> i32 {
+                            unreachable!()
+                        }
+                        let ret = wit_import0();
+                        TypeInfo::from_handle(ret as u32)
+                    }
+                }
+            }
+            impl TypeInfo {
+                #[allow(unused_unsafe, clippy::all)]
+                #[allow(async_fn_in_trait)]
+                pub fn inet() -> TypeInfo {
+                    unsafe {
+                        #[cfg(target_arch = "wasm32")]
+                        #[link(wasm_import_module = "durable:core/sql@2.7.0")]
+                        unsafe extern "C" {
+                            #[link_name = "[static]type-info.inet"]
+                            fn wit_import0() -> i32;
+                        }
+                        #[cfg(not(target_arch = "wasm32"))]
+                        unsafe extern "C" fn wit_import0() -> i32 {
+                            unreachable!()
+                        }
+                        let ret = wit_import0();
+                        TypeInfo::from_handle(ret as u32)
+                    }
+                }
+            }
+            impl TypeInfo {
+                #[allow(unused_unsafe, clippy::all)]
+                #[allow(async_fn_in_trait)]
+                pub fn boolean_array() -> TypeInfo {
+                    unsafe {
+                        #[cfg(target_arch = "wasm32")]
+                        #[link(wasm_import_module = "durable:core/sql@2.7.0")]
+                        unsafe extern "C" {
+                            #[link_name = "[static]type-info.boolean-array"]
+                            fn wit_import0() -> i32;
+                        }
+                        #[cfg(not(target_arch = "wasm32"))]
+                        unsafe extern "C" fn wit_import0() -> i32 {
+                            unreachable!()
+                        }
+                        let ret = wit_import0();
+                        TypeInfo::from_handle(ret as u32)
+                    }
+                }
+            }
+            impl TypeInfo {
+                #[allow(unused_unsafe, clippy::all)]
+                #[allow(async_fn_in_trait)]
+                pub fn float4_array() -> TypeInfo {
+                    unsafe {
+                        #[cfg(target_arch = "wasm32")]
+                        #[link(wasm_import_module = "durable:core/sql@2.7.0")]
+                        unsafe extern "C" {
+                            #[link_name = "[static]type-info.float4-array"]
+                            fn wit_import0() -> i32;
+                        }
+                        #[cfg(not(target_arch = "wasm32"))]
+                        unsafe extern "C" fn wit_import0() -> i32 {
+                            unreachable!()
+                        }
+                        let ret = wit_import0();
+                        TypeInfo::from_handle(ret as u32)
+                    }
+                }
+            }
+            impl TypeInfo {
+                #[allow(unused_unsafe, clippy::all)]
+                #[allow(async_fn_in_trait)]
+                pub fn float8_array() -> TypeInfo {
+                    unsafe {
+                        #[cfg(target_arch = "wasm32")]
+                        #[link(wasm_import_module = "durable:core/sql@2.7.0")]
+                        unsafe extern "C" {
+                            #[link_name = "[static]type-info.float8-array"]
+                            fn wit_import0() -> i32;
+                        }
+                        #[cfg(not(target_arch = "wasm32"))]
+                        unsafe extern "C" fn wit_import0() -> i32 {
+                            unreachable!()
+                        }
+                        let ret = wit_import0();
+                        TypeInfo::from_handle(ret as u32)
+                    }
+                }
+            }
+            impl TypeInfo {
+                #[allow(unused_unsafe, clippy::all)]
+                #[allow(async_fn_in_trait)]
+                pub fn int1_array() -> TypeInfo {
+                    unsafe {
+                        #[cfg(target_arch = "wasm32")]
+                        #[link(wasm_import_module = "durable:core/sql@2.7.0")]
+                        unsafe extern "C" {
+                            #[link_name = "[static]type-info.int1-array"]
+                            fn wit_import0() -> i32;
+                        }
+                        #[cfg(not(target_arch = "wasm32"))]
+                        unsafe extern "C" fn wit_import0() -> i32 {
+                            unreachable!()
+                        }
+                        let ret = wit_import0();
+                        TypeInfo::from_handle(ret as u32)
+                    }
+                }
+            }
+            impl TypeInfo {
+                #[allow(unused_unsafe, clippy::all)]
+                #[allow(async_fn_in_trait)]
+                pub fn int2_array() -> TypeInfo {
+                    unsafe {
+                        #[cfg(target_arch = "wasm32")]
+                        #[link(wasm_import_module = "durable:core/sql@2.7.0")]
+                        unsafe extern "C" {
+                            #[link_name = "[static]type-info.int2-array"]
+                            fn wit_import0() -> i32;
+                        }
+                        #[cfg(not(target_arch = "wasm32"))]
+                        unsafe extern "C" fn wit_import0() -> i32 {
+                            unreachable!()
+                        }
+                        let ret = wit_import0();
+                        TypeInfo::from_handle(ret as u32)
+                    }
+                }
+            }
+            impl TypeInfo {
+                #[allow(unused_unsafe, clippy::all)]
+                #[allow(async_fn_in_trait)]
+                pub fn int4_array() -> TypeInfo {
+                    unsafe {
+                        #[cfg(target_arch = "wasm32")]
+                        #[link(wasm_import_module = "durable:core/sql@2.7.0")]
+                        unsafe extern "C" {
+                            #[link_name = "[static]type-info.int4-array"]
+                            fn wit_import0() -> i32;
+                        }
+                        #[cfg(not(target_arch = "wasm32"))]
+                        unsafe extern "C" fn wit_import0() -> i32 {
+                            unreachable!()
+                        }
+                        let ret = wit_import0();
+                        TypeInfo::from_handle(ret as u32)
+                    }
+                }
+            }
+            impl TypeInfo {
+                #[allow(unused_unsafe, clippy::all)]
+                #[allow(async_fn_in_trait)]
+                pub fn int8_array() -> TypeInfo {
+                    unsafe {
+                        #[cfg(target_arch = "wasm32")]
+                        #[link(wasm_import_module = "durable:core/sql@2.7.0")]
+                        unsafe extern "C" {
+                            #[link_name = "[static]type-info.int8-array"]
+                            fn wit_import0() -> i32;
+                        }
+                        #[cfg(not(target_arch = "wasm32"))]
+                        unsafe extern "C" fn wit_import0() -> i32 {
+                            unreachable!()
+                        }
+                        let ret = wit_import0();
+                        TypeInfo::from_handle(ret as u32)
+                    }
+                }
+            }
+            impl TypeInfo {
+                #[allow(unused_unsafe, clippy::all)]
+                #[allow(async_fn_in_trait)]
+                pub fn text_array() -> TypeInfo {
+                    unsafe {
+                        #[cfg(target_arch = "wasm32")]
+                        #[link(wasm_import_module = "durable:core/sql@2.7.0")]
+                        unsafe extern "C" {
+                            #[link_name = "[static]type-info.text-array"]
+                            fn wit_import0() -> i32;
+                        }
+                        #[cfg(not(target_arch = "wasm32"))]
+                        unsafe extern "C" fn wit_import0() -> i32 {
+                            unreachable!()
+                        }
+                        let ret = wit_import0();
+                        TypeInfo::from_handle(ret as u32)
+                    }
+                }
+            }
+            impl TypeInfo {
+                #[allow(unused_unsafe, clippy::all)]
+                #[allow(async_fn_in_trait)]
+                pub fn bytea_array() -> TypeInfo {
+                    unsafe {
+                        #[cfg(target_arch = "wasm32")]
+                        #[link(wasm_import_module = "durable:core/sql@2.7.0")]
+                        unsafe extern "C" {
+                            #[link_name = "[static]type-info.bytea-array"]
+                            fn wit_import0() -> i32;
+                        }
+                        #[cfg(not(target_arch = "wasm32"))]
+                        unsafe extern "C" fn wit_import0() -> i32 {
+                            unreachable!()
+                        }
+                        let ret = wit_import0();
+                        TypeInfo::from_handle(ret as u32)
+                    }
+                }
+            }
+            impl TypeInfo {
+                #[allow(unused_unsafe, clippy::all)]
+                #[allow(async_fn_in_trait)]
+                pub fn timestamptz_array() -> TypeInfo {
+                    unsafe {
+                        #[cfg(target_arch = "wasm32")]
+                        #[link(wasm_import_module = "durable:core/sql@2.7.0")]
+                        unsafe extern "C" {
+                            #[link_name = "[static]type-info.timestamptz-array"]
+                            fn wit_import0() -> i32;
+                        }
+                        #[cfg(not(target_arch = "wasm32"))]
+                        unsafe extern "C" fn wit_import0() -> i32 {
+                            unreachable!()
+                        }
+                        let ret = wit_import0();
+                        TypeInfo::from_handle(ret as u32)
+                    }
+                }
+            }
+            impl TypeInfo {
+                #[allow(unused_unsafe, clippy::all)]
+                #[allow(async_fn_in_trait)]
+                pub fn timestamp_array() -> TypeInfo {
+                    unsafe {
+                        #[cfg(target_arch = "wasm32")]
+                        #[link(wasm_import_module = "durable:core/sql@2.7.0")]
+                        unsafe extern "C" {
+                            #[link_name = "[static]type-info.timestamp-array"]
+                            fn wit_import0() -> i32;
+                        }
+                        #[cfg(not(target_arch = "wasm32"))]
+                        unsafe extern "C" fn wit_import0() -> i32 {
+                            unreachable!()
+                        }
+                        let ret = wit_import0();
+                        TypeInfo::from_handle(ret as u32)
+                    }
+                }
+            }
+            impl TypeInfo {
+                #[allow(unused_unsafe, clippy::all)]
+                #[allow(async_fn_in_trait)]
+                pub fn uuid_array() -> TypeInfo {
+                    unsafe {
+                        #[cfg(target_arch = "wasm32")]
+                        #[link(wasm_import_module = "durable:core/sql@2.7.0")]
+                        unsafe extern "C" {
+                            #[link_name = "[static]type-info.uuid-array"]
+                            fn wit_import0() -> i32;
+                        }
+                        #[cfg(not(target_arch = "wasm32"))]
+                        unsafe extern "C" fn wit_import0() -> i32 {
+                            unreachable!()
+                        }
+                        let ret = wit_import0();
+                        TypeInfo::from_handle(ret as u32)
+                    }
+                }
+            }
+            impl TypeInfo {
+                #[allow(unused_unsafe, clippy::all)]
+                #[allow(async_fn_in_trait)]
+                pub fn jsonb_array() -> TypeInfo {
+                    unsafe {
+                        #[cfg(target_arch = "wasm32")]
+                        #[link(wasm_import_module = "durable:core/sql@2.7.0")]
+                        unsafe extern "C" {
+                            #[link_name = "[static]type-info.jsonb-array"]
+                            fn wit_import0() -> i32;
+                        }
+                        #[cfg(not(target_arch = "wasm32"))]
+                        unsafe extern "C" fn wit_import0() -> i32 {
+                            unreachable!()
+                        }
+                        let ret = wit_import0();
+                        TypeInfo::from_handle(ret as u32)
+                    }
+                }
+            }
+            impl TypeInfo {
+                #[allow(unused_unsafe, clippy::all)]
+                #[allow(async_fn_in_trait)]
+                pub fn inet_array() -> TypeInfo {
+                    unsafe {
+                        #[cfg(target_arch = "wasm32")]
+                        #[link(wasm_import_module = "durable:core/sql@2.7.0")]
+                        unsafe extern "C" {
+                            #[link_name = "[static]type-info.inet-array"]
+                            fn wit_import0() -> i32;
+                        }
+                        #[cfg(not(target_arch = "wasm32"))]
+                        unsafe extern "C" fn wit_import0() -> i32 {
+                            unreachable!()
+                        }
+                        let ret = wit_import0();
+                        TypeInfo::from_handle(ret as u32)
+                    }
+                }
+            }
+            impl Value {
+                #[allow(unused_unsafe, clippy::all)]
+                /// Whether this value is NULL.
+                ///
+                /// If this is true then all of the `as-*` methods will return none.
+                #[allow(async_fn_in_trait)]
+                pub fn is_null(&self) -> bool {
+                    unsafe {
+                        #[cfg(target_arch = "wasm32")]
+                        #[link(wasm_import_module = "durable:core/sql@2.7.0")]
+                        unsafe extern "C" {
+                            #[link_name = "[method]value.is-null"]
+                            fn wit_import0(_: i32) -> i32;
+                        }
+                        #[cfg(not(target_arch = "wasm32"))]
+                        unsafe extern "C" fn wit_import0(_: i32) -> i32 {
+                            unreachable!()
+                        }
+                        let ret = wit_import0((self).handle() as i32);
+                        _rt::bool_lift(ret as u8)
+                    }
+                }
+            }
+            impl Value {
+                #[allow(unused_unsafe, clippy::all)]
+                /// The type of this value.
+                #[allow(async_fn_in_trait)]
+                pub fn type_info(&self) -> TypeInfo {
+                    unsafe {
+                        #[cfg(target_arch = "wasm32")]
+                        #[link(wasm_import_module = "durable:core/sql@2.7.0")]
+                        unsafe extern "C" {
+                            #[link_name = "[method]value.type-info"]
+                            fn wit_import0(_: i32) -> i32;
+                        }
+                        #[cfg(not(target_arch = "wasm32"))]
+                        unsafe extern "C" fn wit_import0(_: i32) -> i32 {
+                            unreachable!()
+                        }
+                        let ret = wit_import0((self).handle() as i32);
+                        TypeInfo::from_handle(ret as u32)
+                    }
+                }
+            }
+            impl Value {
+                #[allow(unused_unsafe, clippy::all)]
+                /// Create a clone of this value.
+                #[allow(async_fn_in_trait)]
+                pub fn clone(&self) -> Value {
+                    unsafe {
+                        #[cfg(target_arch = "wasm32")]
+                        #[link(wasm_import_module = "durable:core/sql@2.7.0")]
+                        unsafe extern "C" {
+                            #[link_name = "[method]value.clone"]
+                            fn wit_import0(_: i32) -> i32;
+                        }
+                        #[cfg(not(target_arch = "wasm32"))]
+                        unsafe extern "C" fn wit_import0(_: i32) -> i32 {
+                            unreachable!()
+                        }
+                        let ret = wit_import0((self).handle() as i32);
+                        Value::from_handle(ret as u32)
+                    }
+                }
+            }
+            impl Value {
+                #[allow(unused_unsafe, clippy::all)]
+                /// Serialize this type-info to json.
+                ///
+                /// The actual json returned by this function is not meant to be introspected.
+                #[allow(async_fn_in_trait)]
+                pub fn serialize(&self) -> Result<_rt::String, _rt::String> {
+                    unsafe {
+                        #[cfg_attr(target_pointer_width = "64", repr(align(8)))]
+                        #[cfg_attr(target_pointer_width = "32", repr(align(4)))]
+                        struct RetArea(
+                            [::core::mem::MaybeUninit<
+                                u8,
+                            >; 3 * ::core::mem::size_of::<*const u8>()],
+                        );
+                        let mut ret_area = RetArea(
+                            [::core::mem::MaybeUninit::uninit(); 3
+                                * ::core::mem::size_of::<*const u8>()],
+                        );
+                        let ptr0 = ret_area.0.as_mut_ptr().cast::<u8>();
+                        #[cfg(target_arch = "wasm32")]
+                        #[link(wasm_import_module = "durable:core/sql@2.7.0")]
+                        unsafe extern "C" {
+                            #[link_name = "[method]value.serialize"]
+                            fn wit_import1(_: i32, _: *mut u8);
+                        }
+                        #[cfg(not(target_arch = "wasm32"))]
+                        unsafe extern "C" fn wit_import1(_: i32, _: *mut u8) {
+                            unreachable!()
+                        }
+                        wit_import1((self).handle() as i32, ptr0);
+                        let l2 = i32::from(*ptr0.add(0).cast::<u8>());
+                        let result9 = match l2 {
+                            0 => {
+                                let e = {
+                                    let l3 = *ptr0
+                                        .add(::core::mem::size_of::<*const u8>())
+                                        .cast::<*mut u8>();
+                                    let l4 = *ptr0
+                                        .add(2 * ::core::mem::size_of::<*const u8>())
+                                        .cast::<usize>();
+                                    let len5 = l4;
+                                    let bytes5 = _rt::Vec::from_raw_parts(
+                                        l3.cast(),
+                                        len5,
+                                        len5,
+                                    );
+                                    _rt::string_lift(bytes5)
+                                };
+                                Ok(e)
+                            }
+                            1 => {
+                                let e = {
+                                    let l6 = *ptr0
+                                        .add(::core::mem::size_of::<*const u8>())
+                                        .cast::<*mut u8>();
+                                    let l7 = *ptr0
+                                        .add(2 * ::core::mem::size_of::<*const u8>())
+                                        .cast::<usize>();
+                                    let len8 = l7;
+                                    let bytes8 = _rt::Vec::from_raw_parts(
+                                        l6.cast(),
+                                        len8,
+                                        len8,
+                                    );
+                                    _rt::string_lift(bytes8)
+                                };
+                                Err(e)
+                            }
+                            _ => _rt::invalid_enum_discriminant(),
+                        };
+                        result9
                     }
                 }
             }
             impl Value {
                 #[allow(unused_unsafe, clippy::all)]
                 /// Deserialize the type-info from json.
+                #[allow(async_fn_in_trait)]
                 pub fn deserialize(json: &str) -> Result<Value, _rt::String> {
                     unsafe {
-                        #[repr(align(4))]
-                        struct RetArea([::core::mem::MaybeUninit<u8>; 12]);
+                        #[cfg_attr(target_pointer_width = "64", repr(align(8)))]
+                        #[cfg_attr(target_pointer_width = "32", repr(align(4)))]
+                        struct RetArea(
+                            [::core::mem::MaybeUninit<
+                                u8,
+                            >; 3 * ::core::mem::size_of::<*const u8>()],
+                        );
                         let mut ret_area = RetArea(
-                            [::core::mem::MaybeUninit::uninit(); 12],
+                            [::core::mem::MaybeUninit::uninit(); 3
+                                * ::core::mem::size_of::<*const u8>()],
                         );
                         let vec0 = json;
                         let ptr0 = vec0.as_ptr().cast::<u8>();
                         let len0 = vec0.len();
                         let ptr1 = ret_area.0.as_mut_ptr().cast::<u8>();
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.5.0")]
-                        extern "C" {
+                        #[link(wasm_import_module = "durable:core/sql@2.7.0")]
+                        unsafe extern "C" {
                             #[link_name = "[static]value.deserialize"]
-                            fn wit_import(_: *mut u8, _: usize, _: *mut u8);
+                            fn wit_import2(_: *mut u8, _: usize, _: *mut u8);
                         }
                         #[cfg(not(target_arch = "wasm32"))]
-                        fn wit_import(_: *mut u8, _: usize, _: *mut u8) {
+                        unsafe extern "C" fn wit_import2(
+                            _: *mut u8,
+                            _: usize,
+                            _: *mut u8,
+                        ) {
                             unreachable!()
                         }
-                        wit_import(ptr0.cast_mut(), len0, ptr1);
-                        let l2 = i32::from(*ptr1.add(0).cast::<u8>());
-                        match l2 {
+                        wit_import2(ptr0.cast_mut(), len0, ptr1);
+                        let l3 = i32::from(*ptr1.add(0).cast::<u8>());
+                        let result8 = match l3 {
                             0 => {
                                 let e = {
-                                    let l3 = *ptr1.add(4).cast::<i32>();
-                                    Value::from_handle(l3 as u32)
+                                    let l4 = *ptr1
+                                        .add(::core::mem::size_of::<*const u8>())
+                                        .cast::<i32>();
+                                    Value::from_handle(l4 as u32)
                                 };
                                 Ok(e)
                             }
                             1 => {
                                 let e = {
-                                    let l4 = *ptr1.add(4).cast::<*mut u8>();
-                                    let l5 = *ptr1.add(8).cast::<usize>();
-                                    let len6 = l5;
-                                    let bytes6 = _rt::Vec::from_raw_parts(
-                                        l4.cast(),
-                                        len6,
-                                        len6,
+                                    let l5 = *ptr1
+                                        .add(::core::mem::size_of::<*const u8>())
+                                        .cast::<*mut u8>();
+                                    let l6 = *ptr1
+                                        .add(2 * ::core::mem::size_of::<*const u8>())
+                                        .cast::<usize>();
+                                    let len7 = l6;
+                                    let bytes7 = _rt::Vec::from_raw_parts(
+                                        l5.cast(),
+                                        len7,
+                                        len7,
                                     );
-                                    _rt::string_lift(bytes6)
+                                    _rt::string_lift(bytes7)
                                 };
                                 Err(e)
                             }
                             _ => _rt::invalid_enum_discriminant(),
-                        }
+                        };
+                        result8
                     }
                 }
             }
             impl Value {
                 #[allow(unused_unsafe, clippy::all)]
+                #[allow(async_fn_in_trait)]
                 pub fn as_boolean(&self) -> Option<bool> {
                     unsafe {
                         #[repr(align(1))]
@@ -1417,33 +1561,35 @@ pub mod durable {
                         );
                         let ptr0 = ret_area.0.as_mut_ptr().cast::<u8>();
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.5.0")]
-                        extern "C" {
+                        #[link(wasm_import_module = "durable:core/sql@2.7.0")]
+                        unsafe extern "C" {
                             #[link_name = "[method]value.as-boolean"]
-                            fn wit_import(_: i32, _: *mut u8);
+                            fn wit_import1(_: i32, _: *mut u8);
                         }
                         #[cfg(not(target_arch = "wasm32"))]
-                        fn wit_import(_: i32, _: *mut u8) {
+                        unsafe extern "C" fn wit_import1(_: i32, _: *mut u8) {
                             unreachable!()
                         }
-                        wit_import((self).handle() as i32, ptr0);
-                        let l1 = i32::from(*ptr0.add(0).cast::<u8>());
-                        match l1 {
+                        wit_import1((self).handle() as i32, ptr0);
+                        let l2 = i32::from(*ptr0.add(0).cast::<u8>());
+                        let result4 = match l2 {
                             0 => None,
                             1 => {
                                 let e = {
-                                    let l2 = i32::from(*ptr0.add(1).cast::<u8>());
-                                    _rt::bool_lift(l2 as u8)
+                                    let l3 = i32::from(*ptr0.add(1).cast::<u8>());
+                                    _rt::bool_lift(l3 as u8)
                                 };
                                 Some(e)
                             }
                             _ => _rt::invalid_enum_discriminant(),
-                        }
+                        };
+                        result4
                     }
                 }
             }
             impl Value {
                 #[allow(unused_unsafe, clippy::all)]
+                #[allow(async_fn_in_trait)]
                 pub fn as_float4(&self) -> Option<f32> {
                     unsafe {
                         #[repr(align(4))]
@@ -1453,33 +1599,35 @@ pub mod durable {
                         );
                         let ptr0 = ret_area.0.as_mut_ptr().cast::<u8>();
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.5.0")]
-                        extern "C" {
+                        #[link(wasm_import_module = "durable:core/sql@2.7.0")]
+                        unsafe extern "C" {
                             #[link_name = "[method]value.as-float4"]
-                            fn wit_import(_: i32, _: *mut u8);
+                            fn wit_import1(_: i32, _: *mut u8);
                         }
                         #[cfg(not(target_arch = "wasm32"))]
-                        fn wit_import(_: i32, _: *mut u8) {
+                        unsafe extern "C" fn wit_import1(_: i32, _: *mut u8) {
                             unreachable!()
                         }
-                        wit_import((self).handle() as i32, ptr0);
-                        let l1 = i32::from(*ptr0.add(0).cast::<u8>());
-                        match l1 {
+                        wit_import1((self).handle() as i32, ptr0);
+                        let l2 = i32::from(*ptr0.add(0).cast::<u8>());
+                        let result4 = match l2 {
                             0 => None,
                             1 => {
                                 let e = {
-                                    let l2 = *ptr0.add(4).cast::<f32>();
-                                    l2
+                                    let l3 = *ptr0.add(4).cast::<f32>();
+                                    l3
                                 };
                                 Some(e)
                             }
                             _ => _rt::invalid_enum_discriminant(),
-                        }
+                        };
+                        result4
                     }
                 }
             }
             impl Value {
                 #[allow(unused_unsafe, clippy::all)]
+                #[allow(async_fn_in_trait)]
                 pub fn as_float8(&self) -> Option<f64> {
                     unsafe {
                         #[repr(align(8))]
@@ -1489,33 +1637,35 @@ pub mod durable {
                         );
                         let ptr0 = ret_area.0.as_mut_ptr().cast::<u8>();
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.5.0")]
-                        extern "C" {
+                        #[link(wasm_import_module = "durable:core/sql@2.7.0")]
+                        unsafe extern "C" {
                             #[link_name = "[method]value.as-float8"]
-                            fn wit_import(_: i32, _: *mut u8);
+                            fn wit_import1(_: i32, _: *mut u8);
                         }
                         #[cfg(not(target_arch = "wasm32"))]
-                        fn wit_import(_: i32, _: *mut u8) {
+                        unsafe extern "C" fn wit_import1(_: i32, _: *mut u8) {
                             unreachable!()
                         }
-                        wit_import((self).handle() as i32, ptr0);
-                        let l1 = i32::from(*ptr0.add(0).cast::<u8>());
-                        match l1 {
+                        wit_import1((self).handle() as i32, ptr0);
+                        let l2 = i32::from(*ptr0.add(0).cast::<u8>());
+                        let result4 = match l2 {
                             0 => None,
                             1 => {
                                 let e = {
-                                    let l2 = *ptr0.add(8).cast::<f64>();
-                                    l2
+                                    let l3 = *ptr0.add(8).cast::<f64>();
+                                    l3
                                 };
                                 Some(e)
                             }
                             _ => _rt::invalid_enum_discriminant(),
-                        }
+                        };
+                        result4
                     }
                 }
             }
             impl Value {
                 #[allow(unused_unsafe, clippy::all)]
+                #[allow(async_fn_in_trait)]
                 pub fn as_int1(&self) -> Option<i8> {
                     unsafe {
                         #[repr(align(1))]
@@ -1525,33 +1675,35 @@ pub mod durable {
                         );
                         let ptr0 = ret_area.0.as_mut_ptr().cast::<u8>();
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.5.0")]
-                        extern "C" {
+                        #[link(wasm_import_module = "durable:core/sql@2.7.0")]
+                        unsafe extern "C" {
                             #[link_name = "[method]value.as-int1"]
-                            fn wit_import(_: i32, _: *mut u8);
+                            fn wit_import1(_: i32, _: *mut u8);
                         }
                         #[cfg(not(target_arch = "wasm32"))]
-                        fn wit_import(_: i32, _: *mut u8) {
+                        unsafe extern "C" fn wit_import1(_: i32, _: *mut u8) {
                             unreachable!()
                         }
-                        wit_import((self).handle() as i32, ptr0);
-                        let l1 = i32::from(*ptr0.add(0).cast::<u8>());
-                        match l1 {
+                        wit_import1((self).handle() as i32, ptr0);
+                        let l2 = i32::from(*ptr0.add(0).cast::<u8>());
+                        let result4 = match l2 {
                             0 => None,
                             1 => {
                                 let e = {
-                                    let l2 = i32::from(*ptr0.add(1).cast::<i8>());
-                                    l2 as i8
+                                    let l3 = i32::from(*ptr0.add(1).cast::<i8>());
+                                    l3 as i8
                                 };
                                 Some(e)
                             }
                             _ => _rt::invalid_enum_discriminant(),
-                        }
+                        };
+                        result4
                     }
                 }
             }
             impl Value {
                 #[allow(unused_unsafe, clippy::all)]
+                #[allow(async_fn_in_trait)]
                 pub fn as_int2(&self) -> Option<i16> {
                     unsafe {
                         #[repr(align(2))]
@@ -1561,33 +1713,35 @@ pub mod durable {
                         );
                         let ptr0 = ret_area.0.as_mut_ptr().cast::<u8>();
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.5.0")]
-                        extern "C" {
+                        #[link(wasm_import_module = "durable:core/sql@2.7.0")]
+                        unsafe extern "C" {
                             #[link_name = "[method]value.as-int2"]
-                            fn wit_import(_: i32, _: *mut u8);
+                            fn wit_import1(_: i32, _: *mut u8);
                         }
                         #[cfg(not(target_arch = "wasm32"))]
-                        fn wit_import(_: i32, _: *mut u8) {
+                        unsafe extern "C" fn wit_import1(_: i32, _: *mut u8) {
                             unreachable!()
                         }
-                        wit_import((self).handle() as i32, ptr0);
-                        let l1 = i32::from(*ptr0.add(0).cast::<u8>());
-                        match l1 {
+                        wit_import1((self).handle() as i32, ptr0);
+                        let l2 = i32::from(*ptr0.add(0).cast::<u8>());
+                        let result4 = match l2 {
                             0 => None,
                             1 => {
                                 let e = {
-                                    let l2 = i32::from(*ptr0.add(2).cast::<i16>());
-                                    l2 as i16
+                                    let l3 = i32::from(*ptr0.add(2).cast::<i16>());
+                                    l3 as i16
                                 };
                                 Some(e)
                             }
                             _ => _rt::invalid_enum_discriminant(),
-                        }
+                        };
+                        result4
                     }
                 }
             }
             impl Value {
                 #[allow(unused_unsafe, clippy::all)]
+                #[allow(async_fn_in_trait)]
                 pub fn as_int4(&self) -> Option<i32> {
                     unsafe {
                         #[repr(align(4))]
@@ -1597,33 +1751,35 @@ pub mod durable {
                         );
                         let ptr0 = ret_area.0.as_mut_ptr().cast::<u8>();
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.5.0")]
-                        extern "C" {
+                        #[link(wasm_import_module = "durable:core/sql@2.7.0")]
+                        unsafe extern "C" {
                             #[link_name = "[method]value.as-int4"]
-                            fn wit_import(_: i32, _: *mut u8);
+                            fn wit_import1(_: i32, _: *mut u8);
                         }
                         #[cfg(not(target_arch = "wasm32"))]
-                        fn wit_import(_: i32, _: *mut u8) {
+                        unsafe extern "C" fn wit_import1(_: i32, _: *mut u8) {
                             unreachable!()
                         }
-                        wit_import((self).handle() as i32, ptr0);
-                        let l1 = i32::from(*ptr0.add(0).cast::<u8>());
-                        match l1 {
+                        wit_import1((self).handle() as i32, ptr0);
+                        let l2 = i32::from(*ptr0.add(0).cast::<u8>());
+                        let result4 = match l2 {
                             0 => None,
                             1 => {
                                 let e = {
-                                    let l2 = *ptr0.add(4).cast::<i32>();
-                                    l2
+                                    let l3 = *ptr0.add(4).cast::<i32>();
+                                    l3
                                 };
                                 Some(e)
                             }
                             _ => _rt::invalid_enum_discriminant(),
-                        }
+                        };
+                        result4
                     }
                 }
             }
             impl Value {
                 #[allow(unused_unsafe, clippy::all)]
+                #[allow(async_fn_in_trait)]
                 pub fn as_int8(&self) -> Option<i64> {
                     unsafe {
                         #[repr(align(8))]
@@ -1633,114 +1789,140 @@ pub mod durable {
                         );
                         let ptr0 = ret_area.0.as_mut_ptr().cast::<u8>();
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.5.0")]
-                        extern "C" {
+                        #[link(wasm_import_module = "durable:core/sql@2.7.0")]
+                        unsafe extern "C" {
                             #[link_name = "[method]value.as-int8"]
-                            fn wit_import(_: i32, _: *mut u8);
+                            fn wit_import1(_: i32, _: *mut u8);
                         }
                         #[cfg(not(target_arch = "wasm32"))]
-                        fn wit_import(_: i32, _: *mut u8) {
+                        unsafe extern "C" fn wit_import1(_: i32, _: *mut u8) {
                             unreachable!()
                         }
-                        wit_import((self).handle() as i32, ptr0);
-                        let l1 = i32::from(*ptr0.add(0).cast::<u8>());
-                        match l1 {
+                        wit_import1((self).handle() as i32, ptr0);
+                        let l2 = i32::from(*ptr0.add(0).cast::<u8>());
+                        let result4 = match l2 {
                             0 => None,
                             1 => {
                                 let e = {
-                                    let l2 = *ptr0.add(8).cast::<i64>();
-                                    l2
+                                    let l3 = *ptr0.add(8).cast::<i64>();
+                                    l3
                                 };
                                 Some(e)
                             }
                             _ => _rt::invalid_enum_discriminant(),
-                        }
+                        };
+                        result4
                     }
                 }
             }
             impl Value {
                 #[allow(unused_unsafe, clippy::all)]
+                #[allow(async_fn_in_trait)]
                 pub fn as_text(&self) -> Option<_rt::String> {
                     unsafe {
-                        #[repr(align(4))]
-                        struct RetArea([::core::mem::MaybeUninit<u8>; 12]);
+                        #[cfg_attr(target_pointer_width = "64", repr(align(8)))]
+                        #[cfg_attr(target_pointer_width = "32", repr(align(4)))]
+                        struct RetArea(
+                            [::core::mem::MaybeUninit<
+                                u8,
+                            >; 3 * ::core::mem::size_of::<*const u8>()],
+                        );
                         let mut ret_area = RetArea(
-                            [::core::mem::MaybeUninit::uninit(); 12],
+                            [::core::mem::MaybeUninit::uninit(); 3
+                                * ::core::mem::size_of::<*const u8>()],
                         );
                         let ptr0 = ret_area.0.as_mut_ptr().cast::<u8>();
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.5.0")]
-                        extern "C" {
+                        #[link(wasm_import_module = "durable:core/sql@2.7.0")]
+                        unsafe extern "C" {
                             #[link_name = "[method]value.as-text"]
-                            fn wit_import(_: i32, _: *mut u8);
+                            fn wit_import1(_: i32, _: *mut u8);
                         }
                         #[cfg(not(target_arch = "wasm32"))]
-                        fn wit_import(_: i32, _: *mut u8) {
+                        unsafe extern "C" fn wit_import1(_: i32, _: *mut u8) {
                             unreachable!()
                         }
-                        wit_import((self).handle() as i32, ptr0);
-                        let l1 = i32::from(*ptr0.add(0).cast::<u8>());
-                        match l1 {
+                        wit_import1((self).handle() as i32, ptr0);
+                        let l2 = i32::from(*ptr0.add(0).cast::<u8>());
+                        let result6 = match l2 {
                             0 => None,
                             1 => {
                                 let e = {
-                                    let l2 = *ptr0.add(4).cast::<*mut u8>();
-                                    let l3 = *ptr0.add(8).cast::<usize>();
-                                    let len4 = l3;
-                                    let bytes4 = _rt::Vec::from_raw_parts(
-                                        l2.cast(),
-                                        len4,
-                                        len4,
+                                    let l3 = *ptr0
+                                        .add(::core::mem::size_of::<*const u8>())
+                                        .cast::<*mut u8>();
+                                    let l4 = *ptr0
+                                        .add(2 * ::core::mem::size_of::<*const u8>())
+                                        .cast::<usize>();
+                                    let len5 = l4;
+                                    let bytes5 = _rt::Vec::from_raw_parts(
+                                        l3.cast(),
+                                        len5,
+                                        len5,
                                     );
-                                    _rt::string_lift(bytes4)
+                                    _rt::string_lift(bytes5)
                                 };
                                 Some(e)
                             }
                             _ => _rt::invalid_enum_discriminant(),
-                        }
+                        };
+                        result6
                     }
                 }
             }
             impl Value {
                 #[allow(unused_unsafe, clippy::all)]
+                #[allow(async_fn_in_trait)]
                 pub fn as_bytea(&self) -> Option<_rt::Vec<u8>> {
                     unsafe {
-                        #[repr(align(4))]
-                        struct RetArea([::core::mem::MaybeUninit<u8>; 12]);
+                        #[cfg_attr(target_pointer_width = "64", repr(align(8)))]
+                        #[cfg_attr(target_pointer_width = "32", repr(align(4)))]
+                        struct RetArea(
+                            [::core::mem::MaybeUninit<
+                                u8,
+                            >; 3 * ::core::mem::size_of::<*const u8>()],
+                        );
                         let mut ret_area = RetArea(
-                            [::core::mem::MaybeUninit::uninit(); 12],
+                            [::core::mem::MaybeUninit::uninit(); 3
+                                * ::core::mem::size_of::<*const u8>()],
                         );
                         let ptr0 = ret_area.0.as_mut_ptr().cast::<u8>();
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.5.0")]
-                        extern "C" {
+                        #[link(wasm_import_module = "durable:core/sql@2.7.0")]
+                        unsafe extern "C" {
                             #[link_name = "[method]value.as-bytea"]
-                            fn wit_import(_: i32, _: *mut u8);
+                            fn wit_import1(_: i32, _: *mut u8);
                         }
                         #[cfg(not(target_arch = "wasm32"))]
-                        fn wit_import(_: i32, _: *mut u8) {
+                        unsafe extern "C" fn wit_import1(_: i32, _: *mut u8) {
                             unreachable!()
                         }
-                        wit_import((self).handle() as i32, ptr0);
-                        let l1 = i32::from(*ptr0.add(0).cast::<u8>());
-                        match l1 {
+                        wit_import1((self).handle() as i32, ptr0);
+                        let l2 = i32::from(*ptr0.add(0).cast::<u8>());
+                        let result6 = match l2 {
                             0 => None,
                             1 => {
                                 let e = {
-                                    let l2 = *ptr0.add(4).cast::<*mut u8>();
-                                    let l3 = *ptr0.add(8).cast::<usize>();
-                                    let len4 = l3;
-                                    _rt::Vec::from_raw_parts(l2.cast(), len4, len4)
+                                    let l3 = *ptr0
+                                        .add(::core::mem::size_of::<*const u8>())
+                                        .cast::<*mut u8>();
+                                    let l4 = *ptr0
+                                        .add(2 * ::core::mem::size_of::<*const u8>())
+                                        .cast::<usize>();
+                                    let len5 = l4;
+                                    _rt::Vec::from_raw_parts(l3.cast(), len5, len5)
                                 };
                                 Some(e)
                             }
                             _ => _rt::invalid_enum_discriminant(),
-                        }
+                        };
+                        result6
                     }
                 }
             }
             impl Value {
                 #[allow(unused_unsafe, clippy::all)]
+                #[allow(async_fn_in_trait)]
                 pub fn as_timestamptz(&self) -> Option<Timestamptz> {
                     unsafe {
                         #[repr(align(8))]
@@ -1750,39 +1932,41 @@ pub mod durable {
                         );
                         let ptr0 = ret_area.0.as_mut_ptr().cast::<u8>();
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.5.0")]
-                        extern "C" {
+                        #[link(wasm_import_module = "durable:core/sql@2.7.0")]
+                        unsafe extern "C" {
                             #[link_name = "[method]value.as-timestamptz"]
-                            fn wit_import(_: i32, _: *mut u8);
+                            fn wit_import1(_: i32, _: *mut u8);
                         }
                         #[cfg(not(target_arch = "wasm32"))]
-                        fn wit_import(_: i32, _: *mut u8) {
+                        unsafe extern "C" fn wit_import1(_: i32, _: *mut u8) {
                             unreachable!()
                         }
-                        wit_import((self).handle() as i32, ptr0);
-                        let l1 = i32::from(*ptr0.add(0).cast::<u8>());
-                        match l1 {
+                        wit_import1((self).handle() as i32, ptr0);
+                        let l2 = i32::from(*ptr0.add(0).cast::<u8>());
+                        let result6 = match l2 {
                             0 => None,
                             1 => {
                                 let e = {
-                                    let l2 = *ptr0.add(8).cast::<i64>();
-                                    let l3 = *ptr0.add(16).cast::<i32>();
-                                    let l4 = *ptr0.add(20).cast::<i32>();
+                                    let l3 = *ptr0.add(8).cast::<i64>();
+                                    let l4 = *ptr0.add(16).cast::<i32>();
+                                    let l5 = *ptr0.add(20).cast::<i32>();
                                     Timestamptz {
-                                        seconds: l2,
-                                        subsec_nanos: l3 as u32,
-                                        offset: l4,
+                                        seconds: l3,
+                                        subsec_nanos: l4 as u32,
+                                        offset: l5,
                                     }
                                 };
                                 Some(e)
                             }
                             _ => _rt::invalid_enum_discriminant(),
-                        }
+                        };
+                        result6
                     }
                 }
             }
             impl Value {
                 #[allow(unused_unsafe, clippy::all)]
+                #[allow(async_fn_in_trait)]
                 pub fn as_timestamp(&self) -> Option<Timestamp> {
                     unsafe {
                         #[repr(align(8))]
@@ -1792,37 +1976,39 @@ pub mod durable {
                         );
                         let ptr0 = ret_area.0.as_mut_ptr().cast::<u8>();
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.5.0")]
-                        extern "C" {
+                        #[link(wasm_import_module = "durable:core/sql@2.7.0")]
+                        unsafe extern "C" {
                             #[link_name = "[method]value.as-timestamp"]
-                            fn wit_import(_: i32, _: *mut u8);
+                            fn wit_import1(_: i32, _: *mut u8);
                         }
                         #[cfg(not(target_arch = "wasm32"))]
-                        fn wit_import(_: i32, _: *mut u8) {
+                        unsafe extern "C" fn wit_import1(_: i32, _: *mut u8) {
                             unreachable!()
                         }
-                        wit_import((self).handle() as i32, ptr0);
-                        let l1 = i32::from(*ptr0.add(0).cast::<u8>());
-                        match l1 {
+                        wit_import1((self).handle() as i32, ptr0);
+                        let l2 = i32::from(*ptr0.add(0).cast::<u8>());
+                        let result5 = match l2 {
                             0 => None,
                             1 => {
                                 let e = {
-                                    let l2 = *ptr0.add(8).cast::<i64>();
-                                    let l3 = *ptr0.add(16).cast::<i32>();
+                                    let l3 = *ptr0.add(8).cast::<i64>();
+                                    let l4 = *ptr0.add(16).cast::<i32>();
                                     Timestamp {
-                                        seconds: l2,
-                                        subsec_nanos: l3 as u32,
+                                        seconds: l3,
+                                        subsec_nanos: l4 as u32,
                                     }
                                 };
                                 Some(e)
                             }
                             _ => _rt::invalid_enum_discriminant(),
-                        }
+                        };
+                        result5
                     }
                 }
             }
             impl Value {
                 #[allow(unused_unsafe, clippy::all)]
+                #[allow(async_fn_in_trait)]
                 pub fn as_uuid(&self) -> Option<Uuid> {
                     unsafe {
                         #[repr(align(8))]
@@ -1832,81 +2018,95 @@ pub mod durable {
                         );
                         let ptr0 = ret_area.0.as_mut_ptr().cast::<u8>();
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.5.0")]
-                        extern "C" {
+                        #[link(wasm_import_module = "durable:core/sql@2.7.0")]
+                        unsafe extern "C" {
                             #[link_name = "[method]value.as-uuid"]
-                            fn wit_import(_: i32, _: *mut u8);
+                            fn wit_import1(_: i32, _: *mut u8);
                         }
                         #[cfg(not(target_arch = "wasm32"))]
-                        fn wit_import(_: i32, _: *mut u8) {
+                        unsafe extern "C" fn wit_import1(_: i32, _: *mut u8) {
                             unreachable!()
                         }
-                        wit_import((self).handle() as i32, ptr0);
-                        let l1 = i32::from(*ptr0.add(0).cast::<u8>());
-                        match l1 {
+                        wit_import1((self).handle() as i32, ptr0);
+                        let l2 = i32::from(*ptr0.add(0).cast::<u8>());
+                        let result5 = match l2 {
                             0 => None,
                             1 => {
                                 let e = {
-                                    let l2 = *ptr0.add(8).cast::<i64>();
-                                    let l3 = *ptr0.add(16).cast::<i64>();
+                                    let l3 = *ptr0.add(8).cast::<i64>();
+                                    let l4 = *ptr0.add(16).cast::<i64>();
                                     Uuid {
-                                        hi: l2 as u64,
-                                        lo: l3 as u64,
+                                        hi: l3 as u64,
+                                        lo: l4 as u64,
                                     }
                                 };
                                 Some(e)
                             }
                             _ => _rt::invalid_enum_discriminant(),
-                        }
+                        };
+                        result5
                     }
                 }
             }
             impl Value {
                 #[allow(unused_unsafe, clippy::all)]
                 /// Note that this function works for both json and jsonb types.
+                #[allow(async_fn_in_trait)]
                 pub fn as_json(&self) -> Option<_rt::String> {
                     unsafe {
-                        #[repr(align(4))]
-                        struct RetArea([::core::mem::MaybeUninit<u8>; 12]);
+                        #[cfg_attr(target_pointer_width = "64", repr(align(8)))]
+                        #[cfg_attr(target_pointer_width = "32", repr(align(4)))]
+                        struct RetArea(
+                            [::core::mem::MaybeUninit<
+                                u8,
+                            >; 3 * ::core::mem::size_of::<*const u8>()],
+                        );
                         let mut ret_area = RetArea(
-                            [::core::mem::MaybeUninit::uninit(); 12],
+                            [::core::mem::MaybeUninit::uninit(); 3
+                                * ::core::mem::size_of::<*const u8>()],
                         );
                         let ptr0 = ret_area.0.as_mut_ptr().cast::<u8>();
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.5.0")]
-                        extern "C" {
+                        #[link(wasm_import_module = "durable:core/sql@2.7.0")]
+                        unsafe extern "C" {
                             #[link_name = "[method]value.as-json"]
-                            fn wit_import(_: i32, _: *mut u8);
+                            fn wit_import1(_: i32, _: *mut u8);
                         }
                         #[cfg(not(target_arch = "wasm32"))]
-                        fn wit_import(_: i32, _: *mut u8) {
+                        unsafe extern "C" fn wit_import1(_: i32, _: *mut u8) {
                             unreachable!()
                         }
-                        wit_import((self).handle() as i32, ptr0);
-                        let l1 = i32::from(*ptr0.add(0).cast::<u8>());
-                        match l1 {
+                        wit_import1((self).handle() as i32, ptr0);
+                        let l2 = i32::from(*ptr0.add(0).cast::<u8>());
+                        let result6 = match l2 {
                             0 => None,
                             1 => {
                                 let e = {
-                                    let l2 = *ptr0.add(4).cast::<*mut u8>();
-                                    let l3 = *ptr0.add(8).cast::<usize>();
-                                    let len4 = l3;
-                                    let bytes4 = _rt::Vec::from_raw_parts(
-                                        l2.cast(),
-                                        len4,
-                                        len4,
+                                    let l3 = *ptr0
+                                        .add(::core::mem::size_of::<*const u8>())
+                                        .cast::<*mut u8>();
+                                    let l4 = *ptr0
+                                        .add(2 * ::core::mem::size_of::<*const u8>())
+                                        .cast::<usize>();
+                                    let len5 = l4;
+                                    let bytes5 = _rt::Vec::from_raw_parts(
+                                        l3.cast(),
+                                        len5,
+                                        len5,
                                     );
-                                    _rt::string_lift(bytes4)
+                                    _rt::string_lift(bytes5)
                                 };
                                 Some(e)
                             }
                             _ => _rt::invalid_enum_discriminant(),
-                        }
+                        };
+                        result6
                     }
                 }
             }
             impl Value {
                 #[allow(unused_unsafe, clippy::all)]
+                #[allow(async_fn_in_trait)]
                 pub fn as_inet(&self) -> Option<IpNetwork> {
                     unsafe {
                         #[repr(align(8))]
@@ -1916,721 +2116,913 @@ pub mod durable {
                         );
                         let ptr0 = ret_area.0.as_mut_ptr().cast::<u8>();
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.5.0")]
-                        extern "C" {
+                        #[link(wasm_import_module = "durable:core/sql@2.7.0")]
+                        unsafe extern "C" {
                             #[link_name = "[method]value.as-inet"]
-                            fn wit_import(_: i32, _: *mut u8);
+                            fn wit_import1(_: i32, _: *mut u8);
                         }
                         #[cfg(not(target_arch = "wasm32"))]
-                        fn wit_import(_: i32, _: *mut u8) {
+                        unsafe extern "C" fn wit_import1(_: i32, _: *mut u8) {
                             unreachable!()
                         }
-                        wit_import((self).handle() as i32, ptr0);
-                        let l1 = i32::from(*ptr0.add(0).cast::<u8>());
-                        match l1 {
+                        wit_import1((self).handle() as i32, ptr0);
+                        let l2 = i32::from(*ptr0.add(0).cast::<u8>());
+                        let result10 = match l2 {
                             0 => None,
                             1 => {
                                 let e = {
-                                    let l2 = i32::from(*ptr0.add(8).cast::<u8>());
-                                    let v8 = match l2 {
+                                    let l3 = i32::from(*ptr0.add(8).cast::<u8>());
+                                    let v9 = match l3 {
                                         0 => {
-                                            let e8 = {
-                                                let l3 = *ptr0.add(16).cast::<i32>();
-                                                let l4 = i32::from(*ptr0.add(20).cast::<u8>());
+                                            let e9 = {
+                                                let l4 = *ptr0.add(16).cast::<i32>();
+                                                let l5 = i32::from(*ptr0.add(20).cast::<u8>());
                                                 Ipv4Network {
-                                                    addr: l3 as u32,
-                                                    prefix: l4 as u8,
+                                                    addr: l4 as u32,
+                                                    prefix: l5 as u8,
                                                 }
                                             };
-                                            IpNetwork::V4(e8)
+                                            IpNetwork::V4(e9)
                                         }
                                         n => {
                                             debug_assert_eq!(n, 1, "invalid enum discriminant");
-                                            let e8 = {
-                                                let l5 = *ptr0.add(16).cast::<i64>();
-                                                let l6 = *ptr0.add(24).cast::<i64>();
-                                                let l7 = i32::from(*ptr0.add(32).cast::<u8>());
+                                            let e9 = {
+                                                let l6 = *ptr0.add(16).cast::<i64>();
+                                                let l7 = *ptr0.add(24).cast::<i64>();
+                                                let l8 = i32::from(*ptr0.add(32).cast::<u8>());
                                                 Ipv6Network {
-                                                    addr: (l5 as u64, l6 as u64),
-                                                    prefix: l7 as u8,
+                                                    addr: (l6 as u64, l7 as u64),
+                                                    prefix: l8 as u8,
                                                 }
                                             };
-                                            IpNetwork::V6(e8)
+                                            IpNetwork::V6(e9)
                                         }
                                     };
-                                    v8
+                                    v9
                                 };
                                 Some(e)
                             }
                             _ => _rt::invalid_enum_discriminant(),
-                        }
+                        };
+                        result10
                     }
                 }
             }
             impl Value {
                 #[allow(unused_unsafe, clippy::all)]
+                #[allow(async_fn_in_trait)]
                 pub fn as_boolean_array(&self) -> Option<_rt::Vec<bool>> {
                     unsafe {
-                        #[repr(align(4))]
-                        struct RetArea([::core::mem::MaybeUninit<u8>; 12]);
+                        #[cfg_attr(target_pointer_width = "64", repr(align(8)))]
+                        #[cfg_attr(target_pointer_width = "32", repr(align(4)))]
+                        struct RetArea(
+                            [::core::mem::MaybeUninit<
+                                u8,
+                            >; 3 * ::core::mem::size_of::<*const u8>()],
+                        );
                         let mut ret_area = RetArea(
-                            [::core::mem::MaybeUninit::uninit(); 12],
+                            [::core::mem::MaybeUninit::uninit(); 3
+                                * ::core::mem::size_of::<*const u8>()],
                         );
                         let ptr0 = ret_area.0.as_mut_ptr().cast::<u8>();
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.5.0")]
-                        extern "C" {
+                        #[link(wasm_import_module = "durable:core/sql@2.7.0")]
+                        unsafe extern "C" {
                             #[link_name = "[method]value.as-boolean-array"]
-                            fn wit_import(_: i32, _: *mut u8);
+                            fn wit_import1(_: i32, _: *mut u8);
                         }
                         #[cfg(not(target_arch = "wasm32"))]
-                        fn wit_import(_: i32, _: *mut u8) {
+                        unsafe extern "C" fn wit_import1(_: i32, _: *mut u8) {
                             unreachable!()
                         }
-                        wit_import((self).handle() as i32, ptr0);
-                        let l1 = i32::from(*ptr0.add(0).cast::<u8>());
-                        match l1 {
+                        wit_import1((self).handle() as i32, ptr0);
+                        let l2 = i32::from(*ptr0.add(0).cast::<u8>());
+                        let result7 = match l2 {
                             0 => None,
                             1 => {
                                 let e = {
-                                    let l2 = *ptr0.add(4).cast::<*mut u8>();
-                                    let l3 = *ptr0.add(8).cast::<usize>();
-                                    let base5 = l2;
-                                    let len5 = l3;
-                                    let mut result5 = _rt::Vec::with_capacity(len5);
-                                    for i in 0..len5 {
-                                        let base = base5.add(i * 1);
-                                        let e5 = {
-                                            let l4 = i32::from(*base.add(0).cast::<u8>());
-                                            _rt::bool_lift(l4 as u8)
+                                    let l3 = *ptr0
+                                        .add(::core::mem::size_of::<*const u8>())
+                                        .cast::<*mut u8>();
+                                    let l4 = *ptr0
+                                        .add(2 * ::core::mem::size_of::<*const u8>())
+                                        .cast::<usize>();
+                                    let base6 = l3;
+                                    let len6 = l4;
+                                    let mut result6 = _rt::Vec::with_capacity(len6);
+                                    for i in 0..len6 {
+                                        let base = base6.add(i * 1);
+                                        let e6 = {
+                                            let l5 = i32::from(*base.add(0).cast::<u8>());
+                                            _rt::bool_lift(l5 as u8)
                                         };
-                                        result5.push(e5);
+                                        result6.push(e6);
                                     }
-                                    _rt::cabi_dealloc(base5, len5 * 1, 1);
-                                    result5
+                                    _rt::cabi_dealloc(base6, len6 * 1, 1);
+                                    result6
                                 };
                                 Some(e)
                             }
                             _ => _rt::invalid_enum_discriminant(),
-                        }
+                        };
+                        result7
                     }
                 }
             }
             impl Value {
                 #[allow(unused_unsafe, clippy::all)]
+                #[allow(async_fn_in_trait)]
                 pub fn as_float4_array(&self) -> Option<_rt::Vec<f32>> {
                     unsafe {
-                        #[repr(align(4))]
-                        struct RetArea([::core::mem::MaybeUninit<u8>; 12]);
+                        #[cfg_attr(target_pointer_width = "64", repr(align(8)))]
+                        #[cfg_attr(target_pointer_width = "32", repr(align(4)))]
+                        struct RetArea(
+                            [::core::mem::MaybeUninit<
+                                u8,
+                            >; 3 * ::core::mem::size_of::<*const u8>()],
+                        );
                         let mut ret_area = RetArea(
-                            [::core::mem::MaybeUninit::uninit(); 12],
+                            [::core::mem::MaybeUninit::uninit(); 3
+                                * ::core::mem::size_of::<*const u8>()],
                         );
                         let ptr0 = ret_area.0.as_mut_ptr().cast::<u8>();
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.5.0")]
-                        extern "C" {
+                        #[link(wasm_import_module = "durable:core/sql@2.7.0")]
+                        unsafe extern "C" {
                             #[link_name = "[method]value.as-float4-array"]
-                            fn wit_import(_: i32, _: *mut u8);
+                            fn wit_import1(_: i32, _: *mut u8);
                         }
                         #[cfg(not(target_arch = "wasm32"))]
-                        fn wit_import(_: i32, _: *mut u8) {
+                        unsafe extern "C" fn wit_import1(_: i32, _: *mut u8) {
                             unreachable!()
                         }
-                        wit_import((self).handle() as i32, ptr0);
-                        let l1 = i32::from(*ptr0.add(0).cast::<u8>());
-                        match l1 {
+                        wit_import1((self).handle() as i32, ptr0);
+                        let l2 = i32::from(*ptr0.add(0).cast::<u8>());
+                        let result6 = match l2 {
                             0 => None,
                             1 => {
                                 let e = {
-                                    let l2 = *ptr0.add(4).cast::<*mut u8>();
-                                    let l3 = *ptr0.add(8).cast::<usize>();
-                                    let len4 = l3;
-                                    _rt::Vec::from_raw_parts(l2.cast(), len4, len4)
+                                    let l3 = *ptr0
+                                        .add(::core::mem::size_of::<*const u8>())
+                                        .cast::<*mut u8>();
+                                    let l4 = *ptr0
+                                        .add(2 * ::core::mem::size_of::<*const u8>())
+                                        .cast::<usize>();
+                                    let len5 = l4;
+                                    _rt::Vec::from_raw_parts(l3.cast(), len5, len5)
                                 };
                                 Some(e)
                             }
                             _ => _rt::invalid_enum_discriminant(),
-                        }
+                        };
+                        result6
                     }
                 }
             }
             impl Value {
                 #[allow(unused_unsafe, clippy::all)]
+                #[allow(async_fn_in_trait)]
                 pub fn as_float8_array(&self) -> Option<_rt::Vec<f64>> {
                     unsafe {
-                        #[repr(align(4))]
-                        struct RetArea([::core::mem::MaybeUninit<u8>; 12]);
+                        #[cfg_attr(target_pointer_width = "64", repr(align(8)))]
+                        #[cfg_attr(target_pointer_width = "32", repr(align(4)))]
+                        struct RetArea(
+                            [::core::mem::MaybeUninit<
+                                u8,
+                            >; 3 * ::core::mem::size_of::<*const u8>()],
+                        );
                         let mut ret_area = RetArea(
-                            [::core::mem::MaybeUninit::uninit(); 12],
+                            [::core::mem::MaybeUninit::uninit(); 3
+                                * ::core::mem::size_of::<*const u8>()],
                         );
                         let ptr0 = ret_area.0.as_mut_ptr().cast::<u8>();
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.5.0")]
-                        extern "C" {
+                        #[link(wasm_import_module = "durable:core/sql@2.7.0")]
+                        unsafe extern "C" {
                             #[link_name = "[method]value.as-float8-array"]
-                            fn wit_import(_: i32, _: *mut u8);
+                            fn wit_import1(_: i32, _: *mut u8);
                         }
                         #[cfg(not(target_arch = "wasm32"))]
-                        fn wit_import(_: i32, _: *mut u8) {
+                        unsafe extern "C" fn wit_import1(_: i32, _: *mut u8) {
                             unreachable!()
                         }
-                        wit_import((self).handle() as i32, ptr0);
-                        let l1 = i32::from(*ptr0.add(0).cast::<u8>());
-                        match l1 {
+                        wit_import1((self).handle() as i32, ptr0);
+                        let l2 = i32::from(*ptr0.add(0).cast::<u8>());
+                        let result6 = match l2 {
                             0 => None,
                             1 => {
                                 let e = {
-                                    let l2 = *ptr0.add(4).cast::<*mut u8>();
-                                    let l3 = *ptr0.add(8).cast::<usize>();
-                                    let len4 = l3;
-                                    _rt::Vec::from_raw_parts(l2.cast(), len4, len4)
+                                    let l3 = *ptr0
+                                        .add(::core::mem::size_of::<*const u8>())
+                                        .cast::<*mut u8>();
+                                    let l4 = *ptr0
+                                        .add(2 * ::core::mem::size_of::<*const u8>())
+                                        .cast::<usize>();
+                                    let len5 = l4;
+                                    _rt::Vec::from_raw_parts(l3.cast(), len5, len5)
                                 };
                                 Some(e)
                             }
                             _ => _rt::invalid_enum_discriminant(),
-                        }
+                        };
+                        result6
                     }
                 }
             }
             impl Value {
                 #[allow(unused_unsafe, clippy::all)]
+                #[allow(async_fn_in_trait)]
                 pub fn as_int1_array(&self) -> Option<_rt::Vec<i8>> {
                     unsafe {
-                        #[repr(align(4))]
-                        struct RetArea([::core::mem::MaybeUninit<u8>; 12]);
+                        #[cfg_attr(target_pointer_width = "64", repr(align(8)))]
+                        #[cfg_attr(target_pointer_width = "32", repr(align(4)))]
+                        struct RetArea(
+                            [::core::mem::MaybeUninit<
+                                u8,
+                            >; 3 * ::core::mem::size_of::<*const u8>()],
+                        );
                         let mut ret_area = RetArea(
-                            [::core::mem::MaybeUninit::uninit(); 12],
+                            [::core::mem::MaybeUninit::uninit(); 3
+                                * ::core::mem::size_of::<*const u8>()],
                         );
                         let ptr0 = ret_area.0.as_mut_ptr().cast::<u8>();
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.5.0")]
-                        extern "C" {
+                        #[link(wasm_import_module = "durable:core/sql@2.7.0")]
+                        unsafe extern "C" {
                             #[link_name = "[method]value.as-int1-array"]
-                            fn wit_import(_: i32, _: *mut u8);
+                            fn wit_import1(_: i32, _: *mut u8);
                         }
                         #[cfg(not(target_arch = "wasm32"))]
-                        fn wit_import(_: i32, _: *mut u8) {
+                        unsafe extern "C" fn wit_import1(_: i32, _: *mut u8) {
                             unreachable!()
                         }
-                        wit_import((self).handle() as i32, ptr0);
-                        let l1 = i32::from(*ptr0.add(0).cast::<u8>());
-                        match l1 {
+                        wit_import1((self).handle() as i32, ptr0);
+                        let l2 = i32::from(*ptr0.add(0).cast::<u8>());
+                        let result6 = match l2 {
                             0 => None,
                             1 => {
                                 let e = {
-                                    let l2 = *ptr0.add(4).cast::<*mut u8>();
-                                    let l3 = *ptr0.add(8).cast::<usize>();
-                                    let len4 = l3;
-                                    _rt::Vec::from_raw_parts(l2.cast(), len4, len4)
+                                    let l3 = *ptr0
+                                        .add(::core::mem::size_of::<*const u8>())
+                                        .cast::<*mut u8>();
+                                    let l4 = *ptr0
+                                        .add(2 * ::core::mem::size_of::<*const u8>())
+                                        .cast::<usize>();
+                                    let len5 = l4;
+                                    _rt::Vec::from_raw_parts(l3.cast(), len5, len5)
                                 };
                                 Some(e)
                             }
                             _ => _rt::invalid_enum_discriminant(),
-                        }
+                        };
+                        result6
                     }
                 }
             }
             impl Value {
                 #[allow(unused_unsafe, clippy::all)]
+                #[allow(async_fn_in_trait)]
                 pub fn as_int2_array(&self) -> Option<_rt::Vec<i16>> {
                     unsafe {
-                        #[repr(align(4))]
-                        struct RetArea([::core::mem::MaybeUninit<u8>; 12]);
+                        #[cfg_attr(target_pointer_width = "64", repr(align(8)))]
+                        #[cfg_attr(target_pointer_width = "32", repr(align(4)))]
+                        struct RetArea(
+                            [::core::mem::MaybeUninit<
+                                u8,
+                            >; 3 * ::core::mem::size_of::<*const u8>()],
+                        );
                         let mut ret_area = RetArea(
-                            [::core::mem::MaybeUninit::uninit(); 12],
+                            [::core::mem::MaybeUninit::uninit(); 3
+                                * ::core::mem::size_of::<*const u8>()],
                         );
                         let ptr0 = ret_area.0.as_mut_ptr().cast::<u8>();
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.5.0")]
-                        extern "C" {
+                        #[link(wasm_import_module = "durable:core/sql@2.7.0")]
+                        unsafe extern "C" {
                             #[link_name = "[method]value.as-int2-array"]
-                            fn wit_import(_: i32, _: *mut u8);
+                            fn wit_import1(_: i32, _: *mut u8);
                         }
                         #[cfg(not(target_arch = "wasm32"))]
-                        fn wit_import(_: i32, _: *mut u8) {
+                        unsafe extern "C" fn wit_import1(_: i32, _: *mut u8) {
                             unreachable!()
                         }
-                        wit_import((self).handle() as i32, ptr0);
-                        let l1 = i32::from(*ptr0.add(0).cast::<u8>());
-                        match l1 {
+                        wit_import1((self).handle() as i32, ptr0);
+                        let l2 = i32::from(*ptr0.add(0).cast::<u8>());
+                        let result6 = match l2 {
                             0 => None,
                             1 => {
                                 let e = {
-                                    let l2 = *ptr0.add(4).cast::<*mut u8>();
-                                    let l3 = *ptr0.add(8).cast::<usize>();
-                                    let len4 = l3;
-                                    _rt::Vec::from_raw_parts(l2.cast(), len4, len4)
+                                    let l3 = *ptr0
+                                        .add(::core::mem::size_of::<*const u8>())
+                                        .cast::<*mut u8>();
+                                    let l4 = *ptr0
+                                        .add(2 * ::core::mem::size_of::<*const u8>())
+                                        .cast::<usize>();
+                                    let len5 = l4;
+                                    _rt::Vec::from_raw_parts(l3.cast(), len5, len5)
                                 };
                                 Some(e)
                             }
                             _ => _rt::invalid_enum_discriminant(),
-                        }
+                        };
+                        result6
                     }
                 }
             }
             impl Value {
                 #[allow(unused_unsafe, clippy::all)]
+                #[allow(async_fn_in_trait)]
                 pub fn as_int4_array(&self) -> Option<_rt::Vec<i32>> {
                     unsafe {
-                        #[repr(align(4))]
-                        struct RetArea([::core::mem::MaybeUninit<u8>; 12]);
+                        #[cfg_attr(target_pointer_width = "64", repr(align(8)))]
+                        #[cfg_attr(target_pointer_width = "32", repr(align(4)))]
+                        struct RetArea(
+                            [::core::mem::MaybeUninit<
+                                u8,
+                            >; 3 * ::core::mem::size_of::<*const u8>()],
+                        );
                         let mut ret_area = RetArea(
-                            [::core::mem::MaybeUninit::uninit(); 12],
+                            [::core::mem::MaybeUninit::uninit(); 3
+                                * ::core::mem::size_of::<*const u8>()],
                         );
                         let ptr0 = ret_area.0.as_mut_ptr().cast::<u8>();
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.5.0")]
-                        extern "C" {
+                        #[link(wasm_import_module = "durable:core/sql@2.7.0")]
+                        unsafe extern "C" {
                             #[link_name = "[method]value.as-int4-array"]
-                            fn wit_import(_: i32, _: *mut u8);
+                            fn wit_import1(_: i32, _: *mut u8);
                         }
                         #[cfg(not(target_arch = "wasm32"))]
-                        fn wit_import(_: i32, _: *mut u8) {
+                        unsafe extern "C" fn wit_import1(_: i32, _: *mut u8) {
                             unreachable!()
                         }
-                        wit_import((self).handle() as i32, ptr0);
-                        let l1 = i32::from(*ptr0.add(0).cast::<u8>());
-                        match l1 {
+                        wit_import1((self).handle() as i32, ptr0);
+                        let l2 = i32::from(*ptr0.add(0).cast::<u8>());
+                        let result6 = match l2 {
                             0 => None,
                             1 => {
                                 let e = {
-                                    let l2 = *ptr0.add(4).cast::<*mut u8>();
-                                    let l3 = *ptr0.add(8).cast::<usize>();
-                                    let len4 = l3;
-                                    _rt::Vec::from_raw_parts(l2.cast(), len4, len4)
+                                    let l3 = *ptr0
+                                        .add(::core::mem::size_of::<*const u8>())
+                                        .cast::<*mut u8>();
+                                    let l4 = *ptr0
+                                        .add(2 * ::core::mem::size_of::<*const u8>())
+                                        .cast::<usize>();
+                                    let len5 = l4;
+                                    _rt::Vec::from_raw_parts(l3.cast(), len5, len5)
                                 };
                                 Some(e)
                             }
                             _ => _rt::invalid_enum_discriminant(),
-                        }
+                        };
+                        result6
                     }
                 }
             }
             impl Value {
                 #[allow(unused_unsafe, clippy::all)]
+                #[allow(async_fn_in_trait)]
                 pub fn as_int8_array(&self) -> Option<_rt::Vec<i64>> {
                     unsafe {
-                        #[repr(align(4))]
-                        struct RetArea([::core::mem::MaybeUninit<u8>; 12]);
+                        #[cfg_attr(target_pointer_width = "64", repr(align(8)))]
+                        #[cfg_attr(target_pointer_width = "32", repr(align(4)))]
+                        struct RetArea(
+                            [::core::mem::MaybeUninit<
+                                u8,
+                            >; 3 * ::core::mem::size_of::<*const u8>()],
+                        );
                         let mut ret_area = RetArea(
-                            [::core::mem::MaybeUninit::uninit(); 12],
+                            [::core::mem::MaybeUninit::uninit(); 3
+                                * ::core::mem::size_of::<*const u8>()],
                         );
                         let ptr0 = ret_area.0.as_mut_ptr().cast::<u8>();
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.5.0")]
-                        extern "C" {
+                        #[link(wasm_import_module = "durable:core/sql@2.7.0")]
+                        unsafe extern "C" {
                             #[link_name = "[method]value.as-int8-array"]
-                            fn wit_import(_: i32, _: *mut u8);
+                            fn wit_import1(_: i32, _: *mut u8);
                         }
                         #[cfg(not(target_arch = "wasm32"))]
-                        fn wit_import(_: i32, _: *mut u8) {
+                        unsafe extern "C" fn wit_import1(_: i32, _: *mut u8) {
                             unreachable!()
                         }
-                        wit_import((self).handle() as i32, ptr0);
-                        let l1 = i32::from(*ptr0.add(0).cast::<u8>());
-                        match l1 {
+                        wit_import1((self).handle() as i32, ptr0);
+                        let l2 = i32::from(*ptr0.add(0).cast::<u8>());
+                        let result6 = match l2 {
                             0 => None,
                             1 => {
                                 let e = {
-                                    let l2 = *ptr0.add(4).cast::<*mut u8>();
-                                    let l3 = *ptr0.add(8).cast::<usize>();
-                                    let len4 = l3;
-                                    _rt::Vec::from_raw_parts(l2.cast(), len4, len4)
+                                    let l3 = *ptr0
+                                        .add(::core::mem::size_of::<*const u8>())
+                                        .cast::<*mut u8>();
+                                    let l4 = *ptr0
+                                        .add(2 * ::core::mem::size_of::<*const u8>())
+                                        .cast::<usize>();
+                                    let len5 = l4;
+                                    _rt::Vec::from_raw_parts(l3.cast(), len5, len5)
                                 };
                                 Some(e)
                             }
                             _ => _rt::invalid_enum_discriminant(),
-                        }
+                        };
+                        result6
                     }
                 }
             }
             impl Value {
                 #[allow(unused_unsafe, clippy::all)]
+                #[allow(async_fn_in_trait)]
                 pub fn as_text_array(&self) -> Option<_rt::Vec<_rt::String>> {
                     unsafe {
-                        #[repr(align(4))]
-                        struct RetArea([::core::mem::MaybeUninit<u8>; 12]);
+                        #[cfg_attr(target_pointer_width = "64", repr(align(8)))]
+                        #[cfg_attr(target_pointer_width = "32", repr(align(4)))]
+                        struct RetArea(
+                            [::core::mem::MaybeUninit<
+                                u8,
+                            >; 3 * ::core::mem::size_of::<*const u8>()],
+                        );
                         let mut ret_area = RetArea(
-                            [::core::mem::MaybeUninit::uninit(); 12],
+                            [::core::mem::MaybeUninit::uninit(); 3
+                                * ::core::mem::size_of::<*const u8>()],
                         );
                         let ptr0 = ret_area.0.as_mut_ptr().cast::<u8>();
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.5.0")]
-                        extern "C" {
+                        #[link(wasm_import_module = "durable:core/sql@2.7.0")]
+                        unsafe extern "C" {
                             #[link_name = "[method]value.as-text-array"]
-                            fn wit_import(_: i32, _: *mut u8);
+                            fn wit_import1(_: i32, _: *mut u8);
                         }
                         #[cfg(not(target_arch = "wasm32"))]
-                        fn wit_import(_: i32, _: *mut u8) {
+                        unsafe extern "C" fn wit_import1(_: i32, _: *mut u8) {
                             unreachable!()
                         }
-                        wit_import((self).handle() as i32, ptr0);
-                        let l1 = i32::from(*ptr0.add(0).cast::<u8>());
-                        match l1 {
+                        wit_import1((self).handle() as i32, ptr0);
+                        let l2 = i32::from(*ptr0.add(0).cast::<u8>());
+                        let result9 = match l2 {
                             0 => None,
                             1 => {
                                 let e = {
-                                    let l2 = *ptr0.add(4).cast::<*mut u8>();
-                                    let l3 = *ptr0.add(8).cast::<usize>();
-                                    let base7 = l2;
-                                    let len7 = l3;
-                                    let mut result7 = _rt::Vec::with_capacity(len7);
-                                    for i in 0..len7 {
-                                        let base = base7.add(i * 8);
-                                        let e7 = {
-                                            let l4 = *base.add(0).cast::<*mut u8>();
-                                            let l5 = *base.add(4).cast::<usize>();
-                                            let len6 = l5;
-                                            let bytes6 = _rt::Vec::from_raw_parts(
-                                                l4.cast(),
-                                                len6,
-                                                len6,
+                                    let l3 = *ptr0
+                                        .add(::core::mem::size_of::<*const u8>())
+                                        .cast::<*mut u8>();
+                                    let l4 = *ptr0
+                                        .add(2 * ::core::mem::size_of::<*const u8>())
+                                        .cast::<usize>();
+                                    let base8 = l3;
+                                    let len8 = l4;
+                                    let mut result8 = _rt::Vec::with_capacity(len8);
+                                    for i in 0..len8 {
+                                        let base = base8
+                                            .add(i * (2 * ::core::mem::size_of::<*const u8>()));
+                                        let e8 = {
+                                            let l5 = *base.add(0).cast::<*mut u8>();
+                                            let l6 = *base
+                                                .add(::core::mem::size_of::<*const u8>())
+                                                .cast::<usize>();
+                                            let len7 = l6;
+                                            let bytes7 = _rt::Vec::from_raw_parts(
+                                                l5.cast(),
+                                                len7,
+                                                len7,
                                             );
-                                            _rt::string_lift(bytes6)
+                                            _rt::string_lift(bytes7)
                                         };
-                                        result7.push(e7);
+                                        result8.push(e8);
                                     }
-                                    _rt::cabi_dealloc(base7, len7 * 8, 4);
-                                    result7
+                                    _rt::cabi_dealloc(
+                                        base8,
+                                        len8 * (2 * ::core::mem::size_of::<*const u8>()),
+                                        ::core::mem::size_of::<*const u8>(),
+                                    );
+                                    result8
                                 };
                                 Some(e)
                             }
                             _ => _rt::invalid_enum_discriminant(),
-                        }
+                        };
+                        result9
                     }
                 }
             }
             impl Value {
                 #[allow(unused_unsafe, clippy::all)]
+                #[allow(async_fn_in_trait)]
                 pub fn as_bytea_array(&self) -> Option<_rt::Vec<_rt::Vec<u8>>> {
                     unsafe {
-                        #[repr(align(4))]
-                        struct RetArea([::core::mem::MaybeUninit<u8>; 12]);
+                        #[cfg_attr(target_pointer_width = "64", repr(align(8)))]
+                        #[cfg_attr(target_pointer_width = "32", repr(align(4)))]
+                        struct RetArea(
+                            [::core::mem::MaybeUninit<
+                                u8,
+                            >; 3 * ::core::mem::size_of::<*const u8>()],
+                        );
                         let mut ret_area = RetArea(
-                            [::core::mem::MaybeUninit::uninit(); 12],
+                            [::core::mem::MaybeUninit::uninit(); 3
+                                * ::core::mem::size_of::<*const u8>()],
                         );
                         let ptr0 = ret_area.0.as_mut_ptr().cast::<u8>();
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.5.0")]
-                        extern "C" {
+                        #[link(wasm_import_module = "durable:core/sql@2.7.0")]
+                        unsafe extern "C" {
                             #[link_name = "[method]value.as-bytea-array"]
-                            fn wit_import(_: i32, _: *mut u8);
+                            fn wit_import1(_: i32, _: *mut u8);
                         }
                         #[cfg(not(target_arch = "wasm32"))]
-                        fn wit_import(_: i32, _: *mut u8) {
+                        unsafe extern "C" fn wit_import1(_: i32, _: *mut u8) {
                             unreachable!()
                         }
-                        wit_import((self).handle() as i32, ptr0);
-                        let l1 = i32::from(*ptr0.add(0).cast::<u8>());
-                        match l1 {
+                        wit_import1((self).handle() as i32, ptr0);
+                        let l2 = i32::from(*ptr0.add(0).cast::<u8>());
+                        let result9 = match l2 {
                             0 => None,
                             1 => {
                                 let e = {
-                                    let l2 = *ptr0.add(4).cast::<*mut u8>();
-                                    let l3 = *ptr0.add(8).cast::<usize>();
-                                    let base7 = l2;
-                                    let len7 = l3;
-                                    let mut result7 = _rt::Vec::with_capacity(len7);
-                                    for i in 0..len7 {
-                                        let base = base7.add(i * 8);
-                                        let e7 = {
-                                            let l4 = *base.add(0).cast::<*mut u8>();
-                                            let l5 = *base.add(4).cast::<usize>();
-                                            let len6 = l5;
-                                            _rt::Vec::from_raw_parts(l4.cast(), len6, len6)
+                                    let l3 = *ptr0
+                                        .add(::core::mem::size_of::<*const u8>())
+                                        .cast::<*mut u8>();
+                                    let l4 = *ptr0
+                                        .add(2 * ::core::mem::size_of::<*const u8>())
+                                        .cast::<usize>();
+                                    let base8 = l3;
+                                    let len8 = l4;
+                                    let mut result8 = _rt::Vec::with_capacity(len8);
+                                    for i in 0..len8 {
+                                        let base = base8
+                                            .add(i * (2 * ::core::mem::size_of::<*const u8>()));
+                                        let e8 = {
+                                            let l5 = *base.add(0).cast::<*mut u8>();
+                                            let l6 = *base
+                                                .add(::core::mem::size_of::<*const u8>())
+                                                .cast::<usize>();
+                                            let len7 = l6;
+                                            _rt::Vec::from_raw_parts(l5.cast(), len7, len7)
                                         };
-                                        result7.push(e7);
+                                        result8.push(e8);
                                     }
-                                    _rt::cabi_dealloc(base7, len7 * 8, 4);
-                                    result7
+                                    _rt::cabi_dealloc(
+                                        base8,
+                                        len8 * (2 * ::core::mem::size_of::<*const u8>()),
+                                        ::core::mem::size_of::<*const u8>(),
+                                    );
+                                    result8
                                 };
                                 Some(e)
                             }
                             _ => _rt::invalid_enum_discriminant(),
-                        }
+                        };
+                        result9
                     }
                 }
             }
             impl Value {
                 #[allow(unused_unsafe, clippy::all)]
+                #[allow(async_fn_in_trait)]
                 pub fn as_timestamptz_array(&self) -> Option<_rt::Vec<Timestamptz>> {
                     unsafe {
-                        #[repr(align(4))]
-                        struct RetArea([::core::mem::MaybeUninit<u8>; 12]);
+                        #[cfg_attr(target_pointer_width = "64", repr(align(8)))]
+                        #[cfg_attr(target_pointer_width = "32", repr(align(4)))]
+                        struct RetArea(
+                            [::core::mem::MaybeUninit<
+                                u8,
+                            >; 3 * ::core::mem::size_of::<*const u8>()],
+                        );
                         let mut ret_area = RetArea(
-                            [::core::mem::MaybeUninit::uninit(); 12],
+                            [::core::mem::MaybeUninit::uninit(); 3
+                                * ::core::mem::size_of::<*const u8>()],
                         );
                         let ptr0 = ret_area.0.as_mut_ptr().cast::<u8>();
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.5.0")]
-                        extern "C" {
+                        #[link(wasm_import_module = "durable:core/sql@2.7.0")]
+                        unsafe extern "C" {
                             #[link_name = "[method]value.as-timestamptz-array"]
-                            fn wit_import(_: i32, _: *mut u8);
+                            fn wit_import1(_: i32, _: *mut u8);
                         }
                         #[cfg(not(target_arch = "wasm32"))]
-                        fn wit_import(_: i32, _: *mut u8) {
+                        unsafe extern "C" fn wit_import1(_: i32, _: *mut u8) {
                             unreachable!()
                         }
-                        wit_import((self).handle() as i32, ptr0);
-                        let l1 = i32::from(*ptr0.add(0).cast::<u8>());
-                        match l1 {
+                        wit_import1((self).handle() as i32, ptr0);
+                        let l2 = i32::from(*ptr0.add(0).cast::<u8>());
+                        let result6 = match l2 {
                             0 => None,
                             1 => {
                                 let e = {
-                                    let l2 = *ptr0.add(4).cast::<*mut u8>();
-                                    let l3 = *ptr0.add(8).cast::<usize>();
-                                    let len4 = l3;
-                                    _rt::Vec::from_raw_parts(l2.cast(), len4, len4)
+                                    let l3 = *ptr0
+                                        .add(::core::mem::size_of::<*const u8>())
+                                        .cast::<*mut u8>();
+                                    let l4 = *ptr0
+                                        .add(2 * ::core::mem::size_of::<*const u8>())
+                                        .cast::<usize>();
+                                    let len5 = l4;
+                                    _rt::Vec::from_raw_parts(l3.cast(), len5, len5)
                                 };
                                 Some(e)
                             }
                             _ => _rt::invalid_enum_discriminant(),
-                        }
+                        };
+                        result6
                     }
                 }
             }
             impl Value {
                 #[allow(unused_unsafe, clippy::all)]
+                #[allow(async_fn_in_trait)]
                 pub fn as_timestamp_array(&self) -> Option<_rt::Vec<Timestamp>> {
                     unsafe {
-                        #[repr(align(4))]
-                        struct RetArea([::core::mem::MaybeUninit<u8>; 12]);
+                        #[cfg_attr(target_pointer_width = "64", repr(align(8)))]
+                        #[cfg_attr(target_pointer_width = "32", repr(align(4)))]
+                        struct RetArea(
+                            [::core::mem::MaybeUninit<
+                                u8,
+                            >; 3 * ::core::mem::size_of::<*const u8>()],
+                        );
                         let mut ret_area = RetArea(
-                            [::core::mem::MaybeUninit::uninit(); 12],
+                            [::core::mem::MaybeUninit::uninit(); 3
+                                * ::core::mem::size_of::<*const u8>()],
                         );
                         let ptr0 = ret_area.0.as_mut_ptr().cast::<u8>();
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.5.0")]
-                        extern "C" {
+                        #[link(wasm_import_module = "durable:core/sql@2.7.0")]
+                        unsafe extern "C" {
                             #[link_name = "[method]value.as-timestamp-array"]
-                            fn wit_import(_: i32, _: *mut u8);
+                            fn wit_import1(_: i32, _: *mut u8);
                         }
                         #[cfg(not(target_arch = "wasm32"))]
-                        fn wit_import(_: i32, _: *mut u8) {
+                        unsafe extern "C" fn wit_import1(_: i32, _: *mut u8) {
                             unreachable!()
                         }
-                        wit_import((self).handle() as i32, ptr0);
-                        let l1 = i32::from(*ptr0.add(0).cast::<u8>());
-                        match l1 {
+                        wit_import1((self).handle() as i32, ptr0);
+                        let l2 = i32::from(*ptr0.add(0).cast::<u8>());
+                        let result6 = match l2 {
                             0 => None,
                             1 => {
                                 let e = {
-                                    let l2 = *ptr0.add(4).cast::<*mut u8>();
-                                    let l3 = *ptr0.add(8).cast::<usize>();
-                                    let len4 = l3;
-                                    _rt::Vec::from_raw_parts(l2.cast(), len4, len4)
+                                    let l3 = *ptr0
+                                        .add(::core::mem::size_of::<*const u8>())
+                                        .cast::<*mut u8>();
+                                    let l4 = *ptr0
+                                        .add(2 * ::core::mem::size_of::<*const u8>())
+                                        .cast::<usize>();
+                                    let len5 = l4;
+                                    _rt::Vec::from_raw_parts(l3.cast(), len5, len5)
                                 };
                                 Some(e)
                             }
                             _ => _rt::invalid_enum_discriminant(),
-                        }
+                        };
+                        result6
                     }
                 }
             }
             impl Value {
                 #[allow(unused_unsafe, clippy::all)]
+                #[allow(async_fn_in_trait)]
                 pub fn as_uuid_array(&self) -> Option<_rt::Vec<Uuid>> {
                     unsafe {
-                        #[repr(align(4))]
-                        struct RetArea([::core::mem::MaybeUninit<u8>; 12]);
+                        #[cfg_attr(target_pointer_width = "64", repr(align(8)))]
+                        #[cfg_attr(target_pointer_width = "32", repr(align(4)))]
+                        struct RetArea(
+                            [::core::mem::MaybeUninit<
+                                u8,
+                            >; 3 * ::core::mem::size_of::<*const u8>()],
+                        );
                         let mut ret_area = RetArea(
-                            [::core::mem::MaybeUninit::uninit(); 12],
+                            [::core::mem::MaybeUninit::uninit(); 3
+                                * ::core::mem::size_of::<*const u8>()],
                         );
                         let ptr0 = ret_area.0.as_mut_ptr().cast::<u8>();
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.5.0")]
-                        extern "C" {
+                        #[link(wasm_import_module = "durable:core/sql@2.7.0")]
+                        unsafe extern "C" {
                             #[link_name = "[method]value.as-uuid-array"]
-                            fn wit_import(_: i32, _: *mut u8);
+                            fn wit_import1(_: i32, _: *mut u8);
                         }
                         #[cfg(not(target_arch = "wasm32"))]
-                        fn wit_import(_: i32, _: *mut u8) {
+                        unsafe extern "C" fn wit_import1(_: i32, _: *mut u8) {
                             unreachable!()
                         }
-                        wit_import((self).handle() as i32, ptr0);
-                        let l1 = i32::from(*ptr0.add(0).cast::<u8>());
-                        match l1 {
+                        wit_import1((self).handle() as i32, ptr0);
+                        let l2 = i32::from(*ptr0.add(0).cast::<u8>());
+                        let result6 = match l2 {
                             0 => None,
                             1 => {
                                 let e = {
-                                    let l2 = *ptr0.add(4).cast::<*mut u8>();
-                                    let l3 = *ptr0.add(8).cast::<usize>();
-                                    let len4 = l3;
-                                    _rt::Vec::from_raw_parts(l2.cast(), len4, len4)
+                                    let l3 = *ptr0
+                                        .add(::core::mem::size_of::<*const u8>())
+                                        .cast::<*mut u8>();
+                                    let l4 = *ptr0
+                                        .add(2 * ::core::mem::size_of::<*const u8>())
+                                        .cast::<usize>();
+                                    let len5 = l4;
+                                    _rt::Vec::from_raw_parts(l3.cast(), len5, len5)
                                 };
                                 Some(e)
                             }
                             _ => _rt::invalid_enum_discriminant(),
-                        }
+                        };
+                        result6
                     }
                 }
             }
             impl Value {
                 #[allow(unused_unsafe, clippy::all)]
+                #[allow(async_fn_in_trait)]
                 pub fn as_json_array(&self) -> Option<_rt::Vec<_rt::String>> {
                     unsafe {
-                        #[repr(align(4))]
-                        struct RetArea([::core::mem::MaybeUninit<u8>; 12]);
+                        #[cfg_attr(target_pointer_width = "64", repr(align(8)))]
+                        #[cfg_attr(target_pointer_width = "32", repr(align(4)))]
+                        struct RetArea(
+                            [::core::mem::MaybeUninit<
+                                u8,
+                            >; 3 * ::core::mem::size_of::<*const u8>()],
+                        );
                         let mut ret_area = RetArea(
-                            [::core::mem::MaybeUninit::uninit(); 12],
+                            [::core::mem::MaybeUninit::uninit(); 3
+                                * ::core::mem::size_of::<*const u8>()],
                         );
                         let ptr0 = ret_area.0.as_mut_ptr().cast::<u8>();
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.5.0")]
-                        extern "C" {
+                        #[link(wasm_import_module = "durable:core/sql@2.7.0")]
+                        unsafe extern "C" {
                             #[link_name = "[method]value.as-json-array"]
-                            fn wit_import(_: i32, _: *mut u8);
+                            fn wit_import1(_: i32, _: *mut u8);
                         }
                         #[cfg(not(target_arch = "wasm32"))]
-                        fn wit_import(_: i32, _: *mut u8) {
+                        unsafe extern "C" fn wit_import1(_: i32, _: *mut u8) {
                             unreachable!()
                         }
-                        wit_import((self).handle() as i32, ptr0);
-                        let l1 = i32::from(*ptr0.add(0).cast::<u8>());
-                        match l1 {
+                        wit_import1((self).handle() as i32, ptr0);
+                        let l2 = i32::from(*ptr0.add(0).cast::<u8>());
+                        let result9 = match l2 {
                             0 => None,
                             1 => {
                                 let e = {
-                                    let l2 = *ptr0.add(4).cast::<*mut u8>();
-                                    let l3 = *ptr0.add(8).cast::<usize>();
-                                    let base7 = l2;
-                                    let len7 = l3;
-                                    let mut result7 = _rt::Vec::with_capacity(len7);
-                                    for i in 0..len7 {
-                                        let base = base7.add(i * 8);
-                                        let e7 = {
-                                            let l4 = *base.add(0).cast::<*mut u8>();
-                                            let l5 = *base.add(4).cast::<usize>();
-                                            let len6 = l5;
-                                            let bytes6 = _rt::Vec::from_raw_parts(
-                                                l4.cast(),
-                                                len6,
-                                                len6,
+                                    let l3 = *ptr0
+                                        .add(::core::mem::size_of::<*const u8>())
+                                        .cast::<*mut u8>();
+                                    let l4 = *ptr0
+                                        .add(2 * ::core::mem::size_of::<*const u8>())
+                                        .cast::<usize>();
+                                    let base8 = l3;
+                                    let len8 = l4;
+                                    let mut result8 = _rt::Vec::with_capacity(len8);
+                                    for i in 0..len8 {
+                                        let base = base8
+                                            .add(i * (2 * ::core::mem::size_of::<*const u8>()));
+                                        let e8 = {
+                                            let l5 = *base.add(0).cast::<*mut u8>();
+                                            let l6 = *base
+                                                .add(::core::mem::size_of::<*const u8>())
+                                                .cast::<usize>();
+                                            let len7 = l6;
+                                            let bytes7 = _rt::Vec::from_raw_parts(
+                                                l5.cast(),
+                                                len7,
+                                                len7,
                                             );
-                                            _rt::string_lift(bytes6)
+                                            _rt::string_lift(bytes7)
                                         };
-                                        result7.push(e7);
+                                        result8.push(e8);
                                     }
-                                    _rt::cabi_dealloc(base7, len7 * 8, 4);
-                                    result7
+                                    _rt::cabi_dealloc(
+                                        base8,
+                                        len8 * (2 * ::core::mem::size_of::<*const u8>()),
+                                        ::core::mem::size_of::<*const u8>(),
+                                    );
+                                    result8
                                 };
                                 Some(e)
                             }
                             _ => _rt::invalid_enum_discriminant(),
-                        }
+                        };
+                        result9
                     }
                 }
             }
             impl Value {
                 #[allow(unused_unsafe, clippy::all)]
+                #[allow(async_fn_in_trait)]
                 pub fn as_inet_array(&self) -> Option<_rt::Vec<IpNetwork>> {
                     unsafe {
-                        #[repr(align(4))]
-                        struct RetArea([::core::mem::MaybeUninit<u8>; 12]);
+                        #[cfg_attr(target_pointer_width = "64", repr(align(8)))]
+                        #[cfg_attr(target_pointer_width = "32", repr(align(4)))]
+                        struct RetArea(
+                            [::core::mem::MaybeUninit<
+                                u8,
+                            >; 3 * ::core::mem::size_of::<*const u8>()],
+                        );
                         let mut ret_area = RetArea(
-                            [::core::mem::MaybeUninit::uninit(); 12],
+                            [::core::mem::MaybeUninit::uninit(); 3
+                                * ::core::mem::size_of::<*const u8>()],
                         );
                         let ptr0 = ret_area.0.as_mut_ptr().cast::<u8>();
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.5.0")]
-                        extern "C" {
+                        #[link(wasm_import_module = "durable:core/sql@2.7.0")]
+                        unsafe extern "C" {
                             #[link_name = "[method]value.as-inet-array"]
-                            fn wit_import(_: i32, _: *mut u8);
+                            fn wit_import1(_: i32, _: *mut u8);
                         }
                         #[cfg(not(target_arch = "wasm32"))]
-                        fn wit_import(_: i32, _: *mut u8) {
+                        unsafe extern "C" fn wit_import1(_: i32, _: *mut u8) {
                             unreachable!()
                         }
-                        wit_import((self).handle() as i32, ptr0);
-                        let l1 = i32::from(*ptr0.add(0).cast::<u8>());
-                        match l1 {
+                        wit_import1((self).handle() as i32, ptr0);
+                        let l2 = i32::from(*ptr0.add(0).cast::<u8>());
+                        let result13 = match l2 {
                             0 => None,
                             1 => {
                                 let e = {
-                                    let l2 = *ptr0.add(4).cast::<*mut u8>();
-                                    let l3 = *ptr0.add(8).cast::<usize>();
-                                    let base11 = l2;
-                                    let len11 = l3;
-                                    let mut result11 = _rt::Vec::with_capacity(len11);
-                                    for i in 0..len11 {
-                                        let base = base11.add(i * 32);
-                                        let e11 = {
-                                            let l4 = i32::from(*base.add(0).cast::<u8>());
-                                            let v10 = match l4 {
+                                    let l3 = *ptr0
+                                        .add(::core::mem::size_of::<*const u8>())
+                                        .cast::<*mut u8>();
+                                    let l4 = *ptr0
+                                        .add(2 * ::core::mem::size_of::<*const u8>())
+                                        .cast::<usize>();
+                                    let base12 = l3;
+                                    let len12 = l4;
+                                    let mut result12 = _rt::Vec::with_capacity(len12);
+                                    for i in 0..len12 {
+                                        let base = base12.add(i * 32);
+                                        let e12 = {
+                                            let l5 = i32::from(*base.add(0).cast::<u8>());
+                                            let v11 = match l5 {
                                                 0 => {
-                                                    let e10 = {
-                                                        let l5 = *base.add(8).cast::<i32>();
-                                                        let l6 = i32::from(*base.add(12).cast::<u8>());
+                                                    let e11 = {
+                                                        let l6 = *base.add(8).cast::<i32>();
+                                                        let l7 = i32::from(*base.add(12).cast::<u8>());
                                                         Ipv4Network {
-                                                            addr: l5 as u32,
-                                                            prefix: l6 as u8,
+                                                            addr: l6 as u32,
+                                                            prefix: l7 as u8,
                                                         }
                                                     };
-                                                    IpNetwork::V4(e10)
+                                                    IpNetwork::V4(e11)
                                                 }
                                                 n => {
                                                     debug_assert_eq!(n, 1, "invalid enum discriminant");
-                                                    let e10 = {
-                                                        let l7 = *base.add(8).cast::<i64>();
-                                                        let l8 = *base.add(16).cast::<i64>();
-                                                        let l9 = i32::from(*base.add(24).cast::<u8>());
+                                                    let e11 = {
+                                                        let l8 = *base.add(8).cast::<i64>();
+                                                        let l9 = *base.add(16).cast::<i64>();
+                                                        let l10 = i32::from(*base.add(24).cast::<u8>());
                                                         Ipv6Network {
-                                                            addr: (l7 as u64, l8 as u64),
-                                                            prefix: l9 as u8,
+                                                            addr: (l8 as u64, l9 as u64),
+                                                            prefix: l10 as u8,
                                                         }
                                                     };
-                                                    IpNetwork::V6(e10)
+                                                    IpNetwork::V6(e11)
                                                 }
                                             };
-                                            v10
+                                            v11
                                         };
-                                        result11.push(e11);
+                                        result12.push(e12);
                                     }
-                                    _rt::cabi_dealloc(base11, len11 * 32, 8);
-                                    result11
+                                    _rt::cabi_dealloc(base12, len12 * 32, 8);
+                                    result12
                                 };
                                 Some(e)
                             }
                             _ => _rt::invalid_enum_discriminant(),
-                        }
+                        };
+                        result13
                     }
                 }
             }
             impl Value {
                 #[allow(unused_unsafe, clippy::all)]
                 /// Create a null value with the provided type info.
+                #[allow(async_fn_in_trait)]
                 pub fn null(tyinfo: TypeInfo) -> Value {
                     unsafe {
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.5.0")]
-                        extern "C" {
+                        #[link(wasm_import_module = "durable:core/sql@2.7.0")]
+                        unsafe extern "C" {
                             #[link_name = "[static]value.null"]
-                            fn wit_import(_: i32) -> i32;
+                            fn wit_import0(_: i32) -> i32;
                         }
                         #[cfg(not(target_arch = "wasm32"))]
-                        fn wit_import(_: i32) -> i32 {
+                        unsafe extern "C" fn wit_import0(_: i32) -> i32 {
                             unreachable!()
                         }
-                        let ret = wit_import((&tyinfo).take_handle() as i32);
+                        let ret = wit_import0((&tyinfo).take_handle() as i32);
                         Value::from_handle(ret as u32)
                     }
                 }
             }
             impl Value {
                 #[allow(unused_unsafe, clippy::all)]
+                #[allow(async_fn_in_trait)]
                 pub fn boolean(value: bool) -> Value {
                     unsafe {
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.5.0")]
-                        extern "C" {
+                        #[link(wasm_import_module = "durable:core/sql@2.7.0")]
+                        unsafe extern "C" {
                             #[link_name = "[static]value.boolean"]
-                            fn wit_import(_: i32) -> i32;
+                            fn wit_import0(_: i32) -> i32;
                         }
                         #[cfg(not(target_arch = "wasm32"))]
-                        fn wit_import(_: i32) -> i32 {
+                        unsafe extern "C" fn wit_import0(_: i32) -> i32 {
                             unreachable!()
                         }
-                        let ret = wit_import(
+                        let ret = wit_import0(
                             match &value {
                                 true => 1,
                                 false => 0,
@@ -2642,164 +3034,173 @@ pub mod durable {
             }
             impl Value {
                 #[allow(unused_unsafe, clippy::all)]
+                #[allow(async_fn_in_trait)]
                 pub fn float4(value: f32) -> Value {
                     unsafe {
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.5.0")]
-                        extern "C" {
+                        #[link(wasm_import_module = "durable:core/sql@2.7.0")]
+                        unsafe extern "C" {
                             #[link_name = "[static]value.float4"]
-                            fn wit_import(_: f32) -> i32;
+                            fn wit_import0(_: f32) -> i32;
                         }
                         #[cfg(not(target_arch = "wasm32"))]
-                        fn wit_import(_: f32) -> i32 {
+                        unsafe extern "C" fn wit_import0(_: f32) -> i32 {
                             unreachable!()
                         }
-                        let ret = wit_import(_rt::as_f32(&value));
+                        let ret = wit_import0(_rt::as_f32(&value));
                         Value::from_handle(ret as u32)
                     }
                 }
             }
             impl Value {
                 #[allow(unused_unsafe, clippy::all)]
+                #[allow(async_fn_in_trait)]
                 pub fn float8(value: f64) -> Value {
                     unsafe {
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.5.0")]
-                        extern "C" {
+                        #[link(wasm_import_module = "durable:core/sql@2.7.0")]
+                        unsafe extern "C" {
                             #[link_name = "[static]value.float8"]
-                            fn wit_import(_: f64) -> i32;
+                            fn wit_import0(_: f64) -> i32;
                         }
                         #[cfg(not(target_arch = "wasm32"))]
-                        fn wit_import(_: f64) -> i32 {
+                        unsafe extern "C" fn wit_import0(_: f64) -> i32 {
                             unreachable!()
                         }
-                        let ret = wit_import(_rt::as_f64(&value));
+                        let ret = wit_import0(_rt::as_f64(&value));
                         Value::from_handle(ret as u32)
                     }
                 }
             }
             impl Value {
                 #[allow(unused_unsafe, clippy::all)]
+                #[allow(async_fn_in_trait)]
                 pub fn int1(value: i8) -> Value {
                     unsafe {
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.5.0")]
-                        extern "C" {
+                        #[link(wasm_import_module = "durable:core/sql@2.7.0")]
+                        unsafe extern "C" {
                             #[link_name = "[static]value.int1"]
-                            fn wit_import(_: i32) -> i32;
+                            fn wit_import0(_: i32) -> i32;
                         }
                         #[cfg(not(target_arch = "wasm32"))]
-                        fn wit_import(_: i32) -> i32 {
+                        unsafe extern "C" fn wit_import0(_: i32) -> i32 {
                             unreachable!()
                         }
-                        let ret = wit_import(_rt::as_i32(&value));
+                        let ret = wit_import0(_rt::as_i32(&value));
                         Value::from_handle(ret as u32)
                     }
                 }
             }
             impl Value {
                 #[allow(unused_unsafe, clippy::all)]
+                #[allow(async_fn_in_trait)]
                 pub fn int2(value: i16) -> Value {
                     unsafe {
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.5.0")]
-                        extern "C" {
+                        #[link(wasm_import_module = "durable:core/sql@2.7.0")]
+                        unsafe extern "C" {
                             #[link_name = "[static]value.int2"]
-                            fn wit_import(_: i32) -> i32;
+                            fn wit_import0(_: i32) -> i32;
                         }
                         #[cfg(not(target_arch = "wasm32"))]
-                        fn wit_import(_: i32) -> i32 {
+                        unsafe extern "C" fn wit_import0(_: i32) -> i32 {
                             unreachable!()
                         }
-                        let ret = wit_import(_rt::as_i32(&value));
+                        let ret = wit_import0(_rt::as_i32(&value));
                         Value::from_handle(ret as u32)
                     }
                 }
             }
             impl Value {
                 #[allow(unused_unsafe, clippy::all)]
+                #[allow(async_fn_in_trait)]
                 pub fn int4(value: i32) -> Value {
                     unsafe {
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.5.0")]
-                        extern "C" {
+                        #[link(wasm_import_module = "durable:core/sql@2.7.0")]
+                        unsafe extern "C" {
                             #[link_name = "[static]value.int4"]
-                            fn wit_import(_: i32) -> i32;
+                            fn wit_import0(_: i32) -> i32;
                         }
                         #[cfg(not(target_arch = "wasm32"))]
-                        fn wit_import(_: i32) -> i32 {
+                        unsafe extern "C" fn wit_import0(_: i32) -> i32 {
                             unreachable!()
                         }
-                        let ret = wit_import(_rt::as_i32(&value));
+                        let ret = wit_import0(_rt::as_i32(&value));
                         Value::from_handle(ret as u32)
                     }
                 }
             }
             impl Value {
                 #[allow(unused_unsafe, clippy::all)]
+                #[allow(async_fn_in_trait)]
                 pub fn int8(value: i64) -> Value {
                     unsafe {
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.5.0")]
-                        extern "C" {
+                        #[link(wasm_import_module = "durable:core/sql@2.7.0")]
+                        unsafe extern "C" {
                             #[link_name = "[static]value.int8"]
-                            fn wit_import(_: i64) -> i32;
+                            fn wit_import0(_: i64) -> i32;
                         }
                         #[cfg(not(target_arch = "wasm32"))]
-                        fn wit_import(_: i64) -> i32 {
+                        unsafe extern "C" fn wit_import0(_: i64) -> i32 {
                             unreachable!()
                         }
-                        let ret = wit_import(_rt::as_i64(&value));
+                        let ret = wit_import0(_rt::as_i64(&value));
                         Value::from_handle(ret as u32)
                     }
                 }
             }
             impl Value {
                 #[allow(unused_unsafe, clippy::all)]
+                #[allow(async_fn_in_trait)]
                 pub fn text(value: &str) -> Value {
                     unsafe {
                         let vec0 = value;
                         let ptr0 = vec0.as_ptr().cast::<u8>();
                         let len0 = vec0.len();
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.5.0")]
-                        extern "C" {
+                        #[link(wasm_import_module = "durable:core/sql@2.7.0")]
+                        unsafe extern "C" {
                             #[link_name = "[static]value.text"]
-                            fn wit_import(_: *mut u8, _: usize) -> i32;
+                            fn wit_import1(_: *mut u8, _: usize) -> i32;
                         }
                         #[cfg(not(target_arch = "wasm32"))]
-                        fn wit_import(_: *mut u8, _: usize) -> i32 {
+                        unsafe extern "C" fn wit_import1(_: *mut u8, _: usize) -> i32 {
                             unreachable!()
                         }
-                        let ret = wit_import(ptr0.cast_mut(), len0);
+                        let ret = wit_import1(ptr0.cast_mut(), len0);
                         Value::from_handle(ret as u32)
                     }
                 }
             }
             impl Value {
                 #[allow(unused_unsafe, clippy::all)]
+                #[allow(async_fn_in_trait)]
                 pub fn bytea(value: &[u8]) -> Value {
                     unsafe {
                         let vec0 = value;
                         let ptr0 = vec0.as_ptr().cast::<u8>();
                         let len0 = vec0.len();
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.5.0")]
-                        extern "C" {
+                        #[link(wasm_import_module = "durable:core/sql@2.7.0")]
+                        unsafe extern "C" {
                             #[link_name = "[static]value.bytea"]
-                            fn wit_import(_: *mut u8, _: usize) -> i32;
+                            fn wit_import1(_: *mut u8, _: usize) -> i32;
                         }
                         #[cfg(not(target_arch = "wasm32"))]
-                        fn wit_import(_: *mut u8, _: usize) -> i32 {
+                        unsafe extern "C" fn wit_import1(_: *mut u8, _: usize) -> i32 {
                             unreachable!()
                         }
-                        let ret = wit_import(ptr0.cast_mut(), len0);
+                        let ret = wit_import1(ptr0.cast_mut(), len0);
                         Value::from_handle(ret as u32)
                     }
                 }
             }
             impl Value {
                 #[allow(unused_unsafe, clippy::all)]
+                #[allow(async_fn_in_trait)]
                 pub fn timestamptz(value: Timestamptz) -> Value {
                     unsafe {
                         let Timestamptz {
@@ -2808,16 +3209,16 @@ pub mod durable {
                             offset: offset0,
                         } = value;
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.5.0")]
-                        extern "C" {
+                        #[link(wasm_import_module = "durable:core/sql@2.7.0")]
+                        unsafe extern "C" {
                             #[link_name = "[static]value.timestamptz"]
-                            fn wit_import(_: i64, _: i32, _: i32) -> i32;
+                            fn wit_import1(_: i64, _: i32, _: i32) -> i32;
                         }
                         #[cfg(not(target_arch = "wasm32"))]
-                        fn wit_import(_: i64, _: i32, _: i32) -> i32 {
+                        unsafe extern "C" fn wit_import1(_: i64, _: i32, _: i32) -> i32 {
                             unreachable!()
                         }
-                        let ret = wit_import(
+                        let ret = wit_import1(
                             _rt::as_i64(seconds0),
                             _rt::as_i32(subsec_nanos0),
                             _rt::as_i32(offset0),
@@ -2828,6 +3229,7 @@ pub mod durable {
             }
             impl Value {
                 #[allow(unused_unsafe, clippy::all)]
+                #[allow(async_fn_in_trait)]
                 pub fn timestamp(value: Timestamp) -> Value {
                     unsafe {
                         let Timestamp {
@@ -2835,16 +3237,16 @@ pub mod durable {
                             subsec_nanos: subsec_nanos0,
                         } = value;
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.5.0")]
-                        extern "C" {
+                        #[link(wasm_import_module = "durable:core/sql@2.7.0")]
+                        unsafe extern "C" {
                             #[link_name = "[static]value.timestamp"]
-                            fn wit_import(_: i64, _: i32) -> i32;
+                            fn wit_import1(_: i64, _: i32) -> i32;
                         }
                         #[cfg(not(target_arch = "wasm32"))]
-                        fn wit_import(_: i64, _: i32) -> i32 {
+                        unsafe extern "C" fn wit_import1(_: i64, _: i32) -> i32 {
                             unreachable!()
                         }
-                        let ret = wit_import(
+                        let ret = wit_import1(
                             _rt::as_i64(seconds0),
                             _rt::as_i32(subsec_nanos0),
                         );
@@ -2854,54 +3256,63 @@ pub mod durable {
             }
             impl Value {
                 #[allow(unused_unsafe, clippy::all)]
+                #[allow(async_fn_in_trait)]
                 pub fn uuid(value: Uuid) -> Value {
                     unsafe {
                         let Uuid { hi: hi0, lo: lo0 } = value;
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.5.0")]
-                        extern "C" {
+                        #[link(wasm_import_module = "durable:core/sql@2.7.0")]
+                        unsafe extern "C" {
                             #[link_name = "[static]value.uuid"]
-                            fn wit_import(_: i64, _: i64) -> i32;
+                            fn wit_import1(_: i64, _: i64) -> i32;
                         }
                         #[cfg(not(target_arch = "wasm32"))]
-                        fn wit_import(_: i64, _: i64) -> i32 {
+                        unsafe extern "C" fn wit_import1(_: i64, _: i64) -> i32 {
                             unreachable!()
                         }
-                        let ret = wit_import(_rt::as_i64(hi0), _rt::as_i64(lo0));
+                        let ret = wit_import1(_rt::as_i64(hi0), _rt::as_i64(lo0));
                         Value::from_handle(ret as u32)
                     }
                 }
             }
             impl Value {
                 #[allow(unused_unsafe, clippy::all)]
+                #[allow(async_fn_in_trait)]
                 pub fn jsonb(value: &str) -> Value {
                     unsafe {
                         let vec0 = value;
                         let ptr0 = vec0.as_ptr().cast::<u8>();
                         let len0 = vec0.len();
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.5.0")]
-                        extern "C" {
+                        #[link(wasm_import_module = "durable:core/sql@2.7.0")]
+                        unsafe extern "C" {
                             #[link_name = "[static]value.jsonb"]
-                            fn wit_import(_: *mut u8, _: usize) -> i32;
+                            fn wit_import1(_: *mut u8, _: usize) -> i32;
                         }
                         #[cfg(not(target_arch = "wasm32"))]
-                        fn wit_import(_: *mut u8, _: usize) -> i32 {
+                        unsafe extern "C" fn wit_import1(_: *mut u8, _: usize) -> i32 {
                             unreachable!()
                         }
-                        let ret = wit_import(ptr0.cast_mut(), len0);
+                        let ret = wit_import1(ptr0.cast_mut(), len0);
                         Value::from_handle(ret as u32)
                     }
                 }
             }
             impl Value {
                 #[allow(unused_unsafe, clippy::all)]
+                #[allow(async_fn_in_trait)]
                 pub fn inet(value: IpNetwork) -> Result<Value, _rt::String> {
                     unsafe {
-                        #[repr(align(4))]
-                        struct RetArea([::core::mem::MaybeUninit<u8>; 12]);
+                        #[cfg_attr(target_pointer_width = "64", repr(align(8)))]
+                        #[cfg_attr(target_pointer_width = "32", repr(align(4)))]
+                        struct RetArea(
+                            [::core::mem::MaybeUninit<
+                                u8,
+                            >; 3 * ::core::mem::size_of::<*const u8>()],
+                        );
                         let mut ret_area = RetArea(
-                            [::core::mem::MaybeUninit::uninit(); 12],
+                            [::core::mem::MaybeUninit::uninit(); 3
+                                * ::core::mem::size_of::<*const u8>()],
                         );
                         let (result3_0, result3_1, result3_2, result3_3) = match value {
                             IpNetwork::V4(e) => {
@@ -2926,62 +3337,80 @@ pub mod durable {
                         };
                         let ptr4 = ret_area.0.as_mut_ptr().cast::<u8>();
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.5.0")]
-                        extern "C" {
+                        #[link(wasm_import_module = "durable:core/sql@2.7.0")]
+                        unsafe extern "C" {
                             #[link_name = "[static]value.inet"]
-                            fn wit_import(_: i32, _: i64, _: i64, _: i32, _: *mut u8);
+                            fn wit_import5(_: i32, _: i64, _: i64, _: i32, _: *mut u8);
                         }
                         #[cfg(not(target_arch = "wasm32"))]
-                        fn wit_import(_: i32, _: i64, _: i64, _: i32, _: *mut u8) {
+                        unsafe extern "C" fn wit_import5(
+                            _: i32,
+                            _: i64,
+                            _: i64,
+                            _: i32,
+                            _: *mut u8,
+                        ) {
                             unreachable!()
                         }
-                        wit_import(result3_0, result3_1, result3_2, result3_3, ptr4);
-                        let l5 = i32::from(*ptr4.add(0).cast::<u8>());
-                        match l5 {
+                        wit_import5(result3_0, result3_1, result3_2, result3_3, ptr4);
+                        let l6 = i32::from(*ptr4.add(0).cast::<u8>());
+                        let result11 = match l6 {
                             0 => {
                                 let e = {
-                                    let l6 = *ptr4.add(4).cast::<i32>();
-                                    Value::from_handle(l6 as u32)
+                                    let l7 = *ptr4
+                                        .add(::core::mem::size_of::<*const u8>())
+                                        .cast::<i32>();
+                                    Value::from_handle(l7 as u32)
                                 };
                                 Ok(e)
                             }
                             1 => {
                                 let e = {
-                                    let l7 = *ptr4.add(4).cast::<*mut u8>();
-                                    let l8 = *ptr4.add(8).cast::<usize>();
-                                    let len9 = l8;
-                                    let bytes9 = _rt::Vec::from_raw_parts(
-                                        l7.cast(),
-                                        len9,
-                                        len9,
+                                    let l8 = *ptr4
+                                        .add(::core::mem::size_of::<*const u8>())
+                                        .cast::<*mut u8>();
+                                    let l9 = *ptr4
+                                        .add(2 * ::core::mem::size_of::<*const u8>())
+                                        .cast::<usize>();
+                                    let len10 = l9;
+                                    let bytes10 = _rt::Vec::from_raw_parts(
+                                        l8.cast(),
+                                        len10,
+                                        len10,
                                     );
-                                    _rt::string_lift(bytes9)
+                                    _rt::string_lift(bytes10)
                                 };
                                 Err(e)
                             }
                             _ => _rt::invalid_enum_discriminant(),
-                        }
+                        };
+                        result11
                     }
                 }
             }
             impl Value {
                 #[allow(unused_unsafe, clippy::all)]
+                #[allow(async_fn_in_trait)]
                 pub fn enum_value(value: &str, tyinfo: &TypeInfo) -> Value {
                     unsafe {
                         let vec0 = value;
                         let ptr0 = vec0.as_ptr().cast::<u8>();
                         let len0 = vec0.len();
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.5.0")]
-                        extern "C" {
+                        #[link(wasm_import_module = "durable:core/sql@2.7.0")]
+                        unsafe extern "C" {
                             #[link_name = "[static]value.enum-value"]
-                            fn wit_import(_: *mut u8, _: usize, _: i32) -> i32;
+                            fn wit_import1(_: *mut u8, _: usize, _: i32) -> i32;
                         }
                         #[cfg(not(target_arch = "wasm32"))]
-                        fn wit_import(_: *mut u8, _: usize, _: i32) -> i32 {
+                        unsafe extern "C" fn wit_import1(
+                            _: *mut u8,
+                            _: usize,
+                            _: i32,
+                        ) -> i32 {
                             unreachable!()
                         }
-                        let ret = wit_import(
+                        let ret = wit_import1(
                             ptr0.cast_mut(),
                             len0,
                             (tyinfo).handle() as i32,
@@ -2992,23 +3421,17 @@ pub mod durable {
             }
             impl Value {
                 #[allow(unused_unsafe, clippy::all)]
+                #[allow(async_fn_in_trait)]
                 pub fn boolean_array(value: &[bool]) -> Value {
                     unsafe {
                         let vec0 = value;
                         let len0 = vec0.len();
-                        let layout0 = _rt::alloc::Layout::from_size_align_unchecked(
-                            vec0.len() * 1,
-                            1,
-                        );
-                        let result0 = if layout0.size() != 0 {
-                            let ptr = _rt::alloc::alloc(layout0).cast::<u8>();
-                            if ptr.is_null() {
-                                _rt::alloc::handle_alloc_error(layout0);
-                            }
-                            ptr
-                        } else {
-                            { ::core::ptr::null_mut() }
-                        };
+                        let layout0 = _rt::alloc::Layout::from_size_align(
+                                vec0.len() * 1,
+                                1,
+                            )
+                            .unwrap();
+                        let (result0, _cleanup0) = wit_bindgen_rt::Cleanup::new(layout0);
                         for (i, e) in vec0.into_iter().enumerate() {
                             let base = result0.add(i * 1);
                             {
@@ -3019,386 +3442,374 @@ pub mod durable {
                             }
                         }
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.5.0")]
-                        extern "C" {
+                        #[link(wasm_import_module = "durable:core/sql@2.7.0")]
+                        unsafe extern "C" {
                             #[link_name = "[static]value.boolean-array"]
-                            fn wit_import(_: *mut u8, _: usize) -> i32;
+                            fn wit_import1(_: *mut u8, _: usize) -> i32;
                         }
                         #[cfg(not(target_arch = "wasm32"))]
-                        fn wit_import(_: *mut u8, _: usize) -> i32 {
+                        unsafe extern "C" fn wit_import1(_: *mut u8, _: usize) -> i32 {
                             unreachable!()
                         }
-                        let ret = wit_import(result0, len0);
-                        if layout0.size() != 0 {
-                            _rt::alloc::dealloc(result0.cast(), layout0);
-                        }
+                        let ret = wit_import1(result0, len0);
                         Value::from_handle(ret as u32)
                     }
                 }
             }
             impl Value {
                 #[allow(unused_unsafe, clippy::all)]
+                #[allow(async_fn_in_trait)]
                 pub fn float4_array(value: &[f32]) -> Value {
                     unsafe {
                         let vec0 = value;
                         let ptr0 = vec0.as_ptr().cast::<u8>();
                         let len0 = vec0.len();
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.5.0")]
-                        extern "C" {
+                        #[link(wasm_import_module = "durable:core/sql@2.7.0")]
+                        unsafe extern "C" {
                             #[link_name = "[static]value.float4-array"]
-                            fn wit_import(_: *mut u8, _: usize) -> i32;
+                            fn wit_import1(_: *mut u8, _: usize) -> i32;
                         }
                         #[cfg(not(target_arch = "wasm32"))]
-                        fn wit_import(_: *mut u8, _: usize) -> i32 {
+                        unsafe extern "C" fn wit_import1(_: *mut u8, _: usize) -> i32 {
                             unreachable!()
                         }
-                        let ret = wit_import(ptr0.cast_mut(), len0);
+                        let ret = wit_import1(ptr0.cast_mut(), len0);
                         Value::from_handle(ret as u32)
                     }
                 }
             }
             impl Value {
                 #[allow(unused_unsafe, clippy::all)]
+                #[allow(async_fn_in_trait)]
                 pub fn float8_array(value: &[f64]) -> Value {
                     unsafe {
                         let vec0 = value;
                         let ptr0 = vec0.as_ptr().cast::<u8>();
                         let len0 = vec0.len();
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.5.0")]
-                        extern "C" {
+                        #[link(wasm_import_module = "durable:core/sql@2.7.0")]
+                        unsafe extern "C" {
                             #[link_name = "[static]value.float8-array"]
-                            fn wit_import(_: *mut u8, _: usize) -> i32;
+                            fn wit_import1(_: *mut u8, _: usize) -> i32;
                         }
                         #[cfg(not(target_arch = "wasm32"))]
-                        fn wit_import(_: *mut u8, _: usize) -> i32 {
+                        unsafe extern "C" fn wit_import1(_: *mut u8, _: usize) -> i32 {
                             unreachable!()
                         }
-                        let ret = wit_import(ptr0.cast_mut(), len0);
+                        let ret = wit_import1(ptr0.cast_mut(), len0);
                         Value::from_handle(ret as u32)
                     }
                 }
             }
             impl Value {
                 #[allow(unused_unsafe, clippy::all)]
+                #[allow(async_fn_in_trait)]
                 pub fn int1_array(value: &[i8]) -> Value {
                     unsafe {
                         let vec0 = value;
                         let ptr0 = vec0.as_ptr().cast::<u8>();
                         let len0 = vec0.len();
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.5.0")]
-                        extern "C" {
+                        #[link(wasm_import_module = "durable:core/sql@2.7.0")]
+                        unsafe extern "C" {
                             #[link_name = "[static]value.int1-array"]
-                            fn wit_import(_: *mut u8, _: usize) -> i32;
+                            fn wit_import1(_: *mut u8, _: usize) -> i32;
                         }
                         #[cfg(not(target_arch = "wasm32"))]
-                        fn wit_import(_: *mut u8, _: usize) -> i32 {
+                        unsafe extern "C" fn wit_import1(_: *mut u8, _: usize) -> i32 {
                             unreachable!()
                         }
-                        let ret = wit_import(ptr0.cast_mut(), len0);
+                        let ret = wit_import1(ptr0.cast_mut(), len0);
                         Value::from_handle(ret as u32)
                     }
                 }
             }
             impl Value {
                 #[allow(unused_unsafe, clippy::all)]
+                #[allow(async_fn_in_trait)]
                 pub fn int2_array(value: &[i16]) -> Value {
                     unsafe {
                         let vec0 = value;
                         let ptr0 = vec0.as_ptr().cast::<u8>();
                         let len0 = vec0.len();
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.5.0")]
-                        extern "C" {
+                        #[link(wasm_import_module = "durable:core/sql@2.7.0")]
+                        unsafe extern "C" {
                             #[link_name = "[static]value.int2-array"]
-                            fn wit_import(_: *mut u8, _: usize) -> i32;
+                            fn wit_import1(_: *mut u8, _: usize) -> i32;
                         }
                         #[cfg(not(target_arch = "wasm32"))]
-                        fn wit_import(_: *mut u8, _: usize) -> i32 {
+                        unsafe extern "C" fn wit_import1(_: *mut u8, _: usize) -> i32 {
                             unreachable!()
                         }
-                        let ret = wit_import(ptr0.cast_mut(), len0);
+                        let ret = wit_import1(ptr0.cast_mut(), len0);
                         Value::from_handle(ret as u32)
                     }
                 }
             }
             impl Value {
                 #[allow(unused_unsafe, clippy::all)]
+                #[allow(async_fn_in_trait)]
                 pub fn int4_array(value: &[i32]) -> Value {
                     unsafe {
                         let vec0 = value;
                         let ptr0 = vec0.as_ptr().cast::<u8>();
                         let len0 = vec0.len();
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.5.0")]
-                        extern "C" {
+                        #[link(wasm_import_module = "durable:core/sql@2.7.0")]
+                        unsafe extern "C" {
                             #[link_name = "[static]value.int4-array"]
-                            fn wit_import(_: *mut u8, _: usize) -> i32;
+                            fn wit_import1(_: *mut u8, _: usize) -> i32;
                         }
                         #[cfg(not(target_arch = "wasm32"))]
-                        fn wit_import(_: *mut u8, _: usize) -> i32 {
+                        unsafe extern "C" fn wit_import1(_: *mut u8, _: usize) -> i32 {
                             unreachable!()
                         }
-                        let ret = wit_import(ptr0.cast_mut(), len0);
+                        let ret = wit_import1(ptr0.cast_mut(), len0);
                         Value::from_handle(ret as u32)
                     }
                 }
             }
             impl Value {
                 #[allow(unused_unsafe, clippy::all)]
+                #[allow(async_fn_in_trait)]
                 pub fn int8_array(value: &[i64]) -> Value {
                     unsafe {
                         let vec0 = value;
                         let ptr0 = vec0.as_ptr().cast::<u8>();
                         let len0 = vec0.len();
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.5.0")]
-                        extern "C" {
+                        #[link(wasm_import_module = "durable:core/sql@2.7.0")]
+                        unsafe extern "C" {
                             #[link_name = "[static]value.int8-array"]
-                            fn wit_import(_: *mut u8, _: usize) -> i32;
+                            fn wit_import1(_: *mut u8, _: usize) -> i32;
                         }
                         #[cfg(not(target_arch = "wasm32"))]
-                        fn wit_import(_: *mut u8, _: usize) -> i32 {
+                        unsafe extern "C" fn wit_import1(_: *mut u8, _: usize) -> i32 {
                             unreachable!()
                         }
-                        let ret = wit_import(ptr0.cast_mut(), len0);
+                        let ret = wit_import1(ptr0.cast_mut(), len0);
                         Value::from_handle(ret as u32)
                     }
                 }
             }
             impl Value {
                 #[allow(unused_unsafe, clippy::all)]
+                #[allow(async_fn_in_trait)]
                 pub fn text_array(value: &[&str]) -> Value {
                     unsafe {
                         let vec1 = value;
                         let len1 = vec1.len();
-                        let layout1 = _rt::alloc::Layout::from_size_align_unchecked(
-                            vec1.len() * 8,
-                            4,
-                        );
-                        let result1 = if layout1.size() != 0 {
-                            let ptr = _rt::alloc::alloc(layout1).cast::<u8>();
-                            if ptr.is_null() {
-                                _rt::alloc::handle_alloc_error(layout1);
-                            }
-                            ptr
-                        } else {
-                            { ::core::ptr::null_mut() }
-                        };
+                        let layout1 = _rt::alloc::Layout::from_size_align(
+                                vec1.len() * (2 * ::core::mem::size_of::<*const u8>()),
+                                ::core::mem::size_of::<*const u8>(),
+                            )
+                            .unwrap();
+                        let (result1, _cleanup1) = wit_bindgen_rt::Cleanup::new(layout1);
                         for (i, e) in vec1.into_iter().enumerate() {
-                            let base = result1.add(i * 8);
+                            let base = result1
+                                .add(i * (2 * ::core::mem::size_of::<*const u8>()));
                             {
                                 let vec0 = e;
                                 let ptr0 = vec0.as_ptr().cast::<u8>();
                                 let len0 = vec0.len();
-                                *base.add(4).cast::<usize>() = len0;
+                                *base
+                                    .add(::core::mem::size_of::<*const u8>())
+                                    .cast::<usize>() = len0;
                                 *base.add(0).cast::<*mut u8>() = ptr0.cast_mut();
                             }
                         }
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.5.0")]
-                        extern "C" {
+                        #[link(wasm_import_module = "durable:core/sql@2.7.0")]
+                        unsafe extern "C" {
                             #[link_name = "[static]value.text-array"]
-                            fn wit_import(_: *mut u8, _: usize) -> i32;
+                            fn wit_import2(_: *mut u8, _: usize) -> i32;
                         }
                         #[cfg(not(target_arch = "wasm32"))]
-                        fn wit_import(_: *mut u8, _: usize) -> i32 {
+                        unsafe extern "C" fn wit_import2(_: *mut u8, _: usize) -> i32 {
                             unreachable!()
                         }
-                        let ret = wit_import(result1, len1);
-                        if layout1.size() != 0 {
-                            _rt::alloc::dealloc(result1.cast(), layout1);
-                        }
+                        let ret = wit_import2(result1, len1);
                         Value::from_handle(ret as u32)
                     }
                 }
             }
             impl Value {
                 #[allow(unused_unsafe, clippy::all)]
+                #[allow(async_fn_in_trait)]
                 pub fn bytea_array(value: &[&[u8]]) -> Value {
                     unsafe {
                         let vec1 = value;
                         let len1 = vec1.len();
-                        let layout1 = _rt::alloc::Layout::from_size_align_unchecked(
-                            vec1.len() * 8,
-                            4,
-                        );
-                        let result1 = if layout1.size() != 0 {
-                            let ptr = _rt::alloc::alloc(layout1).cast::<u8>();
-                            if ptr.is_null() {
-                                _rt::alloc::handle_alloc_error(layout1);
-                            }
-                            ptr
-                        } else {
-                            { ::core::ptr::null_mut() }
-                        };
+                        let layout1 = _rt::alloc::Layout::from_size_align(
+                                vec1.len() * (2 * ::core::mem::size_of::<*const u8>()),
+                                ::core::mem::size_of::<*const u8>(),
+                            )
+                            .unwrap();
+                        let (result1, _cleanup1) = wit_bindgen_rt::Cleanup::new(layout1);
                         for (i, e) in vec1.into_iter().enumerate() {
-                            let base = result1.add(i * 8);
+                            let base = result1
+                                .add(i * (2 * ::core::mem::size_of::<*const u8>()));
                             {
                                 let vec0 = e;
                                 let ptr0 = vec0.as_ptr().cast::<u8>();
                                 let len0 = vec0.len();
-                                *base.add(4).cast::<usize>() = len0;
+                                *base
+                                    .add(::core::mem::size_of::<*const u8>())
+                                    .cast::<usize>() = len0;
                                 *base.add(0).cast::<*mut u8>() = ptr0.cast_mut();
                             }
                         }
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.5.0")]
-                        extern "C" {
+                        #[link(wasm_import_module = "durable:core/sql@2.7.0")]
+                        unsafe extern "C" {
                             #[link_name = "[static]value.bytea-array"]
-                            fn wit_import(_: *mut u8, _: usize) -> i32;
+                            fn wit_import2(_: *mut u8, _: usize) -> i32;
                         }
                         #[cfg(not(target_arch = "wasm32"))]
-                        fn wit_import(_: *mut u8, _: usize) -> i32 {
+                        unsafe extern "C" fn wit_import2(_: *mut u8, _: usize) -> i32 {
                             unreachable!()
                         }
-                        let ret = wit_import(result1, len1);
-                        if layout1.size() != 0 {
-                            _rt::alloc::dealloc(result1.cast(), layout1);
-                        }
+                        let ret = wit_import2(result1, len1);
                         Value::from_handle(ret as u32)
                     }
                 }
             }
             impl Value {
                 #[allow(unused_unsafe, clippy::all)]
+                #[allow(async_fn_in_trait)]
                 pub fn timestamptz_array(value: &[Timestamptz]) -> Value {
                     unsafe {
                         let vec0 = value;
                         let ptr0 = vec0.as_ptr().cast::<u8>();
                         let len0 = vec0.len();
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.5.0")]
-                        extern "C" {
+                        #[link(wasm_import_module = "durable:core/sql@2.7.0")]
+                        unsafe extern "C" {
                             #[link_name = "[static]value.timestamptz-array"]
-                            fn wit_import(_: *mut u8, _: usize) -> i32;
+                            fn wit_import1(_: *mut u8, _: usize) -> i32;
                         }
                         #[cfg(not(target_arch = "wasm32"))]
-                        fn wit_import(_: *mut u8, _: usize) -> i32 {
+                        unsafe extern "C" fn wit_import1(_: *mut u8, _: usize) -> i32 {
                             unreachable!()
                         }
-                        let ret = wit_import(ptr0.cast_mut(), len0);
+                        let ret = wit_import1(ptr0.cast_mut(), len0);
                         Value::from_handle(ret as u32)
                     }
                 }
             }
             impl Value {
                 #[allow(unused_unsafe, clippy::all)]
+                #[allow(async_fn_in_trait)]
                 pub fn timestamp_array(value: &[Timestamp]) -> Value {
                     unsafe {
                         let vec0 = value;
                         let ptr0 = vec0.as_ptr().cast::<u8>();
                         let len0 = vec0.len();
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.5.0")]
-                        extern "C" {
+                        #[link(wasm_import_module = "durable:core/sql@2.7.0")]
+                        unsafe extern "C" {
                             #[link_name = "[static]value.timestamp-array"]
-                            fn wit_import(_: *mut u8, _: usize) -> i32;
+                            fn wit_import1(_: *mut u8, _: usize) -> i32;
                         }
                         #[cfg(not(target_arch = "wasm32"))]
-                        fn wit_import(_: *mut u8, _: usize) -> i32 {
+                        unsafe extern "C" fn wit_import1(_: *mut u8, _: usize) -> i32 {
                             unreachable!()
                         }
-                        let ret = wit_import(ptr0.cast_mut(), len0);
+                        let ret = wit_import1(ptr0.cast_mut(), len0);
                         Value::from_handle(ret as u32)
                     }
                 }
             }
             impl Value {
                 #[allow(unused_unsafe, clippy::all)]
+                #[allow(async_fn_in_trait)]
                 pub fn uuid_array(value: &[Uuid]) -> Value {
                     unsafe {
                         let vec0 = value;
                         let ptr0 = vec0.as_ptr().cast::<u8>();
                         let len0 = vec0.len();
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.5.0")]
-                        extern "C" {
+                        #[link(wasm_import_module = "durable:core/sql@2.7.0")]
+                        unsafe extern "C" {
                             #[link_name = "[static]value.uuid-array"]
-                            fn wit_import(_: *mut u8, _: usize) -> i32;
+                            fn wit_import1(_: *mut u8, _: usize) -> i32;
                         }
                         #[cfg(not(target_arch = "wasm32"))]
-                        fn wit_import(_: *mut u8, _: usize) -> i32 {
+                        unsafe extern "C" fn wit_import1(_: *mut u8, _: usize) -> i32 {
                             unreachable!()
                         }
-                        let ret = wit_import(ptr0.cast_mut(), len0);
+                        let ret = wit_import1(ptr0.cast_mut(), len0);
                         Value::from_handle(ret as u32)
                     }
                 }
             }
             impl Value {
                 #[allow(unused_unsafe, clippy::all)]
+                #[allow(async_fn_in_trait)]
                 pub fn jsonb_array(value: &[&str]) -> Value {
                     unsafe {
                         let vec1 = value;
                         let len1 = vec1.len();
-                        let layout1 = _rt::alloc::Layout::from_size_align_unchecked(
-                            vec1.len() * 8,
-                            4,
-                        );
-                        let result1 = if layout1.size() != 0 {
-                            let ptr = _rt::alloc::alloc(layout1).cast::<u8>();
-                            if ptr.is_null() {
-                                _rt::alloc::handle_alloc_error(layout1);
-                            }
-                            ptr
-                        } else {
-                            { ::core::ptr::null_mut() }
-                        };
+                        let layout1 = _rt::alloc::Layout::from_size_align(
+                                vec1.len() * (2 * ::core::mem::size_of::<*const u8>()),
+                                ::core::mem::size_of::<*const u8>(),
+                            )
+                            .unwrap();
+                        let (result1, _cleanup1) = wit_bindgen_rt::Cleanup::new(layout1);
                         for (i, e) in vec1.into_iter().enumerate() {
-                            let base = result1.add(i * 8);
+                            let base = result1
+                                .add(i * (2 * ::core::mem::size_of::<*const u8>()));
                             {
                                 let vec0 = e;
                                 let ptr0 = vec0.as_ptr().cast::<u8>();
                                 let len0 = vec0.len();
-                                *base.add(4).cast::<usize>() = len0;
+                                *base
+                                    .add(::core::mem::size_of::<*const u8>())
+                                    .cast::<usize>() = len0;
                                 *base.add(0).cast::<*mut u8>() = ptr0.cast_mut();
                             }
                         }
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.5.0")]
-                        extern "C" {
+                        #[link(wasm_import_module = "durable:core/sql@2.7.0")]
+                        unsafe extern "C" {
                             #[link_name = "[static]value.jsonb-array"]
-                            fn wit_import(_: *mut u8, _: usize) -> i32;
+                            fn wit_import2(_: *mut u8, _: usize) -> i32;
                         }
                         #[cfg(not(target_arch = "wasm32"))]
-                        fn wit_import(_: *mut u8, _: usize) -> i32 {
+                        unsafe extern "C" fn wit_import2(_: *mut u8, _: usize) -> i32 {
                             unreachable!()
                         }
-                        let ret = wit_import(result1, len1);
-                        if layout1.size() != 0 {
-                            _rt::alloc::dealloc(result1.cast(), layout1);
-                        }
+                        let ret = wit_import2(result1, len1);
                         Value::from_handle(ret as u32)
                     }
                 }
             }
             impl Value {
                 #[allow(unused_unsafe, clippy::all)]
+                #[allow(async_fn_in_trait)]
                 pub fn inet_array(value: &[IpNetwork]) -> Result<Value, _rt::String> {
                     unsafe {
-                        #[repr(align(4))]
-                        struct RetArea([::core::mem::MaybeUninit<u8>; 12]);
+                        #[cfg_attr(target_pointer_width = "64", repr(align(8)))]
+                        #[cfg_attr(target_pointer_width = "32", repr(align(4)))]
+                        struct RetArea(
+                            [::core::mem::MaybeUninit<
+                                u8,
+                            >; 3 * ::core::mem::size_of::<*const u8>()],
+                        );
                         let mut ret_area = RetArea(
-                            [::core::mem::MaybeUninit::uninit(); 12],
+                            [::core::mem::MaybeUninit::uninit(); 3
+                                * ::core::mem::size_of::<*const u8>()],
                         );
                         let vec3 = value;
                         let len3 = vec3.len();
-                        let layout3 = _rt::alloc::Layout::from_size_align_unchecked(
-                            vec3.len() * 32,
-                            8,
-                        );
-                        let result3 = if layout3.size() != 0 {
-                            let ptr = _rt::alloc::alloc(layout3).cast::<u8>();
-                            if ptr.is_null() {
-                                _rt::alloc::handle_alloc_error(layout3);
-                            }
-                            ptr
-                        } else {
-                            { ::core::ptr::null_mut() }
-                        };
+                        let layout3 = _rt::alloc::Layout::from_size_align(
+                                vec3.len() * 32,
+                                8,
+                            )
+                            .unwrap();
+                        let (result3, _cleanup3) = wit_bindgen_rt::Cleanup::new(layout3);
                         for (i, e) in vec3.into_iter().enumerate() {
                             let base = result3.add(i * 32);
                             {
@@ -3422,90 +3833,96 @@ pub mod durable {
                         }
                         let ptr4 = ret_area.0.as_mut_ptr().cast::<u8>();
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.5.0")]
-                        extern "C" {
+                        #[link(wasm_import_module = "durable:core/sql@2.7.0")]
+                        unsafe extern "C" {
                             #[link_name = "[static]value.inet-array"]
-                            fn wit_import(_: *mut u8, _: usize, _: *mut u8);
+                            fn wit_import5(_: *mut u8, _: usize, _: *mut u8);
                         }
                         #[cfg(not(target_arch = "wasm32"))]
-                        fn wit_import(_: *mut u8, _: usize, _: *mut u8) {
+                        unsafe extern "C" fn wit_import5(
+                            _: *mut u8,
+                            _: usize,
+                            _: *mut u8,
+                        ) {
                             unreachable!()
                         }
-                        wit_import(result3, len3, ptr4);
-                        let l5 = i32::from(*ptr4.add(0).cast::<u8>());
-                        if layout3.size() != 0 {
-                            _rt::alloc::dealloc(result3.cast(), layout3);
-                        }
-                        match l5 {
+                        wit_import5(result3, len3, ptr4);
+                        let l6 = i32::from(*ptr4.add(0).cast::<u8>());
+                        let result11 = match l6 {
                             0 => {
                                 let e = {
-                                    let l6 = *ptr4.add(4).cast::<i32>();
-                                    Value::from_handle(l6 as u32)
+                                    let l7 = *ptr4
+                                        .add(::core::mem::size_of::<*const u8>())
+                                        .cast::<i32>();
+                                    Value::from_handle(l7 as u32)
                                 };
                                 Ok(e)
                             }
                             1 => {
                                 let e = {
-                                    let l7 = *ptr4.add(4).cast::<*mut u8>();
-                                    let l8 = *ptr4.add(8).cast::<usize>();
-                                    let len9 = l8;
-                                    let bytes9 = _rt::Vec::from_raw_parts(
-                                        l7.cast(),
-                                        len9,
-                                        len9,
+                                    let l8 = *ptr4
+                                        .add(::core::mem::size_of::<*const u8>())
+                                        .cast::<*mut u8>();
+                                    let l9 = *ptr4
+                                        .add(2 * ::core::mem::size_of::<*const u8>())
+                                        .cast::<usize>();
+                                    let len10 = l9;
+                                    let bytes10 = _rt::Vec::from_raw_parts(
+                                        l8.cast(),
+                                        len10,
+                                        len10,
                                     );
-                                    _rt::string_lift(bytes9)
+                                    _rt::string_lift(bytes10)
                                 };
                                 Err(e)
                             }
                             _ => _rt::invalid_enum_discriminant(),
-                        }
+                        };
+                        result11
                     }
                 }
             }
             impl Value {
                 #[allow(unused_unsafe, clippy::all)]
+                #[allow(async_fn_in_trait)]
                 pub fn enum_array(value: &[&str], tyinfo: &TypeInfo) -> Value {
                     unsafe {
                         let vec1 = value;
                         let len1 = vec1.len();
-                        let layout1 = _rt::alloc::Layout::from_size_align_unchecked(
-                            vec1.len() * 8,
-                            4,
-                        );
-                        let result1 = if layout1.size() != 0 {
-                            let ptr = _rt::alloc::alloc(layout1).cast::<u8>();
-                            if ptr.is_null() {
-                                _rt::alloc::handle_alloc_error(layout1);
-                            }
-                            ptr
-                        } else {
-                            { ::core::ptr::null_mut() }
-                        };
+                        let layout1 = _rt::alloc::Layout::from_size_align(
+                                vec1.len() * (2 * ::core::mem::size_of::<*const u8>()),
+                                ::core::mem::size_of::<*const u8>(),
+                            )
+                            .unwrap();
+                        let (result1, _cleanup1) = wit_bindgen_rt::Cleanup::new(layout1);
                         for (i, e) in vec1.into_iter().enumerate() {
-                            let base = result1.add(i * 8);
+                            let base = result1
+                                .add(i * (2 * ::core::mem::size_of::<*const u8>()));
                             {
                                 let vec0 = e;
                                 let ptr0 = vec0.as_ptr().cast::<u8>();
                                 let len0 = vec0.len();
-                                *base.add(4).cast::<usize>() = len0;
+                                *base
+                                    .add(::core::mem::size_of::<*const u8>())
+                                    .cast::<usize>() = len0;
                                 *base.add(0).cast::<*mut u8>() = ptr0.cast_mut();
                             }
                         }
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/sql@2.5.0")]
-                        extern "C" {
+                        #[link(wasm_import_module = "durable:core/sql@2.7.0")]
+                        unsafe extern "C" {
                             #[link_name = "[static]value.enum-array"]
-                            fn wit_import(_: *mut u8, _: usize, _: i32) -> i32;
+                            fn wit_import2(_: *mut u8, _: usize, _: i32) -> i32;
                         }
                         #[cfg(not(target_arch = "wasm32"))]
-                        fn wit_import(_: *mut u8, _: usize, _: i32) -> i32 {
+                        unsafe extern "C" fn wit_import2(
+                            _: *mut u8,
+                            _: usize,
+                            _: i32,
+                        ) -> i32 {
                             unreachable!()
                         }
-                        let ret = wit_import(result1, len1, (tyinfo).handle() as i32);
-                        if layout1.size() != 0 {
-                            _rt::alloc::dealloc(result1.cast(), layout1);
-                        }
+                        let ret = wit_import2(result1, len1, (tyinfo).handle() as i32);
                         Value::from_handle(ret as u32)
                     }
                 }
@@ -3518,26 +3935,17 @@ pub mod durable {
             ///
             /// Calling query again while there are still results from a previous query
             /// results in the remaining unconsumed rows being discarded.
-            pub fn query(sql: &str, params: _rt::Vec<Value>, options: Options) {
+            #[allow(async_fn_in_trait)]
+            pub fn query(sql: &str, params: _rt::Vec<Value>, options: Options) -> () {
                 unsafe {
                     let vec0 = sql;
                     let ptr0 = vec0.as_ptr().cast::<u8>();
                     let len0 = vec0.len();
                     let vec1 = &params;
                     let len1 = vec1.len();
-                    let layout1 = _rt::alloc::Layout::from_size_align_unchecked(
-                        vec1.len() * 4,
-                        4,
-                    );
-                    let result1 = if layout1.size() != 0 {
-                        let ptr = _rt::alloc::alloc(layout1).cast::<u8>();
-                        if ptr.is_null() {
-                            _rt::alloc::handle_alloc_error(layout1);
-                        }
-                        ptr
-                    } else {
-                        { ::core::ptr::null_mut() }
-                    };
+                    let layout1 = _rt::alloc::Layout::from_size_align(vec1.len() * 4, 4)
+                        .unwrap();
+                    let (result1, _cleanup1) = wit_bindgen_rt::Cleanup::new(layout1);
                     for (i, e) in vec1.into_iter().enumerate() {
                         let base = result1.add(i * 4);
                         {
@@ -3546,10 +3954,10 @@ pub mod durable {
                     }
                     let Options { limit: limit2, persistent: persistent2 } = options;
                     #[cfg(target_arch = "wasm32")]
-                    #[link(wasm_import_module = "durable:core/sql@2.5.0")]
-                    extern "C" {
+                    #[link(wasm_import_module = "durable:core/sql@2.7.0")]
+                    unsafe extern "C" {
                         #[link_name = "query"]
-                        fn wit_import(
+                        fn wit_import3(
                             _: *mut u8,
                             _: usize,
                             _: *mut u8,
@@ -3559,7 +3967,7 @@ pub mod durable {
                         );
                     }
                     #[cfg(not(target_arch = "wasm32"))]
-                    fn wit_import(
+                    unsafe extern "C" fn wit_import3(
                         _: *mut u8,
                         _: usize,
                         _: *mut u8,
@@ -3569,7 +3977,7 @@ pub mod durable {
                     ) {
                         unreachable!()
                     }
-                    wit_import(
+                    wit_import3(
                         ptr0.cast_mut(),
                         len0,
                         result1,
@@ -3580,222 +3988,290 @@ pub mod durable {
                             false => 0,
                         },
                     );
-                    if layout1.size() != 0 {
-                        _rt::alloc::dealloc(result1.cast(), layout1);
-                    }
                 }
             }
             #[allow(unused_unsafe, clippy::all)]
             /// Fetch either a query result or a single row from the query.
+            #[allow(async_fn_in_trait)]
             pub fn fetch() -> Option<Result<QueryResult, Error>> {
                 unsafe {
                     #[repr(align(8))]
-                    struct RetArea([::core::mem::MaybeUninit<u8>; 72]);
-                    let mut ret_area = RetArea([::core::mem::MaybeUninit::uninit(); 72]);
+                    struct RetArea(
+                        [::core::mem::MaybeUninit<
+                            u8,
+                        >; 24 + 12 * ::core::mem::size_of::<*const u8>()],
+                    );
+                    let mut ret_area = RetArea(
+                        [::core::mem::MaybeUninit::uninit(); 24
+                            + 12 * ::core::mem::size_of::<*const u8>()],
+                    );
                     let ptr0 = ret_area.0.as_mut_ptr().cast::<u8>();
                     #[cfg(target_arch = "wasm32")]
-                    #[link(wasm_import_module = "durable:core/sql@2.5.0")]
-                    extern "C" {
+                    #[link(wasm_import_module = "durable:core/sql@2.7.0")]
+                    unsafe extern "C" {
                         #[link_name = "fetch"]
-                        fn wit_import(_: *mut u8);
+                        fn wit_import1(_: *mut u8);
                     }
                     #[cfg(not(target_arch = "wasm32"))]
-                    fn wit_import(_: *mut u8) {
+                    unsafe extern "C" fn wit_import1(_: *mut u8) {
                         unreachable!()
                     }
-                    wit_import(ptr0);
-                    let l1 = i32::from(*ptr0.add(0).cast::<u8>());
-                    match l1 {
+                    wit_import1(ptr0);
+                    let l2 = i32::from(*ptr0.add(0).cast::<u8>());
+                    let result50 = match l2 {
                         0 => None,
                         1 => {
                             let e = {
-                                let l2 = i32::from(*ptr0.add(8).cast::<u8>());
-                                match l2 {
+                                let l3 = i32::from(*ptr0.add(8).cast::<u8>());
+                                match l3 {
                                     0 => {
                                         let e = {
-                                            let l3 = i32::from(*ptr0.add(16).cast::<u8>());
-                                            let v12 = match l3 {
+                                            let l4 = i32::from(*ptr0.add(16).cast::<u8>());
+                                            let v13 = match l4 {
                                                 0 => {
-                                                    let e12 = {
-                                                        let l4 = *ptr0.add(24).cast::<i64>();
-                                                        l4 as u64
+                                                    let e13 = {
+                                                        let l5 = *ptr0.add(24).cast::<i64>();
+                                                        l5 as u64
                                                     };
-                                                    QueryResult::Count(e12)
+                                                    QueryResult::Count(e13)
                                                 }
                                                 n => {
                                                     debug_assert_eq!(n, 1, "invalid enum discriminant");
-                                                    let e12 = {
-                                                        let l5 = *ptr0.add(24).cast::<*mut u8>();
-                                                        let l6 = *ptr0.add(28).cast::<usize>();
-                                                        let base11 = l5;
-                                                        let len11 = l6;
-                                                        let mut result11 = _rt::Vec::with_capacity(len11);
-                                                        for i in 0..len11 {
-                                                            let base = base11.add(i * 12);
-                                                            let e11 = {
-                                                                let l7 = *base.add(0).cast::<*mut u8>();
-                                                                let l8 = *base.add(4).cast::<usize>();
-                                                                let len9 = l8;
-                                                                let bytes9 = _rt::Vec::from_raw_parts(
-                                                                    l7.cast(),
-                                                                    len9,
-                                                                    len9,
+                                                    let e13 = {
+                                                        let l6 = *ptr0.add(24).cast::<*mut u8>();
+                                                        let l7 = *ptr0
+                                                            .add(24 + 1 * ::core::mem::size_of::<*const u8>())
+                                                            .cast::<usize>();
+                                                        let base12 = l6;
+                                                        let len12 = l7;
+                                                        let mut result12 = _rt::Vec::with_capacity(len12);
+                                                        for i in 0..len12 {
+                                                            let base = base12
+                                                                .add(i * (3 * ::core::mem::size_of::<*const u8>()));
+                                                            let e12 = {
+                                                                let l8 = *base.add(0).cast::<*mut u8>();
+                                                                let l9 = *base
+                                                                    .add(::core::mem::size_of::<*const u8>())
+                                                                    .cast::<usize>();
+                                                                let len10 = l9;
+                                                                let bytes10 = _rt::Vec::from_raw_parts(
+                                                                    l8.cast(),
+                                                                    len10,
+                                                                    len10,
                                                                 );
-                                                                let l10 = *base.add(8).cast::<i32>();
+                                                                let l11 = *base
+                                                                    .add(2 * ::core::mem::size_of::<*const u8>())
+                                                                    .cast::<i32>();
                                                                 Column {
-                                                                    name: _rt::string_lift(bytes9),
-                                                                    value: Value::from_handle(l10 as u32),
+                                                                    name: _rt::string_lift(bytes10),
+                                                                    value: Value::from_handle(l11 as u32),
                                                                 }
                                                             };
-                                                            result11.push(e11);
+                                                            result12.push(e12);
                                                         }
-                                                        _rt::cabi_dealloc(base11, len11 * 12, 4);
-                                                        Row { columns: result11 }
+                                                        _rt::cabi_dealloc(
+                                                            base12,
+                                                            len12 * (3 * ::core::mem::size_of::<*const u8>()),
+                                                            ::core::mem::size_of::<*const u8>(),
+                                                        );
+                                                        Row { columns: result12 }
                                                     };
-                                                    QueryResult::Row(e12)
+                                                    QueryResult::Row(e13)
                                                 }
                                             };
-                                            v12
+                                            v13
                                         };
                                         Ok(e)
                                     }
                                     1 => {
                                         let e = {
-                                            let l13 = i32::from(*ptr0.add(16).cast::<u8>());
-                                            let v48 = match l13 {
+                                            let l14 = i32::from(*ptr0.add(16).cast::<u8>());
+                                            let v49 = match l14 {
                                                 0 => {
-                                                    let e48 = {
-                                                        let l14 = *ptr0.add(20).cast::<*mut u8>();
-                                                        let l15 = *ptr0.add(24).cast::<usize>();
-                                                        let len16 = l15;
-                                                        let bytes16 = _rt::Vec::from_raw_parts(
-                                                            l14.cast(),
-                                                            len16,
-                                                            len16,
+                                                    let e49 = {
+                                                        let l15 = *ptr0
+                                                            .add(16 + 1 * ::core::mem::size_of::<*const u8>())
+                                                            .cast::<*mut u8>();
+                                                        let l16 = *ptr0
+                                                            .add(16 + 2 * ::core::mem::size_of::<*const u8>())
+                                                            .cast::<usize>();
+                                                        let len17 = l16;
+                                                        let bytes17 = _rt::Vec::from_raw_parts(
+                                                            l15.cast(),
+                                                            len17,
+                                                            len17,
                                                         );
-                                                        let l17 = *ptr0.add(28).cast::<*mut u8>();
-                                                        let l18 = *ptr0.add(32).cast::<usize>();
-                                                        let len19 = l18;
-                                                        let bytes19 = _rt::Vec::from_raw_parts(
-                                                            l17.cast(),
-                                                            len19,
-                                                            len19,
+                                                        let l18 = *ptr0
+                                                            .add(16 + 3 * ::core::mem::size_of::<*const u8>())
+                                                            .cast::<*mut u8>();
+                                                        let l19 = *ptr0
+                                                            .add(16 + 4 * ::core::mem::size_of::<*const u8>())
+                                                            .cast::<usize>();
+                                                        let len20 = l19;
+                                                        let bytes20 = _rt::Vec::from_raw_parts(
+                                                            l18.cast(),
+                                                            len20,
+                                                            len20,
                                                         );
                                                         ColumnDecodeError {
-                                                            index: _rt::string_lift(bytes16),
-                                                            source: _rt::string_lift(bytes19),
+                                                            index: _rt::string_lift(bytes17),
+                                                            source: _rt::string_lift(bytes20),
                                                         }
                                                     };
-                                                    Error::ColumnDecode(e48)
+                                                    Error::ColumnDecode(e49)
                                                 }
                                                 1 => {
-                                                    let e48 = {
-                                                        let l20 = *ptr0.add(20).cast::<*mut u8>();
-                                                        let l21 = *ptr0.add(24).cast::<usize>();
-                                                        let len22 = l21;
-                                                        let bytes22 = _rt::Vec::from_raw_parts(
-                                                            l20.cast(),
-                                                            len22,
-                                                            len22,
+                                                    let e49 = {
+                                                        let l21 = *ptr0
+                                                            .add(16 + 1 * ::core::mem::size_of::<*const u8>())
+                                                            .cast::<*mut u8>();
+                                                        let l22 = *ptr0
+                                                            .add(16 + 2 * ::core::mem::size_of::<*const u8>())
+                                                            .cast::<usize>();
+                                                        let len23 = l22;
+                                                        let bytes23 = _rt::Vec::from_raw_parts(
+                                                            l21.cast(),
+                                                            len23,
+                                                            len23,
                                                         );
-                                                        _rt::string_lift(bytes22)
+                                                        _rt::string_lift(bytes23)
                                                     };
-                                                    Error::TypeNotFound(e48)
+                                                    Error::TypeNotFound(e49)
                                                 }
                                                 2 => {
-                                                    let e48 = {
-                                                        let l23 = *ptr0.add(20).cast::<*mut u8>();
-                                                        let l24 = *ptr0.add(24).cast::<usize>();
-                                                        let len25 = l24;
-                                                        let bytes25 = _rt::Vec::from_raw_parts(
-                                                            l23.cast(),
-                                                            len25,
-                                                            len25,
+                                                    let e49 = {
+                                                        let l24 = *ptr0
+                                                            .add(16 + 1 * ::core::mem::size_of::<*const u8>())
+                                                            .cast::<*mut u8>();
+                                                        let l25 = *ptr0
+                                                            .add(16 + 2 * ::core::mem::size_of::<*const u8>())
+                                                            .cast::<usize>();
+                                                        let len26 = l25;
+                                                        let bytes26 = _rt::Vec::from_raw_parts(
+                                                            l24.cast(),
+                                                            len26,
+                                                            len26,
                                                         );
-                                                        _rt::string_lift(bytes25)
+                                                        _rt::string_lift(bytes26)
                                                     };
-                                                    Error::Encode(e48)
+                                                    Error::Encode(e49)
                                                 }
                                                 3 => {
-                                                    let e48 = {
-                                                        let l26 = *ptr0.add(20).cast::<*mut u8>();
-                                                        let l27 = *ptr0.add(24).cast::<usize>();
-                                                        let len28 = l27;
-                                                        let bytes28 = _rt::Vec::from_raw_parts(
-                                                            l26.cast(),
-                                                            len28,
-                                                            len28,
+                                                    let e49 = {
+                                                        let l27 = *ptr0
+                                                            .add(16 + 1 * ::core::mem::size_of::<*const u8>())
+                                                            .cast::<*mut u8>();
+                                                        let l28 = *ptr0
+                                                            .add(16 + 2 * ::core::mem::size_of::<*const u8>())
+                                                            .cast::<usize>();
+                                                        let len29 = l28;
+                                                        let bytes29 = _rt::Vec::from_raw_parts(
+                                                            l27.cast(),
+                                                            len29,
+                                                            len29,
                                                         );
-                                                        _rt::string_lift(bytes28)
+                                                        _rt::string_lift(bytes29)
                                                     };
-                                                    Error::Decode(e48)
+                                                    Error::Decode(e49)
                                                 }
                                                 4 => {
-                                                    let e48 = {
-                                                        let l29 = *ptr0.add(20).cast::<*mut u8>();
-                                                        let l30 = *ptr0.add(24).cast::<usize>();
-                                                        let len31 = l30;
-                                                        let bytes31 = _rt::Vec::from_raw_parts(
-                                                            l29.cast(),
-                                                            len31,
-                                                            len31,
+                                                    let e49 = {
+                                                        let l30 = *ptr0
+                                                            .add(16 + 1 * ::core::mem::size_of::<*const u8>())
+                                                            .cast::<*mut u8>();
+                                                        let l31 = *ptr0
+                                                            .add(16 + 2 * ::core::mem::size_of::<*const u8>())
+                                                            .cast::<usize>();
+                                                        let len32 = l31;
+                                                        let bytes32 = _rt::Vec::from_raw_parts(
+                                                            l30.cast(),
+                                                            len32,
+                                                            len32,
                                                         );
-                                                        let l32 = i32::from(*ptr0.add(28).cast::<u8>());
-                                                        let l33 = i32::from(*ptr0.add(32).cast::<u8>());
-                                                        let l37 = i32::from(*ptr0.add(44).cast::<u8>());
-                                                        let l41 = i32::from(*ptr0.add(56).cast::<u8>());
+                                                        let l33 = i32::from(
+                                                            *ptr0
+                                                                .add(16 + 3 * ::core::mem::size_of::<*const u8>())
+                                                                .cast::<u8>(),
+                                                        );
+                                                        let l34 = i32::from(
+                                                            *ptr0
+                                                                .add(16 + 4 * ::core::mem::size_of::<*const u8>())
+                                                                .cast::<u8>(),
+                                                        );
+                                                        let l38 = i32::from(
+                                                            *ptr0
+                                                                .add(16 + 7 * ::core::mem::size_of::<*const u8>())
+                                                                .cast::<u8>(),
+                                                        );
+                                                        let l42 = i32::from(
+                                                            *ptr0
+                                                                .add(16 + 10 * ::core::mem::size_of::<*const u8>())
+                                                                .cast::<u8>(),
+                                                        );
                                                         DatabaseError {
-                                                            message: _rt::string_lift(bytes31),
-                                                            kind: DatabaseErrorKind::_lift(l32 as u8),
-                                                            code: match l33 {
+                                                            message: _rt::string_lift(bytes32),
+                                                            kind: DatabaseErrorKind::_lift(l33 as u8),
+                                                            code: match l34 {
                                                                 0 => None,
                                                                 1 => {
                                                                     let e = {
-                                                                        let l34 = *ptr0.add(36).cast::<*mut u8>();
-                                                                        let l35 = *ptr0.add(40).cast::<usize>();
-                                                                        let len36 = l35;
-                                                                        let bytes36 = _rt::Vec::from_raw_parts(
-                                                                            l34.cast(),
-                                                                            len36,
-                                                                            len36,
+                                                                        let l35 = *ptr0
+                                                                            .add(16 + 5 * ::core::mem::size_of::<*const u8>())
+                                                                            .cast::<*mut u8>();
+                                                                        let l36 = *ptr0
+                                                                            .add(16 + 6 * ::core::mem::size_of::<*const u8>())
+                                                                            .cast::<usize>();
+                                                                        let len37 = l36;
+                                                                        let bytes37 = _rt::Vec::from_raw_parts(
+                                                                            l35.cast(),
+                                                                            len37,
+                                                                            len37,
                                                                         );
-                                                                        _rt::string_lift(bytes36)
+                                                                        _rt::string_lift(bytes37)
                                                                     };
                                                                     Some(e)
                                                                 }
                                                                 _ => _rt::invalid_enum_discriminant(),
                                                             },
-                                                            constraint: match l37 {
+                                                            constraint: match l38 {
                                                                 0 => None,
                                                                 1 => {
                                                                     let e = {
-                                                                        let l38 = *ptr0.add(48).cast::<*mut u8>();
-                                                                        let l39 = *ptr0.add(52).cast::<usize>();
-                                                                        let len40 = l39;
-                                                                        let bytes40 = _rt::Vec::from_raw_parts(
-                                                                            l38.cast(),
-                                                                            len40,
-                                                                            len40,
+                                                                        let l39 = *ptr0
+                                                                            .add(16 + 8 * ::core::mem::size_of::<*const u8>())
+                                                                            .cast::<*mut u8>();
+                                                                        let l40 = *ptr0
+                                                                            .add(16 + 9 * ::core::mem::size_of::<*const u8>())
+                                                                            .cast::<usize>();
+                                                                        let len41 = l40;
+                                                                        let bytes41 = _rt::Vec::from_raw_parts(
+                                                                            l39.cast(),
+                                                                            len41,
+                                                                            len41,
                                                                         );
-                                                                        _rt::string_lift(bytes40)
+                                                                        _rt::string_lift(bytes41)
                                                                     };
                                                                     Some(e)
                                                                 }
                                                                 _ => _rt::invalid_enum_discriminant(),
                                                             },
-                                                            table: match l41 {
+                                                            table: match l42 {
                                                                 0 => None,
                                                                 1 => {
                                                                     let e = {
-                                                                        let l42 = *ptr0.add(60).cast::<*mut u8>();
-                                                                        let l43 = *ptr0.add(64).cast::<usize>();
-                                                                        let len44 = l43;
-                                                                        let bytes44 = _rt::Vec::from_raw_parts(
-                                                                            l42.cast(),
-                                                                            len44,
-                                                                            len44,
+                                                                        let l43 = *ptr0
+                                                                            .add(16 + 11 * ::core::mem::size_of::<*const u8>())
+                                                                            .cast::<*mut u8>();
+                                                                        let l44 = *ptr0
+                                                                            .add(16 + 12 * ::core::mem::size_of::<*const u8>())
+                                                                            .cast::<usize>();
+                                                                        let len45 = l44;
+                                                                        let bytes45 = _rt::Vec::from_raw_parts(
+                                                                            l43.cast(),
+                                                                            len45,
+                                                                            len45,
                                                                         );
-                                                                        _rt::string_lift(bytes44)
+                                                                        _rt::string_lift(bytes45)
                                                                     };
                                                                     Some(e)
                                                                 }
@@ -3803,25 +4279,29 @@ pub mod durable {
                                                             },
                                                         }
                                                     };
-                                                    Error::Database(e48)
+                                                    Error::Database(e49)
                                                 }
                                                 n => {
                                                     debug_assert_eq!(n, 5, "invalid enum discriminant");
-                                                    let e48 = {
-                                                        let l45 = *ptr0.add(20).cast::<*mut u8>();
-                                                        let l46 = *ptr0.add(24).cast::<usize>();
-                                                        let len47 = l46;
-                                                        let bytes47 = _rt::Vec::from_raw_parts(
-                                                            l45.cast(),
-                                                            len47,
-                                                            len47,
+                                                    let e49 = {
+                                                        let l46 = *ptr0
+                                                            .add(16 + 1 * ::core::mem::size_of::<*const u8>())
+                                                            .cast::<*mut u8>();
+                                                        let l47 = *ptr0
+                                                            .add(16 + 2 * ::core::mem::size_of::<*const u8>())
+                                                            .cast::<usize>();
+                                                        let len48 = l47;
+                                                        let bytes48 = _rt::Vec::from_raw_parts(
+                                                            l46.cast(),
+                                                            len48,
+                                                            len48,
                                                         );
-                                                        _rt::string_lift(bytes47)
+                                                        _rt::string_lift(bytes48)
                                                     };
-                                                    Error::Other(e48)
+                                                    Error::Other(e49)
                                                 }
                                             };
-                                            v48
+                                            v49
                                         };
                                         Err(e)
                                     }
@@ -3831,13 +4311,16 @@ pub mod durable {
                             Some(e)
                         }
                         _ => _rt::invalid_enum_discriminant(),
-                    }
+                    };
+                    result50
                 }
             }
         }
     }
 }
+#[rustfmt::skip]
 mod _rt {
+    #![allow(dead_code, clippy::all)]
     use core::fmt;
     use core::marker;
     use core::sync::atomic::{AtomicU32, Ordering::Relaxed};
@@ -3870,7 +4353,7 @@ mod _rt {
     impl<T: WasmResource> Resource<T> {
         #[doc(hidden)]
         pub unsafe fn from_handle(handle: u32) -> Self {
-            debug_assert!(handle != u32::MAX);
+            debug_assert!(handle != 0 && handle != u32::MAX);
             Self {
                 handle: AtomicU32::new(handle),
                 _marker: marker::PhantomData,
@@ -3918,7 +4401,7 @@ mod _rt {
         if cfg!(debug_assertions) {
             String::from_utf8(bytes).unwrap()
         } else {
-            String::from_utf8_unchecked(bytes)
+            unsafe { String::from_utf8_unchecked(bytes) }
         }
     }
     pub unsafe fn bool_lift(val: u8) -> bool {
@@ -3936,15 +4419,17 @@ mod _rt {
         if cfg!(debug_assertions) {
             panic!("invalid enum discriminant")
         } else {
-            core::hint::unreachable_unchecked()
+            unsafe { core::hint::unreachable_unchecked() }
         }
     }
     pub unsafe fn cabi_dealloc(ptr: *mut u8, size: usize, align: usize) {
         if size == 0 {
             return;
         }
-        let layout = alloc::Layout::from_size_align_unchecked(size, align);
-        alloc::dealloc(ptr, layout);
+        unsafe {
+            let layout = alloc::Layout::from_size_align_unchecked(size, align);
+            alloc::dealloc(ptr, layout);
+        }
     }
     pub fn as_f32<T: AsF32>(t: T) -> f32 {
         t.as_f32()
@@ -4065,9 +4550,13 @@ mod _rt {
     pub use alloc_crate::alloc;
     extern crate alloc as alloc_crate;
 }
+#[rustfmt::skip]
 #[cfg(target_arch = "wasm32")]
-#[link_section = "component-type:wit-bindgen:0.30.0:import-sql:encoded world"]
+#[unsafe(
+    link_section = "component-type:wit-bindgen:0.44.0:durable:core@2.7.0:import-sql:encoded world"
+)]
 #[doc(hidden)]
+#[allow(clippy::octal_escapes)]
 pub static __WIT_BINDGEN_COMPONENT_TYPE: [u8; 4877] = *b"\
 \0asm\x0d\0\x01\0\0\x19\x16wit-component-encoding\x04\0\x07\x8c%\x01A\x02\x01A\x02\
 \x01B\xfc\x01\x04\0\x09type-info\x03\x01\x01r\x02\x07secondsx\x0csubsec-nanosy\x04\
@@ -4164,9 +4653,9 @@ atic]value.timestamptz-array\x01\x8d\x01\x01@\x01\x05value\xec\0\0\x0f\x04\0\x1d
 \x05value\xe3\0\x06tyinfo\"\0\x0f\x04\0\x18[static]value.enum-array\x01\x91\x01\x01\
 p\x0f\x01@\x03\x03sqls\x06params\x92\x01\x07options\x18\x01\0\x04\0\x05query\x01\
 \x93\x01\x01j\x01\x16\x01!\x01k\x94\x01\x01@\0\0\x95\x01\x04\0\x05fetch\x01\x96\x01\
-\x03\x01\x16durable:core/sql@2.5.0\x05\0\x04\x01\x1ddurable:core/import-sql@2.5.\
-0\x04\0\x0b\x10\x01\0\x0aimport-sql\x03\0\0\0G\x09producers\x01\x0cprocessed-by\x02\
-\x0dwit-component\x070.215.0\x10wit-bindgen-rust\x060.30.0";
+\x03\0\x16durable:core/sql@2.7.0\x05\0\x04\0\x1ddurable:core/import-sql@2.7.0\x04\
+\0\x0b\x10\x01\0\x0aimport-sql\x03\0\0\0G\x09producers\x01\x0cprocessed-by\x02\x0d\
+wit-component\x070.236.1\x10wit-bindgen-rust\x060.44.0";
 #[inline(never)]
 #[doc(hidden)]
 pub fn __link_custom_section_describing_imports() {

@@ -1,8 +1,8 @@
-#[allow(dead_code)]
+#[rustfmt::skip]
+#[allow(dead_code, clippy::all)]
 pub mod durable {
-    #[allow(dead_code)]
     pub mod core {
-        #[allow(dead_code, clippy::all)]
+        #[allow(dead_code, async_fn_in_trait, unused_imports, clippy::all)]
         pub mod http {
             #[used]
             #[doc(hidden)]
@@ -134,7 +134,7 @@ pub mod durable {
                 #[doc(hidden)]
                 pub unsafe fn from_handle(handle: u32) -> Self {
                     Self {
-                        handle: _rt::Resource::from_handle(handle),
+                        handle: unsafe { _rt::Resource::from_handle(handle) },
                     }
                 }
                 #[doc(hidden)]
@@ -149,16 +149,18 @@ pub mod durable {
             unsafe impl _rt::WasmResource for HttpError2 {
                 #[inline]
                 unsafe fn drop(_handle: u32) {
-                    #[cfg(not(target_arch = "wasm32"))]
-                    unreachable!();
                     #[cfg(target_arch = "wasm32")]
-                    {
-                        #[link(wasm_import_module = "durable:core/http@2.5.0")]
-                        extern "C" {
-                            #[link_name = "[resource-drop]http-error2"]
-                            fn drop(_: u32);
-                        }
-                        drop(_handle);
+                    #[link(wasm_import_module = "durable:core/http@2.7.0")]
+                    unsafe extern "C" {
+                        #[link_name = "[resource-drop]http-error2"]
+                        fn drop(_: i32);
+                    }
+                    #[cfg(not(target_arch = "wasm32"))]
+                    unsafe extern "C" fn drop(_: i32) {
+                        unreachable!()
+                    }
+                    unsafe {
+                        drop(_handle as i32);
                     }
                 }
             }
@@ -174,7 +176,7 @@ pub mod durable {
                 #[doc(hidden)]
                 pub unsafe fn from_handle(handle: u32) -> Self {
                     Self {
-                        handle: _rt::Resource::from_handle(handle),
+                        handle: unsafe { _rt::Resource::from_handle(handle) },
                     }
                 }
                 #[doc(hidden)]
@@ -189,16 +191,18 @@ pub mod durable {
             unsafe impl _rt::WasmResource for HttpRequest2 {
                 #[inline]
                 unsafe fn drop(_handle: u32) {
-                    #[cfg(not(target_arch = "wasm32"))]
-                    unreachable!();
                     #[cfg(target_arch = "wasm32")]
-                    {
-                        #[link(wasm_import_module = "durable:core/http@2.5.0")]
-                        extern "C" {
-                            #[link_name = "[resource-drop]http-request2"]
-                            fn drop(_: u32);
-                        }
-                        drop(_handle);
+                    #[link(wasm_import_module = "durable:core/http@2.7.0")]
+                    unsafe extern "C" {
+                        #[link_name = "[resource-drop]http-request2"]
+                        fn drop(_: i32);
+                    }
+                    #[cfg(not(target_arch = "wasm32"))]
+                    unsafe extern "C" fn drop(_: i32) {
+                        unreachable!()
+                    }
+                    unsafe {
+                        drop(_handle as i32);
                     }
                 }
             }
@@ -207,11 +211,20 @@ pub mod durable {
             ///
             /// # Parameters
             /// - `request` - A description of the HTTP request to make.
+            #[allow(async_fn_in_trait)]
             pub fn fetch(request: HttpRequest<'_>) -> Result<HttpResponse, HttpError> {
                 unsafe {
-                    #[repr(align(4))]
-                    struct RetArea([::core::mem::MaybeUninit<u8>; 24]);
-                    let mut ret_area = RetArea([::core::mem::MaybeUninit::uninit(); 24]);
+                    #[cfg_attr(target_pointer_width = "64", repr(align(8)))]
+                    #[cfg_attr(target_pointer_width = "32", repr(align(4)))]
+                    struct RetArea(
+                        [::core::mem::MaybeUninit<
+                            u8,
+                        >; 6 * ::core::mem::size_of::<*const u8>()],
+                    );
+                    let mut ret_area = RetArea(
+                        [::core::mem::MaybeUninit::uninit(); 6
+                            * ::core::mem::size_of::<*const u8>()],
+                    );
                     let HttpRequest {
                         method: method0,
                         url: url0,
@@ -227,33 +240,33 @@ pub mod durable {
                     let len2 = vec2.len();
                     let vec6 = headers0;
                     let len6 = vec6.len();
-                    let layout6 = _rt::alloc::Layout::from_size_align_unchecked(
-                        vec6.len() * 16,
-                        4,
-                    );
-                    let result6 = if layout6.size() != 0 {
-                        let ptr = _rt::alloc::alloc(layout6).cast::<u8>();
-                        if ptr.is_null() {
-                            _rt::alloc::handle_alloc_error(layout6);
-                        }
-                        ptr
-                    } else {
-                        { ::core::ptr::null_mut() }
-                    };
+                    let layout6 = _rt::alloc::Layout::from_size_align(
+                            vec6.len() * (4 * ::core::mem::size_of::<*const u8>()),
+                            ::core::mem::size_of::<*const u8>(),
+                        )
+                        .unwrap();
+                    let (result6, _cleanup6) = wit_bindgen_rt::Cleanup::new(layout6);
                     for (i, e) in vec6.into_iter().enumerate() {
-                        let base = result6.add(i * 16);
+                        let base = result6
+                            .add(i * (4 * ::core::mem::size_of::<*const u8>()));
                         {
                             let HttpHeaderParam { name: name3, value: value3 } = e;
                             let vec4 = name3;
                             let ptr4 = vec4.as_ptr().cast::<u8>();
                             let len4 = vec4.len();
-                            *base.add(4).cast::<usize>() = len4;
+                            *base
+                                .add(::core::mem::size_of::<*const u8>())
+                                .cast::<usize>() = len4;
                             *base.add(0).cast::<*mut u8>() = ptr4.cast_mut();
                             let vec5 = value3;
                             let ptr5 = vec5.as_ptr().cast::<u8>();
                             let len5 = vec5.len();
-                            *base.add(12).cast::<usize>() = len5;
-                            *base.add(8).cast::<*mut u8>() = ptr5.cast_mut();
+                            *base
+                                .add(3 * ::core::mem::size_of::<*const u8>())
+                                .cast::<usize>() = len5;
+                            *base
+                                .add(2 * ::core::mem::size_of::<*const u8>())
+                                .cast::<*mut u8>() = ptr5.cast_mut();
                         }
                     }
                     let (result8_0, result8_1, result8_2) = match body0 {
@@ -271,10 +284,10 @@ pub mod durable {
                     };
                     let ptr10 = ret_area.0.as_mut_ptr().cast::<u8>();
                     #[cfg(target_arch = "wasm32")]
-                    #[link(wasm_import_module = "durable:core/http@2.5.0")]
-                    extern "C" {
+                    #[link(wasm_import_module = "durable:core/http@2.7.0")]
+                    unsafe extern "C" {
                         #[link_name = "fetch"]
-                        fn wit_import(
+                        fn wit_import11(
                             _: *mut u8,
                             _: usize,
                             _: *mut u8,
@@ -290,7 +303,7 @@ pub mod durable {
                         );
                     }
                     #[cfg(not(target_arch = "wasm32"))]
-                    fn wit_import(
+                    unsafe extern "C" fn wit_import11(
                         _: *mut u8,
                         _: usize,
                         _: *mut u8,
@@ -306,7 +319,7 @@ pub mod durable {
                     ) {
                         unreachable!()
                     }
-                    wit_import(
+                    wit_import11(
                         ptr1.cast_mut(),
                         len1,
                         ptr2.cast_mut(),
@@ -320,144 +333,186 @@ pub mod durable {
                         result9_1,
                         ptr10,
                     );
-                    let l11 = i32::from(*ptr10.add(0).cast::<u8>());
-                    if layout6.size() != 0 {
-                        _rt::alloc::dealloc(result6.cast(), layout6);
-                    }
-                    match l11 {
+                    let l12 = i32::from(*ptr10.add(0).cast::<u8>());
+                    let result34 = match l12 {
                         0 => {
                             let e = {
-                                let l12 = i32::from(*ptr10.add(4).cast::<u16>());
-                                let l13 = *ptr10.add(8).cast::<*mut u8>();
-                                let l14 = *ptr10.add(12).cast::<usize>();
-                                let base21 = l13;
-                                let len21 = l14;
-                                let mut result21 = _rt::Vec::with_capacity(len21);
-                                for i in 0..len21 {
-                                    let base = base21.add(i * 16);
-                                    let e21 = {
-                                        let l15 = *base.add(0).cast::<*mut u8>();
-                                        let l16 = *base.add(4).cast::<usize>();
-                                        let len17 = l16;
-                                        let bytes17 = _rt::Vec::from_raw_parts(
-                                            l15.cast(),
-                                            len17,
-                                            len17,
+                                let l13 = i32::from(
+                                    *ptr10
+                                        .add(::core::mem::size_of::<*const u8>())
+                                        .cast::<u16>(),
+                                );
+                                let l14 = *ptr10
+                                    .add(2 * ::core::mem::size_of::<*const u8>())
+                                    .cast::<*mut u8>();
+                                let l15 = *ptr10
+                                    .add(3 * ::core::mem::size_of::<*const u8>())
+                                    .cast::<usize>();
+                                let base22 = l14;
+                                let len22 = l15;
+                                let mut result22 = _rt::Vec::with_capacity(len22);
+                                for i in 0..len22 {
+                                    let base = base22
+                                        .add(i * (4 * ::core::mem::size_of::<*const u8>()));
+                                    let e22 = {
+                                        let l16 = *base.add(0).cast::<*mut u8>();
+                                        let l17 = *base
+                                            .add(::core::mem::size_of::<*const u8>())
+                                            .cast::<usize>();
+                                        let len18 = l17;
+                                        let bytes18 = _rt::Vec::from_raw_parts(
+                                            l16.cast(),
+                                            len18,
+                                            len18,
                                         );
-                                        let l18 = *base.add(8).cast::<*mut u8>();
-                                        let l19 = *base.add(12).cast::<usize>();
-                                        let len20 = l19;
+                                        let l19 = *base
+                                            .add(2 * ::core::mem::size_of::<*const u8>())
+                                            .cast::<*mut u8>();
+                                        let l20 = *base
+                                            .add(3 * ::core::mem::size_of::<*const u8>())
+                                            .cast::<usize>();
+                                        let len21 = l20;
                                         HttpHeaderResult {
-                                            name: _rt::string_lift(bytes17),
-                                            value: _rt::Vec::from_raw_parts(l18.cast(), len20, len20),
+                                            name: _rt::string_lift(bytes18),
+                                            value: _rt::Vec::from_raw_parts(l19.cast(), len21, len21),
                                         }
                                     };
-                                    result21.push(e21);
+                                    result22.push(e22);
                                 }
-                                _rt::cabi_dealloc(base21, len21 * 16, 4);
-                                let l22 = *ptr10.add(16).cast::<*mut u8>();
-                                let l23 = *ptr10.add(20).cast::<usize>();
-                                let len24 = l23;
+                                _rt::cabi_dealloc(
+                                    base22,
+                                    len22 * (4 * ::core::mem::size_of::<*const u8>()),
+                                    ::core::mem::size_of::<*const u8>(),
+                                );
+                                let l23 = *ptr10
+                                    .add(4 * ::core::mem::size_of::<*const u8>())
+                                    .cast::<*mut u8>();
+                                let l24 = *ptr10
+                                    .add(5 * ::core::mem::size_of::<*const u8>())
+                                    .cast::<usize>();
+                                let len25 = l24;
                                 HttpResponse {
-                                    status: l12 as u16,
-                                    headers: result21,
-                                    body: _rt::Vec::from_raw_parts(l22.cast(), len24, len24),
+                                    status: l13 as u16,
+                                    headers: result22,
+                                    body: _rt::Vec::from_raw_parts(l23.cast(), len25, len25),
                                 }
                             };
                             Ok(e)
                         }
                         1 => {
                             let e = {
-                                let l25 = i32::from(*ptr10.add(4).cast::<u8>());
-                                let v32 = match l25 {
+                                let l26 = i32::from(
+                                    *ptr10.add(::core::mem::size_of::<*const u8>()).cast::<u8>(),
+                                );
+                                let v33 = match l26 {
                                     0 => HttpError::Timeout,
                                     1 => HttpError::InvalidMethod,
                                     2 => {
-                                        let e32 = {
-                                            let l26 = *ptr10.add(8).cast::<*mut u8>();
-                                            let l27 = *ptr10.add(12).cast::<usize>();
-                                            let len28 = l27;
-                                            let bytes28 = _rt::Vec::from_raw_parts(
-                                                l26.cast(),
-                                                len28,
-                                                len28,
+                                        let e33 = {
+                                            let l27 = *ptr10
+                                                .add(2 * ::core::mem::size_of::<*const u8>())
+                                                .cast::<*mut u8>();
+                                            let l28 = *ptr10
+                                                .add(3 * ::core::mem::size_of::<*const u8>())
+                                                .cast::<usize>();
+                                            let len29 = l28;
+                                            let bytes29 = _rt::Vec::from_raw_parts(
+                                                l27.cast(),
+                                                len29,
+                                                len29,
                                             );
-                                            _rt::string_lift(bytes28)
+                                            _rt::string_lift(bytes29)
                                         };
-                                        HttpError::InvalidUrl(e32)
+                                        HttpError::InvalidUrl(e33)
                                     }
                                     3 => HttpError::InvalidHeaderName,
                                     4 => HttpError::InvalidHeaderValue,
                                     n => {
                                         debug_assert_eq!(n, 5, "invalid enum discriminant");
-                                        let e32 = {
-                                            let l29 = *ptr10.add(8).cast::<*mut u8>();
-                                            let l30 = *ptr10.add(12).cast::<usize>();
-                                            let len31 = l30;
-                                            let bytes31 = _rt::Vec::from_raw_parts(
-                                                l29.cast(),
-                                                len31,
-                                                len31,
+                                        let e33 = {
+                                            let l30 = *ptr10
+                                                .add(2 * ::core::mem::size_of::<*const u8>())
+                                                .cast::<*mut u8>();
+                                            let l31 = *ptr10
+                                                .add(3 * ::core::mem::size_of::<*const u8>())
+                                                .cast::<usize>();
+                                            let len32 = l31;
+                                            let bytes32 = _rt::Vec::from_raw_parts(
+                                                l30.cast(),
+                                                len32,
+                                                len32,
                                             );
-                                            _rt::string_lift(bytes31)
+                                            _rt::string_lift(bytes32)
                                         };
-                                        HttpError::Other(e32)
+                                        HttpError::Other(e33)
                                     }
                                 };
-                                v32
+                                v33
                             };
                             Err(e)
                         }
                         _ => _rt::invalid_enum_discriminant(),
-                    }
+                    };
+                    result34
                 }
             }
             impl HttpError2 {
                 #[allow(unused_unsafe, clippy::all)]
                 /// The error message describing what went wrong.
+                #[allow(async_fn_in_trait)]
                 pub fn message(&self) -> _rt::String {
                     unsafe {
-                        #[repr(align(4))]
-                        struct RetArea([::core::mem::MaybeUninit<u8>; 8]);
+                        #[cfg_attr(target_pointer_width = "64", repr(align(8)))]
+                        #[cfg_attr(target_pointer_width = "32", repr(align(4)))]
+                        struct RetArea(
+                            [::core::mem::MaybeUninit<
+                                u8,
+                            >; 2 * ::core::mem::size_of::<*const u8>()],
+                        );
                         let mut ret_area = RetArea(
-                            [::core::mem::MaybeUninit::uninit(); 8],
+                            [::core::mem::MaybeUninit::uninit(); 2
+                                * ::core::mem::size_of::<*const u8>()],
                         );
                         let ptr0 = ret_area.0.as_mut_ptr().cast::<u8>();
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/http@2.5.0")]
-                        extern "C" {
+                        #[link(wasm_import_module = "durable:core/http@2.7.0")]
+                        unsafe extern "C" {
                             #[link_name = "[method]http-error2.message"]
-                            fn wit_import(_: i32, _: *mut u8);
+                            fn wit_import1(_: i32, _: *mut u8);
                         }
                         #[cfg(not(target_arch = "wasm32"))]
-                        fn wit_import(_: i32, _: *mut u8) {
+                        unsafe extern "C" fn wit_import1(_: i32, _: *mut u8) {
                             unreachable!()
                         }
-                        wit_import((self).handle() as i32, ptr0);
-                        let l1 = *ptr0.add(0).cast::<*mut u8>();
-                        let l2 = *ptr0.add(4).cast::<usize>();
-                        let len3 = l2;
-                        let bytes3 = _rt::Vec::from_raw_parts(l1.cast(), len3, len3);
-                        _rt::string_lift(bytes3)
+                        wit_import1((self).handle() as i32, ptr0);
+                        let l2 = *ptr0.add(0).cast::<*mut u8>();
+                        let l3 = *ptr0
+                            .add(::core::mem::size_of::<*const u8>())
+                            .cast::<usize>();
+                        let len4 = l3;
+                        let bytes4 = _rt::Vec::from_raw_parts(l2.cast(), len4, len4);
+                        let result5 = _rt::string_lift(bytes4);
+                        result5
                     }
                 }
             }
             impl HttpError2 {
                 #[allow(unused_unsafe, clippy::all)]
                 /// Whether this error is related to a timeout.
+                #[allow(async_fn_in_trait)]
                 pub fn is_timeout(&self) -> bool {
                     unsafe {
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/http@2.5.0")]
-                        extern "C" {
+                        #[link(wasm_import_module = "durable:core/http@2.7.0")]
+                        unsafe extern "C" {
                             #[link_name = "[method]http-error2.is-timeout"]
-                            fn wit_import(_: i32) -> i32;
+                            fn wit_import0(_: i32) -> i32;
                         }
                         #[cfg(not(target_arch = "wasm32"))]
-                        fn wit_import(_: i32) -> i32 {
+                        unsafe extern "C" fn wit_import0(_: i32) -> i32 {
                             unreachable!()
                         }
-                        let ret = wit_import((self).handle() as i32);
+                        let ret = wit_import0((self).handle() as i32);
                         _rt::bool_lift(ret as u8)
                     }
                 }
@@ -465,19 +520,20 @@ pub mod durable {
             impl HttpError2 {
                 #[allow(unused_unsafe, clippy::all)]
                 /// Whether this error was created while building the request.
+                #[allow(async_fn_in_trait)]
                 pub fn is_builder(&self) -> bool {
                     unsafe {
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/http@2.5.0")]
-                        extern "C" {
+                        #[link(wasm_import_module = "durable:core/http@2.7.0")]
+                        unsafe extern "C" {
                             #[link_name = "[method]http-error2.is-builder"]
-                            fn wit_import(_: i32) -> i32;
+                            fn wit_import0(_: i32) -> i32;
                         }
                         #[cfg(not(target_arch = "wasm32"))]
-                        fn wit_import(_: i32) -> i32 {
+                        unsafe extern "C" fn wit_import0(_: i32) -> i32 {
                             unreachable!()
                         }
-                        let ret = wit_import((self).handle() as i32);
+                        let ret = wit_import0((self).handle() as i32);
                         _rt::bool_lift(ret as u8)
                     }
                 }
@@ -485,19 +541,20 @@ pub mod durable {
             impl HttpError2 {
                 #[allow(unused_unsafe, clippy::all)]
                 /// Whether this error is related to a request.
+                #[allow(async_fn_in_trait)]
                 pub fn is_request(&self) -> bool {
                     unsafe {
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/http@2.5.0")]
-                        extern "C" {
+                        #[link(wasm_import_module = "durable:core/http@2.7.0")]
+                        unsafe extern "C" {
                             #[link_name = "[method]http-error2.is-request"]
-                            fn wit_import(_: i32) -> i32;
+                            fn wit_import0(_: i32) -> i32;
                         }
                         #[cfg(not(target_arch = "wasm32"))]
-                        fn wit_import(_: i32) -> i32 {
+                        unsafe extern "C" fn wit_import0(_: i32) -> i32 {
                             unreachable!()
                         }
-                        let ret = wit_import((self).handle() as i32);
+                        let ret = wit_import0((self).handle() as i32);
                         _rt::bool_lift(ret as u8)
                     }
                 }
@@ -506,19 +563,20 @@ pub mod durable {
                 #[allow(unused_unsafe, clippy::all)]
                 /// Whether this error is related to the attempt to connect while making the
                 /// request.
+                #[allow(async_fn_in_trait)]
                 pub fn is_connect(&self) -> bool {
                     unsafe {
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/http@2.5.0")]
-                        extern "C" {
+                        #[link(wasm_import_module = "durable:core/http@2.7.0")]
+                        unsafe extern "C" {
                             #[link_name = "[method]http-error2.is-connect"]
-                            fn wit_import(_: i32) -> i32;
+                            fn wit_import0(_: i32) -> i32;
                         }
                         #[cfg(not(target_arch = "wasm32"))]
-                        fn wit_import(_: i32) -> i32 {
+                        unsafe extern "C" fn wit_import0(_: i32) -> i32 {
                             unreachable!()
                         }
-                        let ret = wit_import((self).handle() as i32);
+                        let ret = wit_import0((self).handle() as i32);
                         _rt::bool_lift(ret as u8)
                     }
                 }
@@ -526,6 +584,7 @@ pub mod durable {
             impl HttpRequest2 {
                 #[allow(unused_unsafe, clippy::all)]
                 /// Create a new request from an HTTP method and a URL.
+                #[allow(async_fn_in_trait)]
                 pub fn new(method: &str, url: &str) -> Result<HttpRequest2, HttpError2> {
                     unsafe {
                         #[repr(align(4))]
@@ -541,10 +600,10 @@ pub mod durable {
                         let len1 = vec1.len();
                         let ptr2 = ret_area.0.as_mut_ptr().cast::<u8>();
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/http@2.5.0")]
-                        extern "C" {
+                        #[link(wasm_import_module = "durable:core/http@2.7.0")]
+                        unsafe extern "C" {
                             #[link_name = "[static]http-request2.new"]
-                            fn wit_import(
+                            fn wit_import3(
                                 _: *mut u8,
                                 _: usize,
                                 _: *mut u8,
@@ -553,7 +612,7 @@ pub mod durable {
                             );
                         }
                         #[cfg(not(target_arch = "wasm32"))]
-                        fn wit_import(
+                        unsafe extern "C" fn wit_import3(
                             _: *mut u8,
                             _: usize,
                             _: *mut u8,
@@ -562,31 +621,33 @@ pub mod durable {
                         ) {
                             unreachable!()
                         }
-                        wit_import(ptr0.cast_mut(), len0, ptr1.cast_mut(), len1, ptr2);
-                        let l3 = i32::from(*ptr2.add(0).cast::<u8>());
-                        match l3 {
+                        wit_import3(ptr0.cast_mut(), len0, ptr1.cast_mut(), len1, ptr2);
+                        let l4 = i32::from(*ptr2.add(0).cast::<u8>());
+                        let result7 = match l4 {
                             0 => {
                                 let e = {
-                                    let l4 = *ptr2.add(4).cast::<i32>();
-                                    HttpRequest2::from_handle(l4 as u32)
+                                    let l5 = *ptr2.add(4).cast::<i32>();
+                                    HttpRequest2::from_handle(l5 as u32)
                                 };
                                 Ok(e)
                             }
                             1 => {
                                 let e = {
-                                    let l5 = *ptr2.add(4).cast::<i32>();
-                                    HttpError2::from_handle(l5 as u32)
+                                    let l6 = *ptr2.add(4).cast::<i32>();
+                                    HttpError2::from_handle(l6 as u32)
                                 };
                                 Err(e)
                             }
                             _ => _rt::invalid_enum_discriminant(),
-                        }
+                        };
+                        result7
                     }
                 }
             }
             impl HttpRequest2 {
                 #[allow(unused_unsafe, clippy::all)]
                 /// Set the HTTP method for this request.
+                #[allow(async_fn_in_trait)]
                 pub fn set_method(&self, method: &str) -> Result<(), HttpError2> {
                     unsafe {
                         #[repr(align(4))]
@@ -599,37 +660,44 @@ pub mod durable {
                         let len0 = vec0.len();
                         let ptr1 = ret_area.0.as_mut_ptr().cast::<u8>();
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/http@2.5.0")]
-                        extern "C" {
+                        #[link(wasm_import_module = "durable:core/http@2.7.0")]
+                        unsafe extern "C" {
                             #[link_name = "[method]http-request2.set-method"]
-                            fn wit_import(_: i32, _: *mut u8, _: usize, _: *mut u8);
+                            fn wit_import2(_: i32, _: *mut u8, _: usize, _: *mut u8);
                         }
                         #[cfg(not(target_arch = "wasm32"))]
-                        fn wit_import(_: i32, _: *mut u8, _: usize, _: *mut u8) {
+                        unsafe extern "C" fn wit_import2(
+                            _: i32,
+                            _: *mut u8,
+                            _: usize,
+                            _: *mut u8,
+                        ) {
                             unreachable!()
                         }
-                        wit_import((self).handle() as i32, ptr0.cast_mut(), len0, ptr1);
-                        let l2 = i32::from(*ptr1.add(0).cast::<u8>());
-                        match l2 {
+                        wit_import2((self).handle() as i32, ptr0.cast_mut(), len0, ptr1);
+                        let l3 = i32::from(*ptr1.add(0).cast::<u8>());
+                        let result5 = match l3 {
                             0 => {
                                 let e = ();
                                 Ok(e)
                             }
                             1 => {
                                 let e = {
-                                    let l3 = *ptr1.add(4).cast::<i32>();
-                                    HttpError2::from_handle(l3 as u32)
+                                    let l4 = *ptr1.add(4).cast::<i32>();
+                                    HttpError2::from_handle(l4 as u32)
                                 };
                                 Err(e)
                             }
                             _ => _rt::invalid_enum_discriminant(),
-                        }
+                        };
+                        result5
                     }
                 }
             }
             impl HttpRequest2 {
                 #[allow(unused_unsafe, clippy::all)]
                 /// Set the URL for this request.
+                #[allow(async_fn_in_trait)]
                 pub fn set_url(&self, url: &str) -> Result<(), HttpError2> {
                     unsafe {
                         #[repr(align(4))]
@@ -642,31 +710,37 @@ pub mod durable {
                         let len0 = vec0.len();
                         let ptr1 = ret_area.0.as_mut_ptr().cast::<u8>();
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/http@2.5.0")]
-                        extern "C" {
+                        #[link(wasm_import_module = "durable:core/http@2.7.0")]
+                        unsafe extern "C" {
                             #[link_name = "[method]http-request2.set-url"]
-                            fn wit_import(_: i32, _: *mut u8, _: usize, _: *mut u8);
+                            fn wit_import2(_: i32, _: *mut u8, _: usize, _: *mut u8);
                         }
                         #[cfg(not(target_arch = "wasm32"))]
-                        fn wit_import(_: i32, _: *mut u8, _: usize, _: *mut u8) {
+                        unsafe extern "C" fn wit_import2(
+                            _: i32,
+                            _: *mut u8,
+                            _: usize,
+                            _: *mut u8,
+                        ) {
                             unreachable!()
                         }
-                        wit_import((self).handle() as i32, ptr0.cast_mut(), len0, ptr1);
-                        let l2 = i32::from(*ptr1.add(0).cast::<u8>());
-                        match l2 {
+                        wit_import2((self).handle() as i32, ptr0.cast_mut(), len0, ptr1);
+                        let l3 = i32::from(*ptr1.add(0).cast::<u8>());
+                        let result5 = match l3 {
                             0 => {
                                 let e = ();
                                 Ok(e)
                             }
                             1 => {
                                 let e = {
-                                    let l3 = *ptr1.add(4).cast::<i32>();
-                                    HttpError2::from_handle(l3 as u32)
+                                    let l4 = *ptr1.add(4).cast::<i32>();
+                                    HttpError2::from_handle(l4 as u32)
                                 };
                                 Err(e)
                             }
                             _ => _rt::invalid_enum_discriminant(),
-                        }
+                        };
+                        result5
                     }
                 }
             }
@@ -675,6 +749,7 @@ pub mod durable {
                 /// Set all the headers for this request at once.
                 ///
                 /// This overrides any headers that have been previously set.
+                #[allow(async_fn_in_trait)]
                 pub fn set_headers(
                     &self,
                     headers: &[HttpHeaderParam<'_>],
@@ -687,106 +762,111 @@ pub mod durable {
                         );
                         let vec3 = headers;
                         let len3 = vec3.len();
-                        let layout3 = _rt::alloc::Layout::from_size_align_unchecked(
-                            vec3.len() * 16,
-                            4,
-                        );
-                        let result3 = if layout3.size() != 0 {
-                            let ptr = _rt::alloc::alloc(layout3).cast::<u8>();
-                            if ptr.is_null() {
-                                _rt::alloc::handle_alloc_error(layout3);
-                            }
-                            ptr
-                        } else {
-                            { ::core::ptr::null_mut() }
-                        };
+                        let layout3 = _rt::alloc::Layout::from_size_align(
+                                vec3.len() * (4 * ::core::mem::size_of::<*const u8>()),
+                                ::core::mem::size_of::<*const u8>(),
+                            )
+                            .unwrap();
+                        let (result3, _cleanup3) = wit_bindgen_rt::Cleanup::new(layout3);
                         for (i, e) in vec3.into_iter().enumerate() {
-                            let base = result3.add(i * 16);
+                            let base = result3
+                                .add(i * (4 * ::core::mem::size_of::<*const u8>()));
                             {
                                 let HttpHeaderParam { name: name0, value: value0 } = e;
                                 let vec1 = name0;
                                 let ptr1 = vec1.as_ptr().cast::<u8>();
                                 let len1 = vec1.len();
-                                *base.add(4).cast::<usize>() = len1;
+                                *base
+                                    .add(::core::mem::size_of::<*const u8>())
+                                    .cast::<usize>() = len1;
                                 *base.add(0).cast::<*mut u8>() = ptr1.cast_mut();
                                 let vec2 = value0;
                                 let ptr2 = vec2.as_ptr().cast::<u8>();
                                 let len2 = vec2.len();
-                                *base.add(12).cast::<usize>() = len2;
-                                *base.add(8).cast::<*mut u8>() = ptr2.cast_mut();
+                                *base
+                                    .add(3 * ::core::mem::size_of::<*const u8>())
+                                    .cast::<usize>() = len2;
+                                *base
+                                    .add(2 * ::core::mem::size_of::<*const u8>())
+                                    .cast::<*mut u8>() = ptr2.cast_mut();
                             }
                         }
                         let ptr4 = ret_area.0.as_mut_ptr().cast::<u8>();
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/http@2.5.0")]
-                        extern "C" {
+                        #[link(wasm_import_module = "durable:core/http@2.7.0")]
+                        unsafe extern "C" {
                             #[link_name = "[method]http-request2.set-headers"]
-                            fn wit_import(_: i32, _: *mut u8, _: usize, _: *mut u8);
+                            fn wit_import5(_: i32, _: *mut u8, _: usize, _: *mut u8);
                         }
                         #[cfg(not(target_arch = "wasm32"))]
-                        fn wit_import(_: i32, _: *mut u8, _: usize, _: *mut u8) {
+                        unsafe extern "C" fn wit_import5(
+                            _: i32,
+                            _: *mut u8,
+                            _: usize,
+                            _: *mut u8,
+                        ) {
                             unreachable!()
                         }
-                        wit_import((self).handle() as i32, result3, len3, ptr4);
-                        let l5 = i32::from(*ptr4.add(0).cast::<u8>());
-                        if layout3.size() != 0 {
-                            _rt::alloc::dealloc(result3.cast(), layout3);
-                        }
-                        match l5 {
+                        wit_import5((self).handle() as i32, result3, len3, ptr4);
+                        let l6 = i32::from(*ptr4.add(0).cast::<u8>());
+                        let result8 = match l6 {
                             0 => {
                                 let e = ();
                                 Ok(e)
                             }
                             1 => {
                                 let e = {
-                                    let l6 = *ptr4.add(4).cast::<i32>();
-                                    HttpError2::from_handle(l6 as u32)
+                                    let l7 = *ptr4.add(4).cast::<i32>();
+                                    HttpError2::from_handle(l7 as u32)
                                 };
                                 Err(e)
                             }
                             _ => _rt::invalid_enum_discriminant(),
-                        }
+                        };
+                        result8
                     }
                 }
             }
             impl HttpRequest2 {
                 #[allow(unused_unsafe, clippy::all)]
                 /// Set the request timeout, in nanoseconds.
-                pub fn set_timeout(&self, timeout: u64) {
+                #[allow(async_fn_in_trait)]
+                pub fn set_timeout(&self, timeout: u64) -> () {
                     unsafe {
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/http@2.5.0")]
-                        extern "C" {
+                        #[link(wasm_import_module = "durable:core/http@2.7.0")]
+                        unsafe extern "C" {
                             #[link_name = "[method]http-request2.set-timeout"]
-                            fn wit_import(_: i32, _: i64);
+                            fn wit_import0(_: i32, _: i64);
                         }
                         #[cfg(not(target_arch = "wasm32"))]
-                        fn wit_import(_: i32, _: i64) {
+                        unsafe extern "C" fn wit_import0(_: i32, _: i64) {
                             unreachable!()
                         }
-                        wit_import((self).handle() as i32, _rt::as_i64(&timeout));
+                        wit_import0((self).handle() as i32, _rt::as_i64(&timeout));
                     }
                 }
             }
             impl HttpRequest2 {
                 #[allow(unused_unsafe, clippy::all)]
                 /// Set the body of this request.
-                pub fn set_body(&self, body: &[u8]) {
+                #[allow(async_fn_in_trait)]
+                pub fn set_body(&self, body: &[u8]) -> () {
                     unsafe {
                         let vec0 = body;
                         let ptr0 = vec0.as_ptr().cast::<u8>();
                         let len0 = vec0.len();
                         #[cfg(target_arch = "wasm32")]
-                        #[link(wasm_import_module = "durable:core/http@2.5.0")]
-                        extern "C" {
+                        #[link(wasm_import_module = "durable:core/http@2.7.0")]
+                        unsafe extern "C" {
                             #[link_name = "[method]http-request2.set-body"]
-                            fn wit_import(_: i32, _: *mut u8, _: usize);
+                            fn wit_import1(_: i32, _: *mut u8, _: usize);
                         }
                         #[cfg(not(target_arch = "wasm32"))]
-                        fn wit_import(_: i32, _: *mut u8, _: usize) {
+                        unsafe extern "C" fn wit_import1(_: i32, _: *mut u8, _: usize) {
                             unreachable!()
                         }
-                        wit_import((self).handle() as i32, ptr0.cast_mut(), len0);
+                        wit_import1((self).handle() as i32, ptr0.cast_mut(), len0);
                     }
                 }
             }
@@ -801,81 +881,116 @@ pub mod durable {
             ///
             /// # Traps
             /// This function will trap if called from outside of a durable transaction.
+            #[allow(async_fn_in_trait)]
             pub fn fetch2(request: HttpRequest2) -> Result<HttpResponse, HttpError2> {
                 unsafe {
-                    #[repr(align(4))]
-                    struct RetArea([::core::mem::MaybeUninit<u8>; 24]);
-                    let mut ret_area = RetArea([::core::mem::MaybeUninit::uninit(); 24]);
+                    #[cfg_attr(target_pointer_width = "64", repr(align(8)))]
+                    #[cfg_attr(target_pointer_width = "32", repr(align(4)))]
+                    struct RetArea(
+                        [::core::mem::MaybeUninit<
+                            u8,
+                        >; 6 * ::core::mem::size_of::<*const u8>()],
+                    );
+                    let mut ret_area = RetArea(
+                        [::core::mem::MaybeUninit::uninit(); 6
+                            * ::core::mem::size_of::<*const u8>()],
+                    );
                     let ptr0 = ret_area.0.as_mut_ptr().cast::<u8>();
                     #[cfg(target_arch = "wasm32")]
-                    #[link(wasm_import_module = "durable:core/http@2.5.0")]
-                    extern "C" {
+                    #[link(wasm_import_module = "durable:core/http@2.7.0")]
+                    unsafe extern "C" {
                         #[link_name = "fetch2"]
-                        fn wit_import(_: i32, _: *mut u8);
+                        fn wit_import1(_: i32, _: *mut u8);
                     }
                     #[cfg(not(target_arch = "wasm32"))]
-                    fn wit_import(_: i32, _: *mut u8) {
+                    unsafe extern "C" fn wit_import1(_: i32, _: *mut u8) {
                         unreachable!()
                     }
-                    wit_import((&request).take_handle() as i32, ptr0);
-                    let l1 = i32::from(*ptr0.add(0).cast::<u8>());
-                    match l1 {
+                    wit_import1((&request).take_handle() as i32, ptr0);
+                    let l2 = i32::from(*ptr0.add(0).cast::<u8>());
+                    let result17 = match l2 {
                         0 => {
                             let e = {
-                                let l2 = i32::from(*ptr0.add(4).cast::<u16>());
-                                let l3 = *ptr0.add(8).cast::<*mut u8>();
-                                let l4 = *ptr0.add(12).cast::<usize>();
-                                let base11 = l3;
-                                let len11 = l4;
-                                let mut result11 = _rt::Vec::with_capacity(len11);
-                                for i in 0..len11 {
-                                    let base = base11.add(i * 16);
-                                    let e11 = {
-                                        let l5 = *base.add(0).cast::<*mut u8>();
-                                        let l6 = *base.add(4).cast::<usize>();
-                                        let len7 = l6;
-                                        let bytes7 = _rt::Vec::from_raw_parts(
-                                            l5.cast(),
-                                            len7,
-                                            len7,
+                                let l3 = i32::from(
+                                    *ptr0.add(::core::mem::size_of::<*const u8>()).cast::<u16>(),
+                                );
+                                let l4 = *ptr0
+                                    .add(2 * ::core::mem::size_of::<*const u8>())
+                                    .cast::<*mut u8>();
+                                let l5 = *ptr0
+                                    .add(3 * ::core::mem::size_of::<*const u8>())
+                                    .cast::<usize>();
+                                let base12 = l4;
+                                let len12 = l5;
+                                let mut result12 = _rt::Vec::with_capacity(len12);
+                                for i in 0..len12 {
+                                    let base = base12
+                                        .add(i * (4 * ::core::mem::size_of::<*const u8>()));
+                                    let e12 = {
+                                        let l6 = *base.add(0).cast::<*mut u8>();
+                                        let l7 = *base
+                                            .add(::core::mem::size_of::<*const u8>())
+                                            .cast::<usize>();
+                                        let len8 = l7;
+                                        let bytes8 = _rt::Vec::from_raw_parts(
+                                            l6.cast(),
+                                            len8,
+                                            len8,
                                         );
-                                        let l8 = *base.add(8).cast::<*mut u8>();
-                                        let l9 = *base.add(12).cast::<usize>();
-                                        let len10 = l9;
+                                        let l9 = *base
+                                            .add(2 * ::core::mem::size_of::<*const u8>())
+                                            .cast::<*mut u8>();
+                                        let l10 = *base
+                                            .add(3 * ::core::mem::size_of::<*const u8>())
+                                            .cast::<usize>();
+                                        let len11 = l10;
                                         HttpHeaderResult {
-                                            name: _rt::string_lift(bytes7),
-                                            value: _rt::Vec::from_raw_parts(l8.cast(), len10, len10),
+                                            name: _rt::string_lift(bytes8),
+                                            value: _rt::Vec::from_raw_parts(l9.cast(), len11, len11),
                                         }
                                     };
-                                    result11.push(e11);
+                                    result12.push(e12);
                                 }
-                                _rt::cabi_dealloc(base11, len11 * 16, 4);
-                                let l12 = *ptr0.add(16).cast::<*mut u8>();
-                                let l13 = *ptr0.add(20).cast::<usize>();
-                                let len14 = l13;
+                                _rt::cabi_dealloc(
+                                    base12,
+                                    len12 * (4 * ::core::mem::size_of::<*const u8>()),
+                                    ::core::mem::size_of::<*const u8>(),
+                                );
+                                let l13 = *ptr0
+                                    .add(4 * ::core::mem::size_of::<*const u8>())
+                                    .cast::<*mut u8>();
+                                let l14 = *ptr0
+                                    .add(5 * ::core::mem::size_of::<*const u8>())
+                                    .cast::<usize>();
+                                let len15 = l14;
                                 HttpResponse {
-                                    status: l2 as u16,
-                                    headers: result11,
-                                    body: _rt::Vec::from_raw_parts(l12.cast(), len14, len14),
+                                    status: l3 as u16,
+                                    headers: result12,
+                                    body: _rt::Vec::from_raw_parts(l13.cast(), len15, len15),
                                 }
                             };
                             Ok(e)
                         }
                         1 => {
                             let e = {
-                                let l15 = *ptr0.add(4).cast::<i32>();
-                                HttpError2::from_handle(l15 as u32)
+                                let l16 = *ptr0
+                                    .add(::core::mem::size_of::<*const u8>())
+                                    .cast::<i32>();
+                                HttpError2::from_handle(l16 as u32)
                             };
                             Err(e)
                         }
                         _ => _rt::invalid_enum_discriminant(),
-                    }
+                    };
+                    result17
                 }
             }
         }
     }
 }
+#[rustfmt::skip]
 mod _rt {
+    #![allow(dead_code, clippy::all)]
     pub use alloc_crate::string::String;
     pub use alloc_crate::vec::Vec;
     use core::fmt;
@@ -910,7 +1025,7 @@ mod _rt {
     impl<T: WasmResource> Resource<T> {
         #[doc(hidden)]
         pub unsafe fn from_handle(handle: u32) -> Self {
-            debug_assert!(handle != u32::MAX);
+            debug_assert!(handle != 0 && handle != u32::MAX);
             Self {
                 handle: AtomicU32::new(handle),
                 _marker: marker::PhantomData,
@@ -980,21 +1095,23 @@ mod _rt {
         if cfg!(debug_assertions) {
             String::from_utf8(bytes).unwrap()
         } else {
-            String::from_utf8_unchecked(bytes)
+            unsafe { String::from_utf8_unchecked(bytes) }
         }
     }
     pub unsafe fn cabi_dealloc(ptr: *mut u8, size: usize, align: usize) {
         if size == 0 {
             return;
         }
-        let layout = alloc::Layout::from_size_align_unchecked(size, align);
-        alloc::dealloc(ptr, layout);
+        unsafe {
+            let layout = alloc::Layout::from_size_align_unchecked(size, align);
+            alloc::dealloc(ptr, layout);
+        }
     }
     pub unsafe fn invalid_enum_discriminant<T>() -> T {
         if cfg!(debug_assertions) {
             panic!("invalid enum discriminant")
         } else {
-            core::hint::unreachable_unchecked()
+            unsafe { core::hint::unreachable_unchecked() }
         }
     }
     pub unsafe fn bool_lift(val: u8) -> bool {
@@ -1010,9 +1127,13 @@ mod _rt {
     }
     extern crate alloc as alloc_crate;
 }
+#[rustfmt::skip]
 #[cfg(target_arch = "wasm32")]
-#[link_section = "component-type:wit-bindgen:0.30.0:import-http:encoded world"]
+#[unsafe(
+    link_section = "component-type:wit-bindgen:0.44.0:durable:core@2.7.0:import-http:encoded world"
+)]
 #[doc(hidden)]
+#[allow(clippy::octal_escapes)]
 pub static __WIT_BINDGEN_COMPONENT_TYPE: [u8; 1099] = *b"\
 \0asm\x0d\0\x01\0\0\x19\x16wit-component-encoding\x04\0\x07\xc9\x07\x01A\x02\x01\
 A\x02\x01B-\x01p}\x01r\x02\x04names\x05value\0\x04\0\x0bhttp-header\x03\0\x01\x01\
@@ -1033,10 +1154,10 @@ lf\x15\x07headers\x03\0\x16\x04\0![method]http-request2.set-headers\x01\x19\x01@
 \x02\x04self\x15\x07timeoutw\x01\0\x04\0![method]http-request2.set-timeout\x01\x1a\
 \x01@\x02\x04self\x15\x04body\0\x01\0\x04\0\x1e[method]http-request2.set-body\x01\
 \x1b\x01j\x01\x09\x01\x0b\x01@\x01\x07request\x07\0\x1c\x04\0\x05fetch\x01\x1d\x01\
-j\x01\x09\x01\x12\x01@\x01\x07request\x11\0\x1e\x04\0\x06fetch2\x01\x1f\x03\x01\x17\
-durable:core/http@2.5.0\x05\0\x04\x01\x1edurable:core/import-http@2.5.0\x04\0\x0b\
-\x11\x01\0\x0bimport-http\x03\0\0\0G\x09producers\x01\x0cprocessed-by\x02\x0dwit\
--component\x070.215.0\x10wit-bindgen-rust\x060.30.0";
+j\x01\x09\x01\x12\x01@\x01\x07request\x11\0\x1e\x04\0\x06fetch2\x01\x1f\x03\0\x17\
+durable:core/http@2.7.0\x05\0\x04\0\x1edurable:core/import-http@2.7.0\x04\0\x0b\x11\
+\x01\0\x0bimport-http\x03\0\0\0G\x09producers\x01\x0cprocessed-by\x02\x0dwit-com\
+ponent\x070.236.1\x10wit-bindgen-rust\x060.44.0";
 #[inline(never)]
 #[doc(hidden)]
 pub fn __link_custom_section_describing_imports() {

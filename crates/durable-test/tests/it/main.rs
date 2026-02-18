@@ -4,6 +4,7 @@ use anyhow::Context;
 use durable_client::{DurableClient, Program, ProgramOptions};
 
 mod basic;
+mod dst_notify;
 mod notify;
 mod shutdown;
 mod sqlx;
