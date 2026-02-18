@@ -10,10 +10,11 @@
 //! just needs to arrange for a notification to be posted to the right task, and
 //! it will pick up where it left off.
 
+use std::time::Duration;
+
 #[doc(inline)]
 pub use durable_core::notify::{Notification, NotifyError, NotifyErrorKind};
 use serde::Serialize;
-use std::time::Duration;
 
 /// Block this workflow until a new notification arrives, and return that
 /// notification.

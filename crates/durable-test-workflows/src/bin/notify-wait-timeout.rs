@@ -3,7 +3,8 @@ use std::time::Duration;
 use durable::notify;
 
 fn main() {
-    // First, attempt a wait with a short timeout that should expire (no notification pending).
+    // First, attempt a wait with a short timeout that should expire (no
+    // notification pending).
     let result = notify::wait_with_timeout(Duration::from_millis(100));
     assert!(result.is_none(), "expected timeout with no notification");
 

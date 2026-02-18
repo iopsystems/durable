@@ -1,8 +1,8 @@
 //! Deterministic simulation tests for `notification_blocking_timeout`.
 //!
 //! These tests use the DST infrastructure (DstScheduler, DstClock, DstEntropy,
-//! DstEventSource) to get precise control over when notifications are delivered,
-//! when the clock advances, and when the worker suspends tasks.
+//! DstEventSource) to get precise control over when notifications are
+//! delivered, when the clock advances, and when the worker suspends tasks.
 
 use std::sync::Arc;
 use std::time::Duration;
@@ -106,8 +106,9 @@ async fn dst_notify_timeout_suspend_then_wake(pool: sqlx::PgPool) -> anyhow::Res
 }
 
 /// With a controlled event source, inject a notification event at a precise
-/// moment while the task is actively waiting in `notification_blocking_timeout`.
-/// The task should wake up and complete promptly without needing to suspend.
+/// moment while the task is actively waiting in
+/// `notification_blocking_timeout`. The task should wake up and complete
+/// promptly without needing to suspend.
 #[sqlx::test]
 async fn dst_notify_timeout_wake_before_suspend(pool: sqlx::PgPool) -> anyhow::Result<()> {
     let scheduler = Arc::new(DstScheduler::new(42));
