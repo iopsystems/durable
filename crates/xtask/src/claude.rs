@@ -180,8 +180,7 @@ impl Setup {
         tracing::info!("configuring trust authentication in {hba_path}");
 
         // Replace all auth methods with trust for local and host connections.
-        let new_contents = format!(
-            "\
+        let new_contents = "\
 # durable-xtask: trust auth configured
 # This file was modified by `cargo xtask claude setup` to allow passwordless
 # local development connections.
@@ -189,7 +188,7 @@ local   all             all                                     trust
 host    all             all             127.0.0.1/32            trust
 host    all             all             ::1/128                 trust
 "
-        );
+        .to_string();
 
         std::fs::write(&hba_path, new_contents)
             .with_context(|| format!("failed to write {hba_path}"))?;
