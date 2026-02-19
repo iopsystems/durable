@@ -1,80 +1,46 @@
-# Test Runner
+---
+name: running-tests
+description: Runs the project test suite using cargo-nextest, including unit tests, integration tests, doc tests, formatting checks, and clippy. Use when the user asks to run tests, check code quality, verify changes, or validate before committing.
+---
 
-Use this skill to run the project's test suite. This is a Rust workspace that uses
-`cargo-nextest` as the test runner, with tests that require a PostgreSQL database
-and pre-built WebAssembly binaries.
+# Running Tests
 
 ## Prerequisites
 
-The SessionStart hook (`.claude/hooks/session-start.sh`) installs required tools and
-starts PostgreSQL. If the environment is not set up, run:
+If the environment is not set up, run `cargo xtask claude setup`.
 
-```sh
-cargo xtask claude setup
-```
-
-This ensures `cargo-nextest`, `cargo-component`, the `wasm32-wasip1` target, and a
-PostgreSQL database are all available.
-
-## Running the full test suite
-
-Run all tests (unit, integration, and deterministic simulation tests):
+## Full test suite
 
 ```sh
 cargo nextest run --locked --all-targets --all-features --no-fail-fast
 ```
 
-The nextest configuration in `.config/nextest.toml` automatically triggers a setup
-script that builds the required WASM test binaries before running tests that depend
-on them.
+Nextest automatically builds WASM test binaries via `.config/nextest.toml` setup scripts before running tests.
 
-## Running doc tests
+## Doc tests
 
-Doc tests are not supported by nextest and must be run separately:
+Nextest does not support doc tests; run them separately:
 
 ```sh
 cargo test --doc --all-features --locked
 ```
 
-## Running a specific test
-
-Pass a filter expression or test name to nextest:
-
-```sh
-cargo nextest run --locked --all-features -E 'test(test_name)'
-```
-
-Or use a simple string filter:
+## Specific test or crate
 
 ```sh
 cargo nextest run --locked --all-features test_name
-```
-
-## Running tests for a specific crate
-
-```sh
 cargo nextest run --locked --all-features -p crate-name
 ```
 
-## Checking formatting
+## Formatting and clippy
 
 ```sh
 cargo fmt --all -- --check
-```
-
-## Running clippy
-
-```sh
 cargo clippy --all-targets --all-features
 ```
 
 ## Key details
 
-- Tests in `crates/durable-test/` use `#[sqlx::test]` and require a running
-  PostgreSQL instance. The `DATABASE_URL` environment variable must be set (the
-  session-start hook writes this to `.env`).
-- The nextest setup script (`crates/durable-test/setup.sh`) builds WASM binaries
-  from `crates/durable-test-workflows/` with `cargo component build --profile wasm`.
-  These binaries are loaded by integration tests at runtime.
-- CI uses the `dev-ci` cargo profile for faster builds. You can add
-  `--cargo-profile dev-ci` to nextest commands locally for the same behavior.
+- Integration tests use `#[sqlx::test]` and require `DATABASE_URL` to be set (the session-start hook writes `.env`).
+- The nextest setup script runs `cargo component build --profile wasm -p durable-test-workflows` to build WASM binaries loaded by tests at runtime.
+- CI uses the `dev-ci` cargo profile. Add `--cargo-profile dev-ci` for the same behavior locally.
