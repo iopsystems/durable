@@ -1,6 +1,6 @@
 ---
 name: running-tests
-description: Runs the project test suite using cargo-nextest, including unit tests, integration tests, doc tests, formatting checks, and clippy. Use when the user asks to run tests, check code quality, verify changes, or validate before committing.
+description: Runs the project test suite using cargo-nextest, including unit and integration tests. Use when the user asks to run tests, verify changes, or validate before committing.
 ---
 
 # Running Tests
@@ -17,26 +17,11 @@ cargo nextest run --locked --all-targets --all-features --no-fail-fast
 
 Nextest automatically builds WASM test binaries via `.config/nextest.toml` setup scripts before running tests.
 
-## Doc tests
-
-Nextest does not support doc tests; run them separately:
-
-```sh
-cargo test --doc --all-features --locked
-```
-
 ## Specific test or crate
 
 ```sh
 cargo nextest run --locked --all-features test_name
 cargo nextest run --locked --all-features -p crate-name
-```
-
-## Formatting and clippy
-
-```sh
-cargo fmt --all -- --check
-cargo clippy --all-targets --all-features
 ```
 
 ## Key details
