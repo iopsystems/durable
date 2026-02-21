@@ -283,13 +283,28 @@ async fn dst_notify_timeout_records_scheduler_events(pool: sqlx::PgPool) -> anyh
     );
 
     // TaskCompleted should have fired exactly once.
-    let complete_count = scheduler
-        .events()
-        .iter()
-        .filter(|e| {
-            matches!(e, durable_runtime::scheduler::ScheduleEvent::TaskCompleted { task_id, .. } if *task_id == task.id())
-        })
-        .count();
+    //
+    // There is a small window between when the worker commits the task's
+    // "complete" state to the database (which causes `task.wait()` to return)
+    // and when it calls `scheduler.notify(TaskCompleted)`. On a multi-threaded
+    // runtime we may need to yield briefly to let the worker finish.
+    let complete_count = timeout(Duration::from_secs(5), async {
+        loop {
+            let count = scheduler
+                .events()
+                .iter()
+                .filter(|e| {
+                    matches!(e, durable_runtime::scheduler::ScheduleEvent::TaskCompleted { task_id, .. } if *task_id == task.id())
+                })
+                .count();
+            if count > 0 {
+                break count;
+            }
+            tokio::task::yield_now().await;
+        }
+    })
+    .await
+    .context("TaskCompleted event not recorded within 5s")?;
     assert_eq!(
         complete_count, 1,
         "expected exactly 1 TaskCompleted event, got {complete_count}"
