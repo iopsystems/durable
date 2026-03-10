@@ -18,7 +18,7 @@ durable-sqlx    = { version = "0.5.5", registry = "iop-systems", path = "crates/
 
 durable-client  = { version = "0.1.1", registry = "iop-systems", path = "crates/durable-client" }
 durable-migrate = { version = "0.1.0", registry = "iop-systems", path = "crates/durable-migrate" }
-durable-runtime = { version = "0.6.0", registry = "iop-systems", path = "crates/durable-runtime" }
+durable-runtime = { version = "0.7.0", registry = "iop-systems", path = "crates/durable-runtime" }
 durable-bindgen = { version = "0.1.2", registry = "iop-systems", path = "crates/durable-bindgen" }
 
 wasmtime         = { version = "41.0" }
