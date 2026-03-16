@@ -22,7 +22,7 @@ pub struct SystemEntropy;
 
 impl Entropy for SystemEntropy {
     fn random_range(&self, range: std::ops::Range<u128>) -> u128 {
-        use rand::Rng;
+        use rand::RngExt;
         rand::rng().random_range(range)
     }
 }

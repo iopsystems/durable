@@ -9,21 +9,21 @@ publish = false
 durable-bindgen = { workspace = true }
 durable-migrate = { workspace = true, features = ["migrate"] }
 
-anyhow = "1.0.86"
-cargo_metadata = "0.19.1"
-clap = { version = "4.5.11", features = ["derive"] }
+anyhow = "1.0.102"
+cargo_metadata = "0.23.1"
+clap = { version = "4.6.0", features = ["derive"] }
 dotenvy = "0.15.7"
-serde = { version = "1.0.204", features = ["derive"] }
-serde_json = "1.0.121"
-tokio = { version = "1.39.2", features = ["rt", "macros", "signal", "process"] }
-tracing-subscriber = { version = "0.3.18", features = ["env-filter"] }
-xshell = "0.2.6"
-tracing = "0.1.40"
-libc = "0.2.155"
-glob = "0.3.1"
+serde = { version = "1.0.228", features = ["derive"] }
+serde_json = "1.0.149"
+tokio = { version = "1.50.0", features = ["rt", "macros", "signal", "process"] }
+tracing-subscriber = { version = "0.3.23", features = ["env-filter"] }
+xshell = "0.2.7"
+tracing = "0.1.44"
+libc = "0.2.183"
+glob = "0.3.3"
 scopeguard = "1.2.0"
 
 [dependencies.sqlx]
-version = "0.8.0"
+version = "0.8.6"
 default-features = false
 features = ["json", "postgres", "runtime-tokio", "tls-rustls"]

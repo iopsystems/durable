@@ -14,5 +14,5 @@ serde_json = { version = "1.0", features = ["raw_value"] }
 wit-bindgen-rt = { workspace = true }
 
 [build-dependencies]
-cc = "1.0"
+cc = "1.2"
 
