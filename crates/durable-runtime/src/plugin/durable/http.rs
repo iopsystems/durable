@@ -40,32 +40,32 @@ impl Task {
 }
 
 impl HostHttpError2 for Task {
-    async fn message(&mut self, res: Resource<HttpError2>) -> wasmtime::Result<String> {
+    async fn message(&mut self, res: Resource<HttpError2>) -> anyhow::Result<String> {
         let error = self.resources.get(res)?;
         Ok(error.to_string())
     }
 
-    async fn is_timeout(&mut self, res: Resource<HttpError2>) -> wasmtime::Result<bool> {
+    async fn is_timeout(&mut self, res: Resource<HttpError2>) -> anyhow::Result<bool> {
         let error = self.resources.get(res)?;
         Ok(error.is_timeout())
     }
 
-    async fn is_builder(&mut self, res: Resource<HttpError2>) -> wasmtime::Result<bool> {
+    async fn is_builder(&mut self, res: Resource<HttpError2>) -> anyhow::Result<bool> {
         let error = self.resources.get(res)?;
         Ok(error.is_builder())
     }
 
-    async fn is_request(&mut self, res: Resource<HttpError2>) -> wasmtime::Result<bool> {
+    async fn is_request(&mut self, res: Resource<HttpError2>) -> anyhow::Result<bool> {
         let error = self.resources.get(res)?;
         Ok(error.is_request())
     }
 
-    async fn is_connect(&mut self, res: Resource<HttpError2>) -> wasmtime::Result<bool> {
+    async fn is_connect(&mut self, res: Resource<HttpError2>) -> anyhow::Result<bool> {
         let error = self.resources.get(res)?;
         Ok(error.is_connect())
     }
 
-    async fn drop(&mut self, res: Resource<HttpError2>) -> wasmtime::Result<()> {
+    async fn drop(&mut self, res: Resource<HttpError2>) -> anyhow::Result<()> {
         self.resources.remove(res)?;
         Ok(())
     }
@@ -123,7 +123,7 @@ impl HostHttpRequest2 for Task {
         &mut self,
         method: String,
         url: String,
-    ) -> wasmtime::Result<Result<Resource<HttpRequest2>, Resource<HttpError2>>> {
+    ) -> anyhow::Result<Result<Resource<HttpRequest2>, Resource<HttpError2>>> {
         let config = self.state.config();
 
         Ok(match HttpRequest2::new(method, url, config) {
@@ -136,7 +136,7 @@ impl HostHttpRequest2 for Task {
         &mut self,
         res: Resource<HttpRequest2>,
         method: String,
-    ) -> wasmtime::Result<Result<(), Resource<HttpError2>>> {
+    ) -> anyhow::Result<Result<(), Resource<HttpError2>>> {
         let request = self.resources.get_mut(res)?;
 
         Ok(match HttpRequest2::set_method(request, &method) {
@@ -149,7 +149,7 @@ impl HostHttpRequest2 for Task {
         &mut self,
         res: Resource<HttpRequest2>,
         url: String,
-    ) -> wasmtime::Result<Result<(), Resource<HttpError2>>> {
+    ) -> anyhow::Result<Result<(), Resource<HttpError2>>> {
         let request = self.resources.get_mut(res)?;
 
         Ok(match HttpRequest2::set_url(request, &url) {
@@ -162,7 +162,7 @@ impl HostHttpRequest2 for Task {
         &mut self,
         res: Resource<HttpRequest2>,
         headers: Vec<HttpHeader>,
-    ) -> wasmtime::Result<Result<(), Resource<HttpError2>>> {
+    ) -> anyhow::Result<Result<(), Resource<HttpError2>>> {
         let request = self.resources.get_mut(res)?;
 
         Ok(match HttpRequest2::set_headers(request, &headers) {
@@ -175,7 +175,7 @@ impl HostHttpRequest2 for Task {
         &mut self,
         res: Resource<HttpRequest2>,
         timeout: u64,
-    ) -> wasmtime::Result<()> {
+    ) -> anyhow::Result<()> {
         let request = self.resources.get_mut(res)?;
         let config = self.state.config();
 
@@ -183,18 +183,14 @@ impl HostHttpRequest2 for Task {
         Ok(())
     }
 
-    async fn set_body(
-        &mut self,
-        res: Resource<HttpRequest2>,
-        body: Vec<u8>,
-    ) -> wasmtime::Result<()> {
+    async fn set_body(&mut self, res: Resource<HttpRequest2>, body: Vec<u8>) -> anyhow::Result<()> {
         let request = self.resources.get_mut(res)?;
 
         HttpRequest2::set_body(request, body);
         Ok(())
     }
 
-    async fn drop(&mut self, res: Resource<HttpRequest2>) -> wasmtime::Result<()> {
+    async fn drop(&mut self, res: Resource<HttpRequest2>) -> anyhow::Result<()> {
         self.resources.remove(res)?;
         Ok(())
     }
@@ -235,7 +231,7 @@ impl Host for Task {
     async fn fetch2(
         &mut self,
         request: Resource<HttpRequest2>,
-    ) -> wasmtime::Result<Result<HttpResponse, Resource<HttpError2>>> {
+    ) -> anyhow::Result<Result<HttpResponse, Resource<HttpError2>>> {
         self.state
             .assert_in_transaction("durable:http/http.fetch2")?;
 

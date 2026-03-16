@@ -47,7 +47,7 @@ impl Resources {
     /// This will return an error if:
     /// - there is no resource with the provided resource id,
     /// - the resource was created in a transaction other than the current one.
-    pub fn get<R>(&self, res: Resource<R>) -> wasmtime::Result<&R::Data>
+    pub fn get<R>(&self, res: Resource<R>) -> anyhow::Result<&R::Data>
     where
         R: Resourceable,
     {
@@ -80,7 +80,7 @@ impl Resources {
     /// This will return an error if:
     /// - there is no resource with the provided resource id,
     /// - the resource was created in a transaction other than the current one.
-    pub fn get_mut<R>(&mut self, res: Resource<R>) -> wasmtime::Result<&mut R::Data>
+    pub fn get_mut<R>(&mut self, res: Resource<R>) -> anyhow::Result<&mut R::Data>
     where
         R: Resourceable,
     {
@@ -104,7 +104,7 @@ impl Resources {
         Ok(&mut entry.data)
     }
 
-    pub fn get_txn<R>(&mut self, res: Resource<R>) -> wasmtime::Result<Option<i32>>
+    pub fn get_txn<R>(&mut self, res: Resource<R>) -> anyhow::Result<Option<i32>>
     where
         R: Resourceable,
     {
@@ -128,7 +128,7 @@ impl Resources {
         Ok(entry.txn)
     }
 
-    pub fn insert<R>(&mut self, data: R::Data) -> wasmtime::Result<Resource<R>>
+    pub fn insert<R>(&mut self, data: R::Data) -> anyhow::Result<Resource<R>>
     where
         R: Resourceable,
     {
@@ -151,7 +151,7 @@ impl Resources {
         Ok(Resource::new_own(index))
     }
 
-    pub fn remove<R>(&mut self, res: Resource<R>) -> wasmtime::Result<R::Data>
+    pub fn remove<R>(&mut self, res: Resource<R>) -> anyhow::Result<R::Data>
     where
         R: Resourceable,
     {

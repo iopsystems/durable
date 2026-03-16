@@ -24,7 +24,7 @@ impl From<SerializableDateTime> for Datetime {
 }
 
 impl wasi::clocks::wall_clock::Host for Task {
-    async fn now(&mut self) -> wasmtime::Result<Datetime> {
+    async fn now(&mut self) -> anyhow::Result<Datetime> {
         let options = TransactionOptions::new("wasi:clocks/wall-clock.now");
         self.state
             .maybe_do_transaction_sync(options, |state| {
@@ -38,7 +38,7 @@ impl wasi::clocks::wall_clock::Host for Task {
             .await
     }
 
-    async fn resolution(&mut self) -> wasmtime::Result<Datetime> {
+    async fn resolution(&mut self) -> anyhow::Result<Datetime> {
         // The underlying clocks on the host don't necessarily have a consistent
         // resolution. This is especially true since the workflow may move between
         // hosts.
@@ -49,7 +49,7 @@ impl wasi::clocks::wall_clock::Host for Task {
 }
 
 impl wasi::clocks::monotonic_clock::Host for Task {
-    async fn now(&mut self) -> wasmtime::Result<Instant> {
+    async fn now(&mut self) -> anyhow::Result<Instant> {
         let options = TransactionOptions::new("wasi:clocks/monotonic-clock.now");
         self.state
             .maybe_do_transaction_sync(options, |state| {
@@ -62,7 +62,7 @@ impl wasi::clocks::monotonic_clock::Host for Task {
             .await
     }
 
-    async fn resolution(&mut self) -> wasmtime::Result<monotonic::Duration> {
+    async fn resolution(&mut self) -> anyhow::Result<monotonic::Duration> {
         // The underlying clocks on the host don't necessarily have a consistent
         // resolution. This is especially true since the workflow may move between
         // hosts.
@@ -71,7 +71,7 @@ impl wasi::clocks::monotonic_clock::Host for Task {
         Ok(1000)
     }
 
-    async fn subscribe_instant(&mut self, when: Instant) -> wasmtime::Result<Resource<Pollable>> {
+    async fn subscribe_instant(&mut self, when: Instant) -> anyhow::Result<Resource<Pollable>> {
         let txn = self.state.transaction().map(|txn| txn.index());
         let timeout = DateTime::from_timestamp((when / NS_PER_S) as i64, (when % NS_PER_S) as u32)
             .unwrap_or(DateTime::<Utc>::MAX_UTC);
@@ -85,7 +85,7 @@ impl wasi::clocks::monotonic_clock::Host for Task {
     async fn subscribe_duration(
         &mut self,
         when: monotonic::Duration,
-    ) -> wasmtime::Result<Resource<Pollable>> {
+    ) -> anyhow::Result<Resource<Pollable>> {
         let now = self.now().await?;
         self.subscribe_instant(now.saturating_add(when)).await
     }

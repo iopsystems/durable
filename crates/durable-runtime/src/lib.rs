@@ -36,6 +36,8 @@ mod bindings {
         exports: {
             default: async | trappable
         },
+
+        anyhow: true,
     });
 }
 
