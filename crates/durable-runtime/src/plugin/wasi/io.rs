@@ -19,14 +19,14 @@ impl wasi::io::error::HostError for Task {
     async fn to_debug_string(
         &mut self,
         res: Resource<wasi::io::error::Error>,
-    ) -> wasmtime::Result<String> {
+    ) -> anyhow::Result<String> {
         let resources = self.plugins.expect::<WasiResources>();
         let error = &resources.errors[res.rep() as usize];
 
         Ok(error.to_string())
     }
 
-    async fn drop(&mut self, res: Resource<wasi::io::error::Error>) -> wasmtime::Result<()> {
+    async fn drop(&mut self, res: Resource<wasi::io::error::Error>) -> anyhow::Result<()> {
         let resources = self.plugins.expect_mut::<WasiResources>();
         resources.errors.remove(res.rep() as usize);
         Ok(())
@@ -44,7 +44,7 @@ impl wasi::io::streams::HostInputStream for Task {
         &mut self,
         _: Resource<InputStream>,
         _: u64,
-    ) -> wasmtime::Result<Result<Vec<u8>, StreamError>> {
+    ) -> anyhow::Result<Result<Vec<u8>, StreamError>> {
         // Workflows have no input streams. We model this by always indicating that
         // the stream is closed.
         Ok(Err(StreamError::Closed))
@@ -54,7 +54,7 @@ impl wasi::io::streams::HostInputStream for Task {
         &mut self,
         _: Resource<InputStream>,
         _: u64,
-    ) -> wasmtime::Result<Result<Vec<u8>, StreamError>> {
+    ) -> anyhow::Result<Result<Vec<u8>, StreamError>> {
         Ok(Err(StreamError::Closed))
     }
 
@@ -62,7 +62,7 @@ impl wasi::io::streams::HostInputStream for Task {
         &mut self,
         _: Resource<InputStream>,
         _: u64,
-    ) -> wasmtime::Result<Result<u64, StreamError>> {
+    ) -> anyhow::Result<Result<u64, StreamError>> {
         Ok(Err(StreamError::Closed))
     }
 
@@ -70,18 +70,18 @@ impl wasi::io::streams::HostInputStream for Task {
         &mut self,
         _: Resource<InputStream>,
         _: u64,
-    ) -> wasmtime::Result<Result<u64, StreamError>> {
+    ) -> anyhow::Result<Result<u64, StreamError>> {
         Ok(Err(StreamError::Closed))
     }
 
     async fn subscribe(
         &mut self,
         _: Resource<InputStream>,
-    ) -> wasmtime::Result<Resource<Pollable>> {
+    ) -> anyhow::Result<Resource<Pollable>> {
         Ok(Resource::new_own(u32::MAX))
     }
 
-    async fn drop(&mut self, _: Resource<InputStream>) -> wasmtime::Result<()> {
+    async fn drop(&mut self, _: Resource<InputStream>) -> anyhow::Result<()> {
         Ok(())
     }
 }
@@ -90,7 +90,7 @@ impl wasi::io::streams::HostOutputStream for Task {
     async fn check_write(
         &mut self,
         _: Resource<OutputStream>,
-    ) -> wasmtime::Result<Result<u64, StreamError>> {
+    ) -> anyhow::Result<Result<u64, StreamError>> {
         Ok(Ok(u64::MAX))
     }
 
@@ -98,7 +98,7 @@ impl wasi::io::streams::HostOutputStream for Task {
         &mut self,
         stream: Resource<OutputStream>,
         contents: Vec<u8>,
-    ) -> wasmtime::Result<Result<(), StreamError>> {
+    ) -> anyhow::Result<Result<(), StreamError>> {
         if stream.rep() != 1 {
             return Ok(Err(StreamError::Closed));
         }
@@ -120,14 +120,14 @@ impl wasi::io::streams::HostOutputStream for Task {
         &mut self,
         stream: Resource<OutputStream>,
         contents: Vec<u8>,
-    ) -> wasmtime::Result<Result<(), StreamError>> {
+    ) -> anyhow::Result<Result<(), StreamError>> {
         self.write(stream, contents).await
     }
 
     async fn flush(
         &mut self,
         stream: Resource<OutputStream>,
-    ) -> wasmtime::Result<Result<(), StreamError>> {
+    ) -> anyhow::Result<Result<(), StreamError>> {
         Ok(match stream.rep() {
             1 => Ok(()),
             _ => Err(StreamError::Closed),
@@ -137,14 +137,14 @@ impl wasi::io::streams::HostOutputStream for Task {
     async fn blocking_flush(
         &mut self,
         stream: Resource<OutputStream>,
-    ) -> wasmtime::Result<Result<(), StreamError>> {
+    ) -> anyhow::Result<Result<(), StreamError>> {
         self.flush(stream).await
     }
 
     async fn subscribe(
         &mut self,
         _: Resource<OutputStream>,
-    ) -> wasmtime::Result<Resource<Pollable>> {
+    ) -> anyhow::Result<Resource<Pollable>> {
         Ok(Resource::new_own(u32::MAX))
     }
 
@@ -152,7 +152,7 @@ impl wasi::io::streams::HostOutputStream for Task {
         &mut self,
         stream: Resource<OutputStream>,
         len: u64,
-    ) -> wasmtime::Result<Result<(), StreamError>> {
+    ) -> anyhow::Result<Result<(), StreamError>> {
         if stream.rep() != 1 {
             return Ok(Err(StreamError::Closed));
         }
@@ -176,7 +176,7 @@ impl wasi::io::streams::HostOutputStream for Task {
         &mut self,
         stream: Resource<OutputStream>,
         len: u64,
-    ) -> wasmtime::Result<Result<(), StreamError>> {
+    ) -> anyhow::Result<Result<(), StreamError>> {
         self.write_zeroes(stream, len).await
     }
 
@@ -185,7 +185,7 @@ impl wasi::io::streams::HostOutputStream for Task {
         _dst: Resource<OutputStream>,
         _src: Resource<InputStream>,
         _len: u64,
-    ) -> wasmtime::Result<Result<u64, StreamError>> {
+    ) -> anyhow::Result<Result<u64, StreamError>> {
         Ok(Err(StreamError::Closed))
     }
 
@@ -194,11 +194,11 @@ impl wasi::io::streams::HostOutputStream for Task {
         _dst: Resource<OutputStream>,
         _src: Resource<InputStream>,
         _len: u64,
-    ) -> wasmtime::Result<Result<u64, StreamError>> {
+    ) -> anyhow::Result<Result<u64, StreamError>> {
         Ok(Err(StreamError::Closed))
     }
 
-    async fn drop(&mut self, _: Resource<OutputStream>) -> wasmtime::Result<()> {
+    async fn drop(&mut self, _: Resource<OutputStream>) -> anyhow::Result<()> {
         Ok(())
     }
 }
@@ -206,7 +206,7 @@ impl wasi::io::streams::HostOutputStream for Task {
 impl wasi::io::streams::Host for Task {}
 
 impl wasi::io::poll::HostPollable for Task {
-    async fn ready(&mut self, pollable: Resource<Pollable>) -> wasmtime::Result<bool> {
+    async fn ready(&mut self, pollable: Resource<Pollable>) -> anyhow::Result<bool> {
         // Pollable is for a stream, so it is always ready.
         if pollable.rep() == u32::MAX {
             return Ok(true);
@@ -233,7 +233,7 @@ impl wasi::io::poll::HostPollable for Task {
             .await
     }
 
-    async fn block(&mut self, pollable: Resource<Pollable>) -> wasmtime::Result<()> {
+    async fn block(&mut self, pollable: Resource<Pollable>) -> anyhow::Result<()> {
         // Pollable is for a stream, so it is always ready.
         if pollable.rep() == u32::MAX {
             return Ok(());
@@ -295,7 +295,7 @@ impl wasi::io::poll::HostPollable for Task {
         Ok(())
     }
 
-    async fn drop(&mut self, pollable: Resource<Pollable>) -> wasmtime::Result<()> {
+    async fn drop(&mut self, pollable: Resource<Pollable>) -> anyhow::Result<()> {
         // All stream pollables are shared so no drops necessary.
         if pollable.rep() == u32::MAX {
             return Ok(());
@@ -309,7 +309,7 @@ impl wasi::io::poll::HostPollable for Task {
 }
 
 impl wasi::io::poll::Host for Task {
-    async fn poll(&mut self, pollables: Vec<Resource<Pollable>>) -> wasmtime::Result<Vec<u32>> {
+    async fn poll(&mut self, pollables: Vec<Resource<Pollable>>) -> anyhow::Result<Vec<u32>> {
         if pollables.len() > u32::MAX as usize {
             anyhow::bail!("poll called with more than 2^32 pollables");
         }

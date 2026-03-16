@@ -38,7 +38,7 @@ async fn poll_notification(
 }
 
 impl Host for Task {
-    async fn notification_blocking(&mut self) -> wasmtime::Result<Event> {
+    async fn notification_blocking(&mut self) -> anyhow::Result<Event> {
         if self.state.transaction().is_some() {
             anyhow::bail!(
                 "durable:core/notify.notification-blocking cannot be called from within a \
@@ -121,7 +121,7 @@ impl Host for Task {
     async fn notification_blocking_timeout(
         &mut self,
         timeout_ns: u64,
-    ) -> wasmtime::Result<Option<Event>> {
+    ) -> anyhow::Result<Option<Event>> {
         if self.state.transaction().is_some() {
             anyhow::bail!(
                 "durable:core/notify.notification-blocking-timeout cannot be called from within a \
@@ -240,7 +240,7 @@ impl Host for Task {
         task: i64,
         event: String,
         data: String,
-    ) -> wasmtime::Result<Result<(), NotifyError>> {
+    ) -> anyhow::Result<Result<(), NotifyError>> {
         if self.state.transaction().is_some() {
             anyhow::bail!("durable:core/notify.notify cannot be called from within a transaction");
         }

@@ -261,15 +261,13 @@ impl WorkerBuilder {
             metrics: SharedMetrics::new(),
         });
 
-        let mut config = self.wasmtime_config.unwrap_or_else(|| {
+        let config = self.wasmtime_config.unwrap_or_else(|| {
             let mut config = wasmtime::Config::new();
             config.wasm_backtrace_details(wasmtime::WasmBacktraceDetails::Enable);
             config.cranelift_opt_level(wasmtime::OptLevel::Speed);
             config.debug_info(true);
             config
         });
-
-        config.async_support(true);
 
         let engine = wasmtime::Engine::new(&config)?;
         let event_source = match self.event_source {
@@ -1313,7 +1311,8 @@ impl Worker {
                     move || Component::new(&engine, &wasm)
                 })
                 .await
-                .context("component compilation panicked")??;
+                .context("component compilation panicked")?
+                .map_err(anyhow::Error::from)?;
 
                 let elapsed = start.elapsed();
                 tracing::debug!(
@@ -1358,6 +1357,7 @@ impl Worker {
         for plugin in shared.plugins.iter() {
             plugin
                 .setup(&mut linker, &mut task)
+                .map_err(anyhow::Error::from)
                 .with_context(|| format!("failed to set up plugin `{}`", plugin.name()))?;
         }
 
@@ -1369,6 +1369,7 @@ impl Worker {
 
         let instance = Imports::instantiate_async(&mut store, &component, &linker)
             .await
+            .map_err(anyhow::Error::from)
             .context("failed to instantiate the wasm component")?;
         let guest = instance.wasi_cli_run();
 
@@ -1377,6 +1378,7 @@ impl Worker {
             Ok(Ok(())) => TaskStatus::ExitSuccess,
             Ok(Err(())) => TaskStatus::ExitFailure,
             Err(e) => {
+                let e: anyhow::Error = e.into();
                 if let Some(exit) = as_task_exit(&e) {
                     exit
                 } else {

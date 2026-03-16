@@ -45,7 +45,7 @@ where
 }
 
 impl sql::HostTypeInfo for Task {
-    async fn name(&mut self, res: Resource<sql::TypeInfo>) -> wasmtime::Result<String> {
+    async fn name(&mut self, res: Resource<sql::TypeInfo>) -> anyhow::Result<String> {
         use sqlx::TypeInfo;
 
         let tyinfo = self.resources.get(res)?;
@@ -56,7 +56,7 @@ impl sql::HostTypeInfo for Task {
         &mut self,
         a: Resource<sql::TypeInfo>,
         b: Resource<sql::TypeInfo>,
-    ) -> wasmtime::Result<bool> {
+    ) -> anyhow::Result<bool> {
         use sqlx::TypeInfo;
 
         let tya = self.resources.get(a)?;
@@ -69,7 +69,7 @@ impl sql::HostTypeInfo for Task {
         &mut self,
         a: Resource<sql::TypeInfo>,
         b: Resource<sql::TypeInfo>,
-    ) -> wasmtime::Result<bool> {
+    ) -> anyhow::Result<bool> {
         let tya = self.resources.get(a)?;
         let tyb = self.resources.get(b)?;
 
@@ -79,7 +79,7 @@ impl sql::HostTypeInfo for Task {
     async fn clone(
         &mut self,
         res: Resource<sql::TypeInfo>,
-    ) -> wasmtime::Result<Resource<sql::TypeInfo>> {
+    ) -> anyhow::Result<Resource<sql::TypeInfo>> {
         let tyinfo = self.resources.get(res)?.clone();
         self.resources.insert(tyinfo)
     }
@@ -87,7 +87,7 @@ impl sql::HostTypeInfo for Task {
     async fn serialize(
         &mut self,
         res: Resource<sql::TypeInfo>,
-    ) -> wasmtime::Result<Result<String, String>> {
+    ) -> anyhow::Result<Result<String, String>> {
         let tyinfo = self.resources.get(res)?;
         let json = serde_json::to_string(tyinfo).map_err(|e| e.to_string());
 
@@ -97,7 +97,7 @@ impl sql::HostTypeInfo for Task {
     async fn deserialize(
         &mut self,
         json: String,
-    ) -> wasmtime::Result<Result<Resource<sql::TypeInfo>, String>> {
+    ) -> anyhow::Result<Result<Resource<sql::TypeInfo>, String>> {
         let tyinfo: TypeInfoResource = match serde_json::from_str(&json) {
             Ok(tyinfo) => tyinfo,
             Err(e) => return Ok(Err(e.to_string())),
@@ -109,7 +109,7 @@ impl sql::HostTypeInfo for Task {
     async fn with_name(
         &mut self,
         name: String,
-    ) -> wasmtime::Result<Result<Resource<sql::TypeInfo>, String>> {
+    ) -> anyhow::Result<Result<Resource<sql::TypeInfo>, String>> {
         let pool = self.state.pool();
 
         let result = sqlx::query_scalar!(r#"SELECT $1::regtype::oid as "oid!""#, &name as &str)
@@ -132,154 +132,154 @@ impl sql::HostTypeInfo for Task {
         })?))
     }
 
-    async fn boolean(&mut self) -> wasmtime::Result<Resource<sql::TypeInfo>> {
+    async fn boolean(&mut self) -> anyhow::Result<Resource<sql::TypeInfo>> {
         self.resources
             .insert(<bool as sqlx::Type<sqlx::Postgres>>::type_info().into())
     }
 
-    async fn float4(&mut self) -> wasmtime::Result<Resource<sql::TypeInfo>> {
+    async fn float4(&mut self) -> anyhow::Result<Resource<sql::TypeInfo>> {
         self.resources
             .insert(<f32 as sqlx::Type<sqlx::Postgres>>::type_info().into())
     }
 
-    async fn float8(&mut self) -> wasmtime::Result<Resource<sql::TypeInfo>> {
+    async fn float8(&mut self) -> anyhow::Result<Resource<sql::TypeInfo>> {
         self.resources
             .insert(<f64 as sqlx::Type<sqlx::Postgres>>::type_info().into())
     }
 
-    async fn int1(&mut self) -> wasmtime::Result<Resource<sql::TypeInfo>> {
+    async fn int1(&mut self) -> anyhow::Result<Resource<sql::TypeInfo>> {
         self.resources
             .insert(<i8 as sqlx::Type<sqlx::Postgres>>::type_info().into())
     }
 
-    async fn int2(&mut self) -> wasmtime::Result<Resource<sql::TypeInfo>> {
+    async fn int2(&mut self) -> anyhow::Result<Resource<sql::TypeInfo>> {
         self.resources
             .insert(<i16 as sqlx::Type<sqlx::Postgres>>::type_info().into())
     }
 
-    async fn int4(&mut self) -> wasmtime::Result<Resource<sql::TypeInfo>> {
+    async fn int4(&mut self) -> anyhow::Result<Resource<sql::TypeInfo>> {
         self.resources
             .insert(<i32 as sqlx::Type<sqlx::Postgres>>::type_info().into())
     }
 
-    async fn int8(&mut self) -> wasmtime::Result<Resource<sql::TypeInfo>> {
+    async fn int8(&mut self) -> anyhow::Result<Resource<sql::TypeInfo>> {
         self.resources
             .insert(<i64 as sqlx::Type<sqlx::Postgres>>::type_info().into())
     }
 
-    async fn text(&mut self) -> wasmtime::Result<Resource<sql::TypeInfo>> {
+    async fn text(&mut self) -> anyhow::Result<Resource<sql::TypeInfo>> {
         self.resources
             .insert(<String as sqlx::Type<sqlx::Postgres>>::type_info().into())
     }
 
-    async fn bytea(&mut self) -> wasmtime::Result<Resource<sql::TypeInfo>> {
+    async fn bytea(&mut self) -> anyhow::Result<Resource<sql::TypeInfo>> {
         self.resources
             .insert(<Vec<u8> as sqlx::Type<sqlx::Postgres>>::type_info().into())
     }
 
-    async fn timestamptz(&mut self) -> wasmtime::Result<Resource<sql::TypeInfo>> {
+    async fn timestamptz(&mut self) -> anyhow::Result<Resource<sql::TypeInfo>> {
         self.resources
             .insert(<DateTime<Utc> as sqlx::Type<sqlx::Postgres>>::type_info().into())
     }
 
-    async fn timestamp(&mut self) -> wasmtime::Result<Resource<sql::TypeInfo>> {
+    async fn timestamp(&mut self) -> anyhow::Result<Resource<sql::TypeInfo>> {
         self.resources
             .insert(<NaiveDateTime as sqlx::Type<sqlx::Postgres>>::type_info().into())
     }
 
-    async fn uuid(&mut self) -> wasmtime::Result<Resource<sql::TypeInfo>> {
+    async fn uuid(&mut self) -> anyhow::Result<Resource<sql::TypeInfo>> {
         self.resources
             .insert(<Uuid as sqlx::Type<sqlx::Postgres>>::type_info().into())
     }
 
-    async fn jsonb(&mut self) -> wasmtime::Result<Resource<sql::TypeInfo>> {
+    async fn jsonb(&mut self) -> anyhow::Result<Resource<sql::TypeInfo>> {
         self.resources
             .insert(<Json<()> as sqlx::Type<sqlx::Postgres>>::type_info().into())
     }
 
-    async fn inet(&mut self) -> wasmtime::Result<Resource<sql::TypeInfo>> {
+    async fn inet(&mut self) -> anyhow::Result<Resource<sql::TypeInfo>> {
         self.resources
             .insert(<IpNetwork as sqlx::Type<sqlx::Postgres>>::type_info().into())
     }
 
-    async fn boolean_array(&mut self) -> wasmtime::Result<Resource<sql::TypeInfo>> {
+    async fn boolean_array(&mut self) -> anyhow::Result<Resource<sql::TypeInfo>> {
         self.resources
             .insert(<Vec<bool> as sqlx::Type<sqlx::Postgres>>::type_info().into())
     }
 
-    async fn float4_array(&mut self) -> wasmtime::Result<Resource<sql::TypeInfo>> {
+    async fn float4_array(&mut self) -> anyhow::Result<Resource<sql::TypeInfo>> {
         self.resources
             .insert(<Vec<f32> as sqlx::Type<sqlx::Postgres>>::type_info().into())
     }
 
-    async fn float8_array(&mut self) -> wasmtime::Result<Resource<sql::TypeInfo>> {
+    async fn float8_array(&mut self) -> anyhow::Result<Resource<sql::TypeInfo>> {
         self.resources
             .insert(<Vec<f64> as sqlx::Type<sqlx::Postgres>>::type_info().into())
     }
 
-    async fn int1_array(&mut self) -> wasmtime::Result<Resource<sql::TypeInfo>> {
+    async fn int1_array(&mut self) -> anyhow::Result<Resource<sql::TypeInfo>> {
         self.resources
             .insert(<Vec<i8> as sqlx::Type<sqlx::Postgres>>::type_info().into())
     }
 
-    async fn int2_array(&mut self) -> wasmtime::Result<Resource<sql::TypeInfo>> {
+    async fn int2_array(&mut self) -> anyhow::Result<Resource<sql::TypeInfo>> {
         self.resources
             .insert(<Vec<i16> as sqlx::Type<sqlx::Postgres>>::type_info().into())
     }
 
-    async fn int4_array(&mut self) -> wasmtime::Result<Resource<sql::TypeInfo>> {
+    async fn int4_array(&mut self) -> anyhow::Result<Resource<sql::TypeInfo>> {
         self.resources
             .insert(<Vec<i32> as sqlx::Type<sqlx::Postgres>>::type_info().into())
     }
 
-    async fn int8_array(&mut self) -> wasmtime::Result<Resource<sql::TypeInfo>> {
+    async fn int8_array(&mut self) -> anyhow::Result<Resource<sql::TypeInfo>> {
         self.resources
             .insert(<Vec<i64> as sqlx::Type<sqlx::Postgres>>::type_info().into())
     }
 
-    async fn text_array(&mut self) -> wasmtime::Result<Resource<sql::TypeInfo>> {
+    async fn text_array(&mut self) -> anyhow::Result<Resource<sql::TypeInfo>> {
         self.resources
             .insert(<Vec<String> as sqlx::Type<sqlx::Postgres>>::type_info().into())
     }
 
-    async fn bytea_array(&mut self) -> wasmtime::Result<Resource<sql::TypeInfo>> {
+    async fn bytea_array(&mut self) -> anyhow::Result<Resource<sql::TypeInfo>> {
         self.resources
             .insert(<Vec<Vec<u8>> as sqlx::Type<sqlx::Postgres>>::type_info().into())
     }
 
-    async fn timestamptz_array(&mut self) -> wasmtime::Result<Resource<sql::TypeInfo>> {
+    async fn timestamptz_array(&mut self) -> anyhow::Result<Resource<sql::TypeInfo>> {
         self.resources
             .insert(<Vec<DateTime<Utc>> as sqlx::Type<sqlx::Postgres>>::type_info().into())
     }
 
-    async fn timestamp_array(&mut self) -> wasmtime::Result<Resource<sql::TypeInfo>> {
+    async fn timestamp_array(&mut self) -> anyhow::Result<Resource<sql::TypeInfo>> {
         self.resources
             .insert(<Vec<NaiveDateTime> as sqlx::Type<sqlx::Postgres>>::type_info().into())
     }
 
-    async fn uuid_array(&mut self) -> wasmtime::Result<Resource<sql::TypeInfo>> {
+    async fn uuid_array(&mut self) -> anyhow::Result<Resource<sql::TypeInfo>> {
         self.resources
             .insert(<Vec<Uuid> as sqlx::Type<sqlx::Postgres>>::type_info().into())
     }
 
-    async fn jsonb_array(&mut self) -> wasmtime::Result<Resource<sql::TypeInfo>> {
+    async fn jsonb_array(&mut self) -> anyhow::Result<Resource<sql::TypeInfo>> {
         self.resources
             .insert(<Vec<Json<()>> as sqlx::Type<sqlx::Postgres>>::type_info().into())
     }
 
-    async fn inet_array(&mut self) -> wasmtime::Result<Resource<sql::TypeInfo>> {
+    async fn inet_array(&mut self) -> anyhow::Result<Resource<sql::TypeInfo>> {
         self.resources
             .insert(<Vec<IpNetwork> as sqlx::Type<sqlx::Postgres>>::type_info().into())
     }
 
-    async fn drop(&mut self, rep: Resource<sql::TypeInfo>) -> wasmtime::Result<()> {
+    async fn drop(&mut self, rep: Resource<sql::TypeInfo>) -> anyhow::Result<()> {
         self.resources.remove(rep)?;
         Ok(())
     }
 }
 
 impl sql::HostValue for Task {
-    async fn is_null(&mut self, res: Resource<sql::Value>) -> wasmtime::Result<bool> {
+    async fn is_null(&mut self, res: Resource<sql::Value>) -> anyhow::Result<bool> {
         let value = self.resources.get(res)?;
         Ok(value.value.is_null())
     }
@@ -287,13 +287,13 @@ impl sql::HostValue for Task {
     async fn type_info(
         &mut self,
         res: Resource<sql::Value>,
-    ) -> wasmtime::Result<Resource<sql::TypeInfo>> {
+    ) -> anyhow::Result<Resource<sql::TypeInfo>> {
         let value = self.resources.get(res)?;
         let tyinfo = value.type_info.clone();
         self.resources.insert(tyinfo)
     }
 
-    async fn clone(&mut self, res: Resource<sql::Value>) -> wasmtime::Result<Resource<sql::Value>> {
+    async fn clone(&mut self, res: Resource<sql::Value>) -> anyhow::Result<Resource<sql::Value>> {
         let value = self.resources.get(res)?.clone();
         self.resources.insert(value)
     }
@@ -301,7 +301,7 @@ impl sql::HostValue for Task {
     async fn serialize(
         &mut self,
         res: Resource<sql::Value>,
-    ) -> wasmtime::Result<Result<String, String>> {
+    ) -> anyhow::Result<Result<String, String>> {
         let tyinfo = self.resources.get(res)?;
         let json = serde_json::to_string(tyinfo).map_err(|e| e.to_string());
 
@@ -311,7 +311,7 @@ impl sql::HostValue for Task {
     async fn deserialize(
         &mut self,
         json: String,
-    ) -> wasmtime::Result<Result<Resource<sql::Value>, String>> {
+    ) -> anyhow::Result<Result<Resource<sql::Value>, String>> {
         let value: ValueResource = match serde_json::from_str(&json) {
             Ok(tyinfo) => tyinfo,
             Err(e) => return Ok(Err(e.to_string())),
@@ -320,7 +320,7 @@ impl sql::HostValue for Task {
         Ok(Ok(self.resources.insert(value)?))
     }
 
-    async fn as_boolean(&mut self, res: Resource<sql::Value>) -> wasmtime::Result<Option<bool>> {
+    async fn as_boolean(&mut self, res: Resource<sql::Value>) -> anyhow::Result<Option<bool>> {
         let value = self.resources.get(res)?;
 
         Ok(match &value.value {
@@ -329,7 +329,7 @@ impl sql::HostValue for Task {
         })
     }
 
-    async fn as_float4(&mut self, res: Resource<sql::Value>) -> wasmtime::Result<Option<f32>> {
+    async fn as_float4(&mut self, res: Resource<sql::Value>) -> anyhow::Result<Option<f32>> {
         let value = self.resources.get(res)?;
 
         Ok(match &value.value {
@@ -338,7 +338,7 @@ impl sql::HostValue for Task {
         })
     }
 
-    async fn as_float8(&mut self, res: Resource<sql::Value>) -> wasmtime::Result<Option<f64>> {
+    async fn as_float8(&mut self, res: Resource<sql::Value>) -> anyhow::Result<Option<f64>> {
         let value = self.resources.get(res)?;
 
         Ok(match &value.value {
@@ -347,7 +347,7 @@ impl sql::HostValue for Task {
         })
     }
 
-    async fn as_int1(&mut self, res: Resource<sql::Value>) -> wasmtime::Result<Option<i8>> {
+    async fn as_int1(&mut self, res: Resource<sql::Value>) -> anyhow::Result<Option<i8>> {
         let value = self.resources.get(res)?;
 
         Ok(match &value.value {
@@ -356,7 +356,7 @@ impl sql::HostValue for Task {
         })
     }
 
-    async fn as_int2(&mut self, res: Resource<sql::Value>) -> wasmtime::Result<Option<i16>> {
+    async fn as_int2(&mut self, res: Resource<sql::Value>) -> anyhow::Result<Option<i16>> {
         let value = self.resources.get(res)?;
 
         Ok(match &value.value {
@@ -365,7 +365,7 @@ impl sql::HostValue for Task {
         })
     }
 
-    async fn as_int4(&mut self, res: Resource<sql::Value>) -> wasmtime::Result<Option<i32>> {
+    async fn as_int4(&mut self, res: Resource<sql::Value>) -> anyhow::Result<Option<i32>> {
         let value = self.resources.get(res)?;
 
         Ok(match &value.value {
@@ -374,7 +374,7 @@ impl sql::HostValue for Task {
         })
     }
 
-    async fn as_int8(&mut self, res: Resource<sql::Value>) -> wasmtime::Result<Option<i64>> {
+    async fn as_int8(&mut self, res: Resource<sql::Value>) -> anyhow::Result<Option<i64>> {
         let value = self.resources.get(res)?;
 
         Ok(match &value.value {
@@ -383,7 +383,7 @@ impl sql::HostValue for Task {
         })
     }
 
-    async fn as_text(&mut self, res: Resource<sql::Value>) -> wasmtime::Result<Option<String>> {
+    async fn as_text(&mut self, res: Resource<sql::Value>) -> anyhow::Result<Option<String>> {
         let value = self.resources.get(res)?;
 
         Ok(match &value.value {
@@ -392,7 +392,7 @@ impl sql::HostValue for Task {
         })
     }
 
-    async fn as_bytea(&mut self, res: Resource<sql::Value>) -> wasmtime::Result<Option<Vec<u8>>> {
+    async fn as_bytea(&mut self, res: Resource<sql::Value>) -> anyhow::Result<Option<Vec<u8>>> {
         let value = self.resources.get(res)?;
 
         Ok(match &value.value {
@@ -404,7 +404,7 @@ impl sql::HostValue for Task {
     async fn as_timestamptz(
         &mut self,
         res: Resource<sql::Value>,
-    ) -> wasmtime::Result<Option<sql::Timestamptz>> {
+    ) -> anyhow::Result<Option<sql::Timestamptz>> {
         let value = self.resources.get(res)?;
 
         Ok(match &value.value {
@@ -416,7 +416,7 @@ impl sql::HostValue for Task {
     async fn as_timestamp(
         &mut self,
         res: Resource<sql::Value>,
-    ) -> wasmtime::Result<Option<sql::Timestamp>> {
+    ) -> anyhow::Result<Option<sql::Timestamp>> {
         let value = self.resources.get(res)?;
 
         Ok(match &value.value {
@@ -425,7 +425,7 @@ impl sql::HostValue for Task {
         })
     }
 
-    async fn as_uuid(&mut self, res: Resource<sql::Value>) -> wasmtime::Result<Option<sql::Uuid>> {
+    async fn as_uuid(&mut self, res: Resource<sql::Value>) -> anyhow::Result<Option<sql::Uuid>> {
         let value = self.resources.get(res)?;
 
         Ok(match &value.value {
@@ -434,7 +434,7 @@ impl sql::HostValue for Task {
         })
     }
 
-    async fn as_json(&mut self, res: Resource<sql::Value>) -> wasmtime::Result<Option<String>> {
+    async fn as_json(&mut self, res: Resource<sql::Value>) -> anyhow::Result<Option<String>> {
         let value = self.resources.get(res)?;
 
         Ok(match &value.value {
@@ -446,7 +446,7 @@ impl sql::HostValue for Task {
     async fn as_inet(
         &mut self,
         res: Resource<sql::Value>,
-    ) -> wasmtime::Result<Option<sql::IpNetwork>> {
+    ) -> anyhow::Result<Option<sql::IpNetwork>> {
         let value = self.resources.get(res)?;
 
         Ok(match value.value {
@@ -458,7 +458,7 @@ impl sql::HostValue for Task {
     async fn as_boolean_array(
         &mut self,
         res: Resource<sql::Value>,
-    ) -> wasmtime::Result<Option<Vec<bool>>> {
+    ) -> anyhow::Result<Option<Vec<bool>>> {
         let value = self.resources.get(res)?;
 
         Ok(match &value.value {
@@ -470,7 +470,7 @@ impl sql::HostValue for Task {
     async fn as_float4_array(
         &mut self,
         res: Resource<sql::Value>,
-    ) -> wasmtime::Result<Option<Vec<f32>>> {
+    ) -> anyhow::Result<Option<Vec<f32>>> {
         let value = self.resources.get(res)?;
 
         Ok(match &value.value {
@@ -482,7 +482,7 @@ impl sql::HostValue for Task {
     async fn as_float8_array(
         &mut self,
         res: Resource<sql::Value>,
-    ) -> wasmtime::Result<Option<Vec<f64>>> {
+    ) -> anyhow::Result<Option<Vec<f64>>> {
         let value = self.resources.get(res)?;
 
         Ok(match &value.value {
@@ -494,7 +494,7 @@ impl sql::HostValue for Task {
     async fn as_int1_array(
         &mut self,
         res: Resource<sql::Value>,
-    ) -> wasmtime::Result<Option<Vec<i8>>> {
+    ) -> anyhow::Result<Option<Vec<i8>>> {
         let value = self.resources.get(res)?;
 
         Ok(match &value.value {
@@ -506,7 +506,7 @@ impl sql::HostValue for Task {
     async fn as_int2_array(
         &mut self,
         res: Resource<sql::Value>,
-    ) -> wasmtime::Result<Option<Vec<i16>>> {
+    ) -> anyhow::Result<Option<Vec<i16>>> {
         let value = self.resources.get(res)?;
 
         Ok(match &value.value {
@@ -518,7 +518,7 @@ impl sql::HostValue for Task {
     async fn as_int4_array(
         &mut self,
         res: Resource<sql::Value>,
-    ) -> wasmtime::Result<Option<Vec<i32>>> {
+    ) -> anyhow::Result<Option<Vec<i32>>> {
         let value = self.resources.get(res)?;
 
         Ok(match &value.value {
@@ -530,7 +530,7 @@ impl sql::HostValue for Task {
     async fn as_int8_array(
         &mut self,
         res: Resource<sql::Value>,
-    ) -> wasmtime::Result<Option<Vec<i64>>> {
+    ) -> anyhow::Result<Option<Vec<i64>>> {
         let value = self.resources.get(res)?;
 
         Ok(match &value.value {
@@ -542,7 +542,7 @@ impl sql::HostValue for Task {
     async fn as_text_array(
         &mut self,
         res: Resource<sql::Value>,
-    ) -> wasmtime::Result<Option<Vec<String>>> {
+    ) -> anyhow::Result<Option<Vec<String>>> {
         let value = self.resources.get(res)?;
 
         Ok(match &value.value {
@@ -554,7 +554,7 @@ impl sql::HostValue for Task {
     async fn as_bytea_array(
         &mut self,
         res: Resource<sql::Value>,
-    ) -> wasmtime::Result<Option<Vec<Vec<u8>>>> {
+    ) -> anyhow::Result<Option<Vec<Vec<u8>>>> {
         let value = self.resources.get(res)?;
 
         Ok(match &value.value {
@@ -566,7 +566,7 @@ impl sql::HostValue for Task {
     async fn as_timestamptz_array(
         &mut self,
         res: Resource<sql::Value>,
-    ) -> wasmtime::Result<Option<Vec<sql::Timestamptz>>> {
+    ) -> anyhow::Result<Option<Vec<sql::Timestamptz>>> {
         let value = self.resources.get(res)?;
 
         Ok(match &value.value {
@@ -578,7 +578,7 @@ impl sql::HostValue for Task {
     async fn as_timestamp_array(
         &mut self,
         res: Resource<sql::Value>,
-    ) -> wasmtime::Result<Option<Vec<sql::Timestamp>>> {
+    ) -> anyhow::Result<Option<Vec<sql::Timestamp>>> {
         let value = self.resources.get(res)?;
 
         Ok(match &value.value {
@@ -590,7 +590,7 @@ impl sql::HostValue for Task {
     async fn as_uuid_array(
         &mut self,
         res: Resource<sql::Value>,
-    ) -> wasmtime::Result<Option<Vec<sql::Uuid>>> {
+    ) -> anyhow::Result<Option<Vec<sql::Uuid>>> {
         let value = self.resources.get(res)?;
 
         Ok(match &value.value {
@@ -602,7 +602,7 @@ impl sql::HostValue for Task {
     async fn as_json_array(
         &mut self,
         res: Resource<sql::Value>,
-    ) -> wasmtime::Result<Option<Vec<String>>> {
+    ) -> anyhow::Result<Option<Vec<String>>> {
         let value = self.resources.get(res)?;
 
         Ok(match &value.value {
@@ -614,7 +614,7 @@ impl sql::HostValue for Task {
     async fn as_inet_array(
         &mut self,
         res: Resource<sql::Value>,
-    ) -> wasmtime::Result<Option<Vec<sql::IpNetwork>>> {
+    ) -> anyhow::Result<Option<Vec<sql::IpNetwork>>> {
         let value = self.resources.get(res)?;
 
         Ok(match &value.value {
@@ -626,7 +626,7 @@ impl sql::HostValue for Task {
     async fn null(
         &mut self,
         tyinfo: Resource<sql::TypeInfo>,
-    ) -> wasmtime::Result<Resource<sql::Value>> {
+    ) -> anyhow::Result<Resource<sql::Value>> {
         let tyinfo = self.resources.remove(tyinfo)?;
         let value = ValueResource {
             type_info: tyinfo,
@@ -636,7 +636,7 @@ impl sql::HostValue for Task {
         self.resources.insert(value)
     }
 
-    async fn boolean(&mut self, value: bool) -> wasmtime::Result<Resource<sql::Value>> {
+    async fn boolean(&mut self, value: bool) -> anyhow::Result<Resource<sql::Value>> {
         let value = ValueResource {
             type_info: type_info(&value),
             value: Value::Boolean(value),
@@ -645,7 +645,7 @@ impl sql::HostValue for Task {
         self.resources.insert(value)
     }
 
-    async fn float4(&mut self, value: f32) -> wasmtime::Result<Resource<sql::Value>> {
+    async fn float4(&mut self, value: f32) -> anyhow::Result<Resource<sql::Value>> {
         let value = ValueResource {
             type_info: type_info(&value),
             value: Value::Float4(value),
@@ -654,7 +654,7 @@ impl sql::HostValue for Task {
         self.resources.insert(value)
     }
 
-    async fn float8(&mut self, value: f64) -> wasmtime::Result<Resource<sql::Value>> {
+    async fn float8(&mut self, value: f64) -> anyhow::Result<Resource<sql::Value>> {
         let value = ValueResource {
             type_info: type_info(&value),
             value: Value::Float8(value),
@@ -663,7 +663,7 @@ impl sql::HostValue for Task {
         self.resources.insert(value)
     }
 
-    async fn int1(&mut self, value: i8) -> wasmtime::Result<Resource<sql::Value>> {
+    async fn int1(&mut self, value: i8) -> anyhow::Result<Resource<sql::Value>> {
         let value = ValueResource {
             type_info: type_info(&value),
             value: Value::Int1(value),
@@ -672,7 +672,7 @@ impl sql::HostValue for Task {
         self.resources.insert(value)
     }
 
-    async fn int2(&mut self, value: i16) -> wasmtime::Result<Resource<sql::Value>> {
+    async fn int2(&mut self, value: i16) -> anyhow::Result<Resource<sql::Value>> {
         let value = ValueResource {
             type_info: type_info(&value),
             value: Value::Int2(value),
@@ -681,7 +681,7 @@ impl sql::HostValue for Task {
         self.resources.insert(value)
     }
 
-    async fn int4(&mut self, value: i32) -> wasmtime::Result<Resource<sql::Value>> {
+    async fn int4(&mut self, value: i32) -> anyhow::Result<Resource<sql::Value>> {
         let value = ValueResource {
             type_info: type_info(&value),
             value: Value::Int4(value),
@@ -690,7 +690,7 @@ impl sql::HostValue for Task {
         self.resources.insert(value)
     }
 
-    async fn int8(&mut self, value: i64) -> wasmtime::Result<Resource<sql::Value>> {
+    async fn int8(&mut self, value: i64) -> anyhow::Result<Resource<sql::Value>> {
         let value = ValueResource {
             type_info: type_info(&value),
             value: Value::Int8(value),
@@ -699,7 +699,7 @@ impl sql::HostValue for Task {
         self.resources.insert(value)
     }
 
-    async fn text(&mut self, value: String) -> wasmtime::Result<Resource<sql::Value>> {
+    async fn text(&mut self, value: String) -> anyhow::Result<Resource<sql::Value>> {
         let value = ValueResource {
             type_info: type_info(&value),
             value: Value::Text(value),
@@ -708,7 +708,7 @@ impl sql::HostValue for Task {
         self.resources.insert(value)
     }
 
-    async fn bytea(&mut self, value: Vec<u8>) -> wasmtime::Result<Resource<sql::Value>> {
+    async fn bytea(&mut self, value: Vec<u8>) -> anyhow::Result<Resource<sql::Value>> {
         let value = ValueResource {
             type_info: type_info(&value),
             value: Value::Bytea(value),
@@ -720,7 +720,7 @@ impl sql::HostValue for Task {
     async fn timestamptz(
         &mut self,
         value: sql::Timestamptz,
-    ) -> wasmtime::Result<Resource<sql::Value>> {
+    ) -> anyhow::Result<Resource<sql::Value>> {
         let value: DateTime<FixedOffset> = value.into();
         let value = ValueResource {
             type_info: type_info(&value),
@@ -730,7 +730,7 @@ impl sql::HostValue for Task {
         self.resources.insert(value)
     }
 
-    async fn timestamp(&mut self, value: sql::Timestamp) -> wasmtime::Result<Resource<sql::Value>> {
+    async fn timestamp(&mut self, value: sql::Timestamp) -> anyhow::Result<Resource<sql::Value>> {
         let value: NaiveDateTime = value.into();
         let value = ValueResource {
             type_info: type_info(&value),
@@ -740,7 +740,7 @@ impl sql::HostValue for Task {
         self.resources.insert(value)
     }
 
-    async fn uuid(&mut self, value: sql::Uuid) -> wasmtime::Result<Resource<sql::Value>> {
+    async fn uuid(&mut self, value: sql::Uuid) -> anyhow::Result<Resource<sql::Value>> {
         let value = value.into();
         let value = ValueResource {
             type_info: type_info(&value),
@@ -750,7 +750,7 @@ impl sql::HostValue for Task {
         self.resources.insert(value)
     }
 
-    async fn jsonb(&mut self, value: String) -> wasmtime::Result<Resource<sql::Value>> {
+    async fn jsonb(&mut self, value: String) -> anyhow::Result<Resource<sql::Value>> {
         let value = value.into_boxed_str();
         let value: Box<RawValue> = unsafe { std::mem::transmute(value) };
         let value = ValueResource {
@@ -764,7 +764,7 @@ impl sql::HostValue for Task {
     async fn inet(
         &mut self,
         value: sql::IpNetwork,
-    ) -> wasmtime::Result<Result<Resource<sql::Value>, String>> {
+    ) -> anyhow::Result<Result<Resource<sql::Value>, String>> {
         let value: IpNetwork = match value.try_into() {
             Ok(value) => value,
             Err(e) => return Ok(Err(e.to_string())),
@@ -781,7 +781,7 @@ impl sql::HostValue for Task {
         &mut self,
         value: String,
         tyinfo: Resource<sql::TypeInfo>,
-    ) -> wasmtime::Result<Resource<sql::Value>> {
+    ) -> anyhow::Result<Resource<sql::Value>> {
         let tyinfo = self.resources.get(tyinfo)?.clone();
         let value = ValueResource {
             type_info: tyinfo,
@@ -791,7 +791,7 @@ impl sql::HostValue for Task {
         self.resources.insert(value)
     }
 
-    async fn boolean_array(&mut self, value: Vec<bool>) -> wasmtime::Result<Resource<sql::Value>> {
+    async fn boolean_array(&mut self, value: Vec<bool>) -> anyhow::Result<Resource<sql::Value>> {
         let value = ValueResource {
             type_info: type_info(&value),
             value: Value::BooleanArray(value),
@@ -800,7 +800,7 @@ impl sql::HostValue for Task {
         self.resources.insert(value)
     }
 
-    async fn float4_array(&mut self, value: Vec<f32>) -> wasmtime::Result<Resource<sql::Value>> {
+    async fn float4_array(&mut self, value: Vec<f32>) -> anyhow::Result<Resource<sql::Value>> {
         let value = ValueResource {
             type_info: type_info(&value),
             value: Value::Float4Array(value),
@@ -809,7 +809,7 @@ impl sql::HostValue for Task {
         self.resources.insert(value)
     }
 
-    async fn float8_array(&mut self, value: Vec<f64>) -> wasmtime::Result<Resource<sql::Value>> {
+    async fn float8_array(&mut self, value: Vec<f64>) -> anyhow::Result<Resource<sql::Value>> {
         let value = ValueResource {
             type_info: type_info(&value),
             value: Value::Float8Array(value),
@@ -818,7 +818,7 @@ impl sql::HostValue for Task {
         self.resources.insert(value)
     }
 
-    async fn int1_array(&mut self, value: Vec<i8>) -> wasmtime::Result<Resource<sql::Value>> {
+    async fn int1_array(&mut self, value: Vec<i8>) -> anyhow::Result<Resource<sql::Value>> {
         let value = ValueResource {
             type_info: type_info(&value),
             value: Value::Int1Array(value),
@@ -827,7 +827,7 @@ impl sql::HostValue for Task {
         self.resources.insert(value)
     }
 
-    async fn int2_array(&mut self, value: Vec<i16>) -> wasmtime::Result<Resource<sql::Value>> {
+    async fn int2_array(&mut self, value: Vec<i16>) -> anyhow::Result<Resource<sql::Value>> {
         let value = ValueResource {
             type_info: type_info(&value),
             value: Value::Int2Array(value),
@@ -836,7 +836,7 @@ impl sql::HostValue for Task {
         self.resources.insert(value)
     }
 
-    async fn int4_array(&mut self, value: Vec<i32>) -> wasmtime::Result<Resource<sql::Value>> {
+    async fn int4_array(&mut self, value: Vec<i32>) -> anyhow::Result<Resource<sql::Value>> {
         let value = ValueResource {
             type_info: type_info(&value),
             value: Value::Int4Array(value),
@@ -845,7 +845,7 @@ impl sql::HostValue for Task {
         self.resources.insert(value)
     }
 
-    async fn int8_array(&mut self, value: Vec<i64>) -> wasmtime::Result<Resource<sql::Value>> {
+    async fn int8_array(&mut self, value: Vec<i64>) -> anyhow::Result<Resource<sql::Value>> {
         let value = ValueResource {
             type_info: type_info(&value),
             value: Value::Int8Array(value),
@@ -854,7 +854,7 @@ impl sql::HostValue for Task {
         self.resources.insert(value)
     }
 
-    async fn text_array(&mut self, value: Vec<String>) -> wasmtime::Result<Resource<sql::Value>> {
+    async fn text_array(&mut self, value: Vec<String>) -> anyhow::Result<Resource<sql::Value>> {
         let value = ValueResource {
             type_info: type_info(&value),
             value: Value::TextArray(value),
@@ -863,7 +863,7 @@ impl sql::HostValue for Task {
         self.resources.insert(value)
     }
 
-    async fn bytea_array(&mut self, value: Vec<Vec<u8>>) -> wasmtime::Result<Resource<sql::Value>> {
+    async fn bytea_array(&mut self, value: Vec<Vec<u8>>) -> anyhow::Result<Resource<sql::Value>> {
         let value = ValueResource {
             type_info: type_info(&value),
             value: Value::ByteaArray(value),
@@ -875,7 +875,7 @@ impl sql::HostValue for Task {
     async fn timestamptz_array(
         &mut self,
         value: Vec<sql::Timestamptz>,
-    ) -> wasmtime::Result<Resource<sql::Value>> {
+    ) -> anyhow::Result<Resource<sql::Value>> {
         let value = value.into_iter().map(From::from).collect();
         let value = ValueResource {
             type_info: type_info(&value),
@@ -888,7 +888,7 @@ impl sql::HostValue for Task {
     async fn timestamp_array(
         &mut self,
         value: Vec<sql::Timestamp>,
-    ) -> wasmtime::Result<Resource<sql::Value>> {
+    ) -> anyhow::Result<Resource<sql::Value>> {
         let value = value.into_iter().map(From::from).collect();
         let value = ValueResource {
             type_info: type_info(&value),
@@ -901,7 +901,7 @@ impl sql::HostValue for Task {
     async fn uuid_array(
         &mut self,
         value: Vec<sql::Uuid>,
-    ) -> wasmtime::Result<Resource<sql::Value>> {
+    ) -> anyhow::Result<Resource<sql::Value>> {
         let value = value.into_iter().map(From::from).collect();
         let value = ValueResource {
             type_info: type_info(&value),
@@ -911,7 +911,7 @@ impl sql::HostValue for Task {
         self.resources.insert(value)
     }
 
-    async fn jsonb_array(&mut self, value: Vec<String>) -> wasmtime::Result<Resource<sql::Value>> {
+    async fn jsonb_array(&mut self, value: Vec<String>) -> anyhow::Result<Resource<sql::Value>> {
         let value = value
             .into_iter()
             .map(|json| {
@@ -932,7 +932,7 @@ impl sql::HostValue for Task {
     async fn inet_array(
         &mut self,
         values: Vec<sql::IpNetwork>,
-    ) -> wasmtime::Result<Result<Resource<sql::Value>, String>> {
+    ) -> anyhow::Result<Result<Resource<sql::Value>, String>> {
         let values: Vec<IpNetwork> = match values.into_iter().map(TryFrom::try_from).collect() {
             Ok(values) => values,
             Err(e) => return Ok(Err(e.to_string())),
@@ -949,7 +949,7 @@ impl sql::HostValue for Task {
         &mut self,
         value: Vec<String>,
         tyinfo: Resource<sql::TypeInfo>,
-    ) -> wasmtime::Result<Resource<sql::Value>> {
+    ) -> anyhow::Result<Resource<sql::Value>> {
         let tyinfo = self.resources.get(tyinfo)?.clone();
         let value = ValueResource {
             type_info: tyinfo,
@@ -959,7 +959,7 @@ impl sql::HostValue for Task {
         self.resources.insert(value)
     }
 
-    async fn drop(&mut self, res: Resource<sql::Value>) -> wasmtime::Result<()> {
+    async fn drop(&mut self, res: Resource<sql::Value>) -> anyhow::Result<()> {
         self.resources.remove(res)?;
         Ok(())
     }
@@ -1024,7 +1024,7 @@ impl Host for Task {
         })
     }
 
-    async fn fetch(&mut self) -> wasmtime::Result<Option<Result<sql::QueryResult, sql::Error>>> {
+    async fn fetch(&mut self) -> anyhow::Result<Option<Result<sql::QueryResult, sql::Error>>> {
         let txn = self.state.assert_in_transaction("durable::sql::query")?;
         let stream = match txn.stream() {
             Some(stream) => stream,
