@@ -33,7 +33,7 @@ use std::time::Duration;
 use chrono::{DateTime, Utc};
 use parking_lot::Mutex;
 use rand::rngs::StdRng;
-use rand::{Rng, SeedableRng};
+use rand::{RngExt, SeedableRng};
 use tokio::sync::Notify;
 
 use crate::clock::Clock;

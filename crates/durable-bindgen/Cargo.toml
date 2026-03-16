@@ -9,8 +9,8 @@ repository = { workspace = true }
 description = "Bindings generator for durable"
 
 [dependencies]
-anyhow = "1.0.86"
-prettyplease = "0.2.20"
-syn = { version = "2.0.72", features = ["full"] }
+anyhow = "1.0.102"
+prettyplease = "0.2.37"
+syn = { version = "2.0.117", features = ["full"] }
 wit-bindgen-core = { workspace = true }
 wit-bindgen-rust = { workspace = true }

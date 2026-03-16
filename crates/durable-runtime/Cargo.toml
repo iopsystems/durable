@@ -18,42 +18,42 @@ tokio-console = ["dep:console-subscriber", "tokio/tracing"]
 [dependencies]
 durable-migrate = { workspace = true, features = ["migrate"] }
 
-ahash = "0.8.11"
-anyhow = "1.0.86"
-anymap3 = "1.0.0"
-async-stream = "0.3.5"
-async-trait = "0.1.81"
+ahash = "0.8.12"
+anyhow = "1.0.102"
+anymap3 = "1.0.1"
+async-stream = "0.3.6"
+async-trait = "0.1.89"
 cache-compute = "0.3.0"
-cfg-if = "1.0.0"
-chrono = { version = "0.4.38", features = ["serde"] }
-clap = { version = "4.0", optional = true, features = ["derive", "env"] }
-console-subscriber = { version = "0.4.0", optional = true }
-derive_setters = "0.1.6"
+cfg-if = "1.0.4"
+chrono = { version = "0.4.44", features = ["serde"] }
+clap = { version = "4.6", optional = true, features = ["derive", "env"] }
+console-subscriber = { version = "0.5.0", optional = true }
+derive_setters = "0.1.9"
 ipnetwork = "0.20.0"
-futures-concurrency = "7.6.1"
-futures-util = "0.3.30"
-getrandom = { version = "0.3.0", features = ["std"] }
-http = "1.1.0"
-humantime = "2.1.0"
-log = "0.4.22"
-parking_lot = "0.12.3"
-pin-project = "1.1.5"
-rand = "0.9.0"
-reqwest = "0.12.5"
-serde = { version = "1.0.204", features = ["derive"] }
-serde_json = { version = "1.0.120", features = ["raw_value"] }
-sha2 = "0.10.8"
-slab = "0.4.9"
-tokio = { version = "1.39.1", features = ["macros", "sync", "rt-multi-thread"] }
-tracing = "0.1.40"
+futures-concurrency = "7.7.1"
+futures-util = "0.3.32"
+getrandom = { version = "0.4.2", features = ["std"] }
+http = "1.4.0"
+humantime = "2.3.0"
+log = "0.4.29"
+parking_lot = "0.12.5"
+pin-project = "1.1.11"
+rand = "0.10.0"
+reqwest = "0.13.2"
+serde = { version = "1.0.228", features = ["derive"] }
+serde_json = { version = "1.0.149", features = ["raw_value"] }
+sha2 = "0.10.9"
+slab = "0.4.12"
+tokio = { version = "1.50.0", features = ["macros", "sync", "rt-multi-thread"] }
+tracing = "0.1.44"
 uluru = "3.1.0"
-uuid = { version = "1.10.0", features = ["serde"] }
+uuid = { version = "1.22.0", features = ["serde"] }
 wasmtime = { workspace = true }
-url = "2.5.2"
-metrics = "0.24.0"
+url = "2.5.8"
+metrics = "0.24.3"
 
 [dependencies.sqlx]
-version = "0.8.0"
+version = "0.8.6"
 features = [
     "postgres",
     "runtime-tokio",
@@ -64,7 +64,7 @@ features = [
 ]
 
 [dependencies.sqlx-postgres]
-version = "0.8.0"
+version = "0.8.6"
 features = ["offline"]
 
 [dependencies.tracing-subscriber]
@@ -76,9 +76,9 @@ features = ["fmt", "env-filter"]
 backtrace-on-stack-overflow = { version = "0.3", optional = true }
 
 [dev-dependencies]
-toml = "0.8"
+toml = "1.0"
 
 [build-dependencies]
 durable-migrate = { workspace = true }
 
-anyhow = "1.0.86"
+anyhow = "1.0.102"
