@@ -3,7 +3,7 @@ members = ["crates/*", "examples"]
 resolver = "2"
 
 [workspace.package]
-version = "0.5.9"
+version = "0.5.10"
 license = "Apache-2.0 OR MIT"
 publish = ["iop-systems"]
 repository = "https://github.com/iopsystems/durable"
@@ -16,10 +16,10 @@ durable-core    = { version = "0.5.5", registry = "iop-systems", path = "crates/
 durable-http    = { version = "0.5.5", registry = "iop-systems", path = "crates/durable-http" }
 durable-sqlx    = { version = "0.5.5", registry = "iop-systems", path = "crates/durable-sqlx" }
 
-durable-client  = { version = "0.1.1", registry = "iop-systems", path = "crates/durable-client" }
-durable-migrate = { version = "0.1.0", registry = "iop-systems", path = "crates/durable-migrate" }
-durable-runtime = { version = "0.7.0", registry = "iop-systems", path = "crates/durable-runtime" }
-durable-bindgen = { version = "0.1.2", registry = "iop-systems", path = "crates/durable-bindgen" }
+durable-client  = { version = "0.1.9", registry = "iop-systems", path = "crates/durable-client" }
+durable-migrate = { version = "0.1.1", registry = "iop-systems", path = "crates/durable-migrate" }
+durable-runtime = { version = "0.8.0", registry = "iop-systems", path = "crates/durable-runtime" }
+durable-bindgen = { version = "0.1.3", registry = "iop-systems", path = "crates/durable-bindgen" }
 
 wasmtime         = { version = "42.0", features = ["anyhow"] }
 wit-bindgen-core = { version = "0.51.0" }
@@ -27,9 +27,9 @@ wit-bindgen-rust = { version = "0.51.0" }
 wit-bindgen-rt   = { version = "0.44.0" }
 
 [workspace.dependencies.durable-sqlx-macros]
-version = "0.8.1"
+version = "0.8.2"
 registry = "iop-systems"
-path = "crates/durable-sqlx-macros" 
+path = "crates/durable-sqlx-macros"
 
 [profile.release]
 debug = true
