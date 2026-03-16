@@ -898,10 +898,7 @@ impl sql::HostValue for Task {
         self.resources.insert(value)
     }
 
-    async fn uuid_array(
-        &mut self,
-        value: Vec<sql::Uuid>,
-    ) -> anyhow::Result<Resource<sql::Value>> {
+    async fn uuid_array(&mut self, value: Vec<sql::Uuid>) -> anyhow::Result<Resource<sql::Value>> {
         let value = value.into_iter().map(From::from).collect();
         let value = ValueResource {
             type_info: type_info(&value),

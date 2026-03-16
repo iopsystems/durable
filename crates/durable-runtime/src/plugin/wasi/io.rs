@@ -74,10 +74,7 @@ impl wasi::io::streams::HostInputStream for Task {
         Ok(Err(StreamError::Closed))
     }
 
-    async fn subscribe(
-        &mut self,
-        _: Resource<InputStream>,
-    ) -> anyhow::Result<Resource<Pollable>> {
+    async fn subscribe(&mut self, _: Resource<InputStream>) -> anyhow::Result<Resource<Pollable>> {
         Ok(Resource::new_own(u32::MAX))
     }
 
@@ -141,10 +138,7 @@ impl wasi::io::streams::HostOutputStream for Task {
         self.flush(stream).await
     }
 
-    async fn subscribe(
-        &mut self,
-        _: Resource<OutputStream>,
-    ) -> anyhow::Result<Resource<Pollable>> {
+    async fn subscribe(&mut self, _: Resource<OutputStream>) -> anyhow::Result<Resource<Pollable>> {
         Ok(Resource::new_own(u32::MAX))
     }
 

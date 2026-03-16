@@ -183,11 +183,7 @@ impl HostHttpRequest2 for Task {
         Ok(())
     }
 
-    async fn set_body(
-        &mut self,
-        res: Resource<HttpRequest2>,
-        body: Vec<u8>,
-    ) -> anyhow::Result<()> {
+    async fn set_body(&mut self, res: Resource<HttpRequest2>, body: Vec<u8>) -> anyhow::Result<()> {
         let request = self.resources.get_mut(res)?;
 
         HttpRequest2::set_body(request, body);
