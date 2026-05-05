@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE durable.task\n              SET state = 'suspended',\n                  running_on = NULL\n            WHERE id = $1\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Int8"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "3402a2d91a23aa927386d4825768a50c5731c6b9bb4dfae298197349827113b6"
+}

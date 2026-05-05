@@ -14,6 +14,7 @@ pub mod migrate;
 pub mod plugin;
 mod resource;
 pub mod scheduler;
+pub(crate) mod storage;
 pub mod task;
 pub mod util;
 mod worker;

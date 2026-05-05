@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "INSERT INTO durable.log(task_id, index, message)\n                     VALUES ($1, $2, $3)",
+  "query": "INSERT INTO durable.log(task_id, index, message)\n             VALUES ($1, $2, $3)",
   "describe": {
     "columns": [],
     "parameters": {
@@ -12,5 +12,5 @@
     },
     "nullable": []
   },
-  "hash": "df8f78420eee9d8c6e56b7b349ba10235ff73813bda043108ec1d3a87793b3d7"
+  "hash": "a2e037bea4471d830a137c39dad6507b05f9333aedaa31aa3128fcd59124618c"
 }

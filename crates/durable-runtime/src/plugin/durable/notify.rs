@@ -5,6 +5,7 @@ use tokio::sync::broadcast::error::RecvError;
 use tokio::time::Instant;
 
 use crate::bindings::durable::core::notify::{Event, Host, NotifyError};
+use crate::storage::TaskState;
 use crate::task::TransactionOptions;
 use crate::{Task, TaskStatus};
 
@@ -12,27 +13,17 @@ async fn poll_notification(
     task: &mut Task,
     tx: &mut sqlx::PgConnection,
 ) -> anyhow::Result<Option<EventData>> {
-    let data = sqlx::query_as!(
-        EventData,
-        r#"
-        DELETE FROM durable.notification
-        WHERE ctid IN (
-            SELECT ctid
-             FROM durable.notification
-            WHERE task_id = $1
-            ORDER BY created_at ASC
-            LIMIT 1
-            FOR UPDATE
-        )
-        RETURNING
-            created_at,
-            event,
-            data as "data: Json<Box<RawValue>>"
-        "#,
-        task.state.task_id()
-    )
-    .fetch_optional(&mut *tx)
-    .await?;
+    let task_id = task.state.task_id();
+    let data = task
+        .state
+        .storage()
+        .poll_notification(&mut *tx, task_id)
+        .await?
+        .map(|n| EventData {
+            created_at: n.created_at,
+            event: n.event,
+            data: n.data,
+        });
 
     Ok(data)
 }
@@ -86,16 +77,10 @@ impl Host for Task {
                 // The timer expired, so we need to attempt to suspend.
                 let mut tx = self.state.pool().begin().await?;
 
-                sqlx::query!(
-                    "UPDATE durable.task
-                      SET state = 'suspended',
-                          running_on = NULL
-                    WHERE id = $1
-                    ",
-                    self.task_id()
-                )
-                .execute(&mut *tx)
-                .await?;
+                self.state
+                    .storage()
+                    .suspend_task_no_wakeup(&mut tx, self.task_id())
+                    .await?;
 
                 if poll_notification(&mut *self, &mut tx).await?.is_some() {
                     // A new notification barged in while we were updating. Roll back the
@@ -206,16 +191,10 @@ impl Host for Task {
                 Some(Expired::Suspend) => {
                     let mut tx = self.state.pool().begin().await?;
 
-                    sqlx::query!(
-                        "UPDATE durable.task
-                      SET state = 'suspended',
-                          running_on = NULL
-                    WHERE id = $1
-                    ",
-                        self.task_id()
-                    )
-                    .execute(&mut *tx)
-                    .await?;
+                    self.state
+                        .storage()
+                        .suspend_task_no_wakeup(&mut tx, self.task_id())
+                        .await?;
 
                     if poll_notification(&mut *self, &mut tx).await?.is_some() {
                         // A new notification barged in while we were updating.
@@ -250,6 +229,7 @@ impl Host for Task {
             return Ok(result);
         }
 
+        let storage = self.state.shared.storage.clone();
         let txn = self.state.transaction_mut().unwrap();
         let tx = txn.conn().unwrap();
 
@@ -261,17 +241,7 @@ impl Host for Task {
 
             // Note: We lock the row here so that concurrent notification polls
             //       cannot barge in here.
-            let state = sqlx::query_scalar!(
-                r#"
-                SELECT state as "state!: TaskState" 
-                 FROM durable.task
-                WHERE task.id = $1
-                FOR UPDATE
-                "#,
-                task
-            )
-            .fetch_optional(&mut **tx)
-            .await?;
+            let state = storage.fetch_task_state_locked(&mut *tx, task).await?;
 
             match state {
                 Some(TaskState::Complete | TaskState::Failed) => {
@@ -281,17 +251,9 @@ impl Host for Task {
                 _ => (),
             }
 
-            let result = sqlx::query_scalar!(
-                r#"
-                INSERT INTO durable.notification(task_id, event, data)
-                VALUES ($1, $2, $3)
-                "#,
-                task,
-                event,
-                Json(json) as Json<&RawValue>
-            )
-            .execute(&mut **tx)
-            .await;
+            let result = storage
+                .insert_notification(&mut *tx, task, &event, Json(json))
+                .await;
 
             match result {
                 Ok(_) => Ok(Ok(())),
@@ -358,14 +320,4 @@ impl<'de> serde::Deserialize<'de> for NotifyError {
     {
         RemoteNotifyError::deserialize(de)
     }
-}
-
-#[derive(Copy, Clone, Debug, Eq, PartialEq, sqlx::Type)]
-#[sqlx(type_name = "durable.task_state", rename_all = "lowercase")]
-enum TaskState {
-    Ready,
-    Active,
-    Suspended,
-    Complete,
-    Failed,
 }

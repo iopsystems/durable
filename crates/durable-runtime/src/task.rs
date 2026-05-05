@@ -202,7 +202,7 @@ pub struct Task {
 }
 
 pub struct TaskState {
-    shared: Arc<SharedState>,
+    pub(crate) shared: Arc<SharedState>,
     worker_id: i64,
 
     task: TaskData,
@@ -273,6 +273,10 @@ impl TaskState {
     /// Access the database connection pool for the worker.
     pub fn pool(&self) -> &sqlx::PgPool {
         &self.shared.pool
+    }
+
+    pub(crate) fn storage(&self) -> &dyn crate::storage::Storage {
+        &*self.shared.storage
     }
 
     /// Access the reqwest client for the worker.
@@ -444,20 +448,11 @@ impl TaskState {
             );
         }
 
-        let record = sqlx::query!(
-            r#"
-            SELECT
-                label,
-                value as "value: Json<Box<RawValue>>"
-             FROM durable.event
-            WHERE task_id = $1
-              AND index = $2
-            "#,
-            self.task_id(),
-            self.txn_index
-        )
-        .fetch_optional(&mut *conn)
-        .await?;
+        let record = self
+            .shared
+            .storage
+            .fetch_event_at_index(&mut *conn, self.task_id(), self.txn_index)
+            .await?;
 
         if let Some(record) = record {
             if record.label != options.label {
@@ -600,47 +595,19 @@ impl TaskState {
         // - We avoid multiple roundtrips to the database.
         // - Since all the statements are conditional on running_on = worker_id, we can
         //   run this outside of a transaction with no issues.
-        let running_on = sqlx::query!(
-            r#"
-            WITH
-                current_task AS (
-                    SELECT id, running_on
-                    FROM durable.task
-                    WHERE id = $1
-                    LIMIT 1
-                ),
-                insert_event AS (
-                    INSERT INTO durable.event(task_id, index, label, value)
-                    SELECT
-                        id as task_id,
-                        $2 as index,
-                        $3 as label,
-                        $4 as value
-                    FROM current_task
-                    RETURNING task_id
-                ),
-                insert_log AS (
-                    INSERT INTO durable.log(task_id, index, message)
-                    SELECT task_id, index, message
-                    FROM (VALUES ($1, $2, $5)) as t(task_id, index, message)
-                    JOIN current_task task ON task.id = task_id
-                    WHERE message IS NOT NULL
-                    RETURNING task_id
-                )
-            SELECT running_on
-             FROM current_task
-            LEFT JOIN insert_event event ON event.task_id = id
-            LEFT JOIN insert_event log   ON log.task_id = id
-            "#,
-            self.task_id(),
-            self.txn_index,
-            &*txn.label,
-            Json(data) as Json<&T>,
-            message
-        )
-        .fetch_one(&mut *conn)
-        .await?
-        .running_on;
+        let value = serde_json::value::to_raw_value(data)?;
+        let running_on = self
+            .shared
+            .storage
+            .commit_event_with_log(
+                &mut *conn,
+                self.task_id(),
+                self.txn_index,
+                &txn.label,
+                Json(&*value),
+                message.as_deref(),
+            )
+            .await?;
 
         tracing::trace!(
             target: "durable_runtime::task::transaction",
@@ -673,17 +640,10 @@ impl TaskState {
         conn: &mut PgConnection,
         timeout: Option<DateTime<Utc>>,
     ) -> anyhow::Result<TaskStatus> {
-        sqlx::query!(
-            "UPDATE durable.task
-            SET state = 'suspended',
-                running_on = NULL,
-                wakeup_at = $2
-            WHERE id = $1",
-            self.task_id(),
-            timeout
-        )
-        .execute(&mut *conn)
-        .await?;
+        self.shared
+            .storage
+            .suspend_task(&mut *conn, self.task_id(), timeout)
+            .await?;
 
         Ok(TaskStatus::Suspend)
     }
