@@ -79,7 +79,7 @@ impl Host for Task {
 
                 self.state
                     .storage()
-                    .suspend_task_no_wakeup(&mut *tx, self.task_id())
+                    .suspend_task_no_wakeup(&mut tx, self.task_id())
                     .await?;
 
                 if poll_notification(&mut *self, &mut tx).await?.is_some() {
@@ -193,7 +193,7 @@ impl Host for Task {
 
                     self.state
                         .storage()
-                        .suspend_task_no_wakeup(&mut *tx, self.task_id())
+                        .suspend_task_no_wakeup(&mut tx, self.task_id())
                         .await?;
 
                     if poll_notification(&mut *self, &mut tx).await?.is_some() {
@@ -241,7 +241,7 @@ impl Host for Task {
 
             // Note: We lock the row here so that concurrent notification polls
             //       cannot barge in here.
-            let state = storage.fetch_task_state_locked(&mut **tx, task).await?;
+            let state = storage.fetch_task_state_locked(&mut *tx, task).await?;
 
             match state {
                 Some(TaskState::Complete | TaskState::Failed) => {
@@ -252,7 +252,7 @@ impl Host for Task {
             }
 
             let result = storage
-                .insert_notification(&mut **tx, task, &event, Json(json))
+                .insert_notification(&mut *tx, task, &event, Json(json))
                 .await;
 
             match result {

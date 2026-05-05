@@ -847,10 +847,7 @@ impl Worker {
         let record = self.shared.storage.load_leader_id(&mut conn).await?;
         drop(conn);
 
-        let new_leader = match record {
-            Some(id) => id,
-            None => -1,
-        };
+        let new_leader = record.unwrap_or(-1);
 
         self.shared.leader.store(new_leader);
         self.shared
