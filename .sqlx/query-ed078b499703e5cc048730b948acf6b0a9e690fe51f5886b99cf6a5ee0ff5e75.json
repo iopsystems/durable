@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE durable.task\n            SET state = 'failed',\n                completed_at = CURRENT_TIMESTAMP,\n                running_on = NULL,\n                wasm = NULL\n            WHERE id = $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Int8"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "ed078b499703e5cc048730b948acf6b0a9e690fe51f5886b99cf6a5ee0ff5e75"
+}

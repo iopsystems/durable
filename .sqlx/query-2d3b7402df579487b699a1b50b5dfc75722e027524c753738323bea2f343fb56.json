@@ -1,0 +1,12 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            UPDATE durable.task\n              SET state = 'ready'\n            WHERE state = 'suspended'\n              AND EXISTS((\n                SELECT task_id\n                 FROM durable.notification\n                WHERE task_id = task.id\n                  AND created_at < NOW() - '10 minutes'::interval\n              ))\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": []
+  },
+  "hash": "2d3b7402df579487b699a1b50b5dfc75722e027524c753738323bea2f343fb56"
+}

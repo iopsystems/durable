@@ -1,0 +1,20 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT wakeup_at as \"wakeup_at!\"\n             FROM durable.task\n            WHERE state = 'suspended'\n              AND wakeup_at IS NOT NULL\n            ORDER BY wakeup_at ASC\n            LIMIT 1\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "wakeup_at!",
+        "type_info": "Timestamptz"
+      }
+    ],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": [
+      true
+    ]
+  },
+  "hash": "6b9dd270eea86985822ded5a1fc4edc7f9aee0703ea1f5c1c84b221c0dd529b1"
+}

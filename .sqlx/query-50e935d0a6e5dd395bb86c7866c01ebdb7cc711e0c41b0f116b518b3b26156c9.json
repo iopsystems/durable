@@ -1,0 +1,22 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE durable.worker\n              SET heartbeat_at = CURRENT_TIMESTAMP\n            WHERE id = $1\n            RETURNING id",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int8"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "50e935d0a6e5dd395bb86c7866c01ebdb7cc711e0c41b0f116b518b3b26156c9"
+}

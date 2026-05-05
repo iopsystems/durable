@@ -24,7 +24,7 @@ use crate::event::{self, Event, EventSource, Notification};
 use crate::flag::{ShutdownFlag, ShutdownGuard};
 use crate::plugin::{DurablePlugin, Plugin};
 use crate::scheduler::{Component as SchedulerComponent, ScheduleEvent};
-use crate::task::{RecordedEvent, Task, TaskState};
+use crate::task::{Task, TaskState};
 use crate::util::{IntoPgInterval, Mailbox, MetricSpan};
 use crate::Config;
 
@@ -34,6 +34,7 @@ const LOG_PANIC_INDEX: i32 = i32::MAX;
 pub(crate) struct SharedState {
     pub shutdown: ShutdownFlag,
     pub pool: sqlx::PgPool,
+    pub(crate) storage: Arc<dyn crate::storage::Storage>,
     pub client: reqwest::Client,
     pub notifications: broadcast::Sender<Notification>,
     pub config: Config,
@@ -255,6 +256,7 @@ impl WorkerBuilder {
             suspend: Notify::new(),
             cache: Mutex::new(uluru::LRUCache::new()),
             compile_sema: Semaphore::new(self.config.max_concurrent_compilations),
+            storage: Arc::new(crate::storage::PgStorage::new(self.pool.clone())),
             pool: self.pool,
             config: self.config,
             plugins: self.plugins,
@@ -339,16 +341,9 @@ impl Worker {
     }
 
     pub async fn run(&mut self) -> anyhow::Result<()> {
-        self.worker_id = sqlx::query!(
-            "
-            INSERT INTO durable.worker(heartbeat_at)
-            VALUES (CURRENT_TIMESTAMP)
-            RETURNING id
-            "
-        )
-        .fetch_one(&self.shared.pool)
-        .await?
-        .id;
+        let mut conn = self.shared.pool.acquire().await?;
+        self.worker_id = self.shared.storage.insert_worker(&mut conn).await?;
+        drop(conn);
 
         tracing::info!("durable worker id is {}", self.worker_id);
 
@@ -390,10 +385,15 @@ impl Worker {
         span.in_scope(|| {
             tracing::info!("deleting worker database entry");
         });
-        let result = sqlx::query!("DELETE FROM durable.worker WHERE id = $1", self.worker_id)
-            .execute(&self.shared.pool)
-            .await
-            .context("failed to delete the worker entry from the database");
+        let result = async {
+            let mut conn = self.shared.pool.acquire().await?;
+            self.shared
+                .storage
+                .delete_worker(&mut conn, self.worker_id)
+                .await
+        }
+        .await
+        .context("failed to delete the worker entry from the database");
 
         self.shared.scheduler.notify(ScheduleEvent::WorkerDeleted {
             worker_id: self.worker_id,
@@ -431,21 +431,15 @@ impl Worker {
                 .acquire(SchedulerComponent::Heartbeat { worker_id })
                 .await;
 
-            let record = sqlx::query!(
-                "UPDATE durable.worker
-                  SET heartbeat_at = CURRENT_TIMESTAMP
-                WHERE id = $1
-                RETURNING id",
-                worker_id
-            )
-            .fetch_optional(&shared.pool)
-            .await?;
+            let mut conn = shared.pool.acquire().await?;
+            let alive = shared.storage.heartbeat_worker(&mut conn, worker_id).await?;
+            drop(conn);
 
             // Our record is gone from the database. This means that some other worker
             // determined that we were inactive.
             //
             // We should shutdown and then (optionally) restart with a new worker id.
-            if record.is_none() {
+            if !alive {
                 shared.shutdown.raise();
                 anyhow::bail!("worker entry was deleted from the database");
             }
@@ -499,34 +493,20 @@ impl Worker {
             let timeout = shared.config.heartbeat_timeout.into_pg_interval();
 
             let mut result = if let Some(following) = following.take() {
-                sqlx::query!(
-                    "
-                    DELETE FROM durable.worker
-                    WHERE id = $1
-                      AND CURRENT_TIMESTAMP - heartbeat_at > $2
-                    ",
-                    following,
-                    timeout
-                )
-                .execute(&mut *tx)
-                .await?
+                shared
+                    .storage
+                    .delete_following_expired_worker(&mut tx, following, timeout)
+                    .await?
             } else {
                 Default::default()
             };
 
             if result.rows_affected() > 0 {
                 result.extend(std::iter::once(
-                    sqlx::query!(
-                        "
-                        DELETE FROM durable.worker
-                        WHERE CURRENT_TIMESTAMP - heartbeat_at > $2
-                        AND NOT id = $1
-                        ",
-                        worker_id,
-                        timeout
-                    )
-                    .execute(&mut *tx)
-                    .await?,
+                    shared
+                        .storage
+                        .delete_other_expired_workers(&mut tx, worker_id, timeout)
+                        .await?,
                 ));
 
                 tracing::debug!(
@@ -537,39 +517,10 @@ impl Worker {
             }
 
             // Select either the next worker in sequence, or the newest id in the sequence.
-            let record = sqlx::query!(
-                r#"
-                WITH
-                    prev AS (
-                        SELECT id, heartbeat_at
-                        FROM durable.worker
-                        WHERE id < $1
-                        ORDER BY id DESC
-                        LIMIT 1
-                    ),
-                    next AS (
-                        SELECT id, heartbeat_at
-                        FROM durable.worker
-                        WHERE NOT id = $1
-                        ORDER BY id DESC
-                        LIMIT 1
-                    ),
-                    combined AS (
-                        SELECT * FROM prev
-                        UNION ALL
-                        SELECT * FROM next
-                    )
-                SELECT
-                    id as "id!",
-                    heartbeat_at as "heartbeat_at!"
-                FROM combined
-                ORDER BY id ASC
-                LIMIT 1
-                "#,
-                worker_id
-            )
-            .fetch_optional(&mut *tx)
-            .await?;
+            let record = shared
+                .storage
+                .next_worker_in_sequence(&mut tx, worker_id)
+                .await?;
 
             tx.commit().await?;
 
@@ -641,24 +592,13 @@ impl Worker {
             // postgresql is forced to evaluate it for each row.
             //
             // If we don't do that all the rows here get the same random number.
-            let result = sqlx::query!(
-                "
-                UPDATE durable.task
-                  SET state = 'ready',
-                      wakeup_at = NULL,
-                      running_on = (
-                        SELECT id
-                         FROM durable.worker
-                        ORDER BY random() + task.id
-                        LIMIT 1
-                      )
-                WHERE state = 'suspended'
-                  AND wakeup_at <= (NOW() - $1::interval)
-                ",
-                shared.config.suspend_margin.into_pg_interval()
-            )
-            .execute(&mut *conn)
-            .await?;
+            let result = shared
+                .storage
+                .wake_suspended_tasks(
+                    &mut conn,
+                    shared.config.suspend_margin.into_pg_interval(),
+                )
+                .await?;
 
             let count = result.rows_affected();
             if count > 0 {
@@ -666,19 +606,7 @@ impl Worker {
                 shared.scheduler.notify(ScheduleEvent::TasksWoken { count });
             }
 
-            let wakeup_at = sqlx::query!(
-                r#"
-                SELECT wakeup_at as "wakeup_at!"
-                 FROM durable.task
-                WHERE state = 'suspended'
-                  AND wakeup_at IS NOT NULL
-                ORDER BY wakeup_at ASC
-                LIMIT 1
-                "#
-            )
-            .fetch_optional(&mut *conn)
-            .await?
-            .map(|record| record.wakeup_at);
+            let wakeup_at = shared.storage.next_wakeup_at(&mut conn).await?;
 
             let now = shared.clock.now();
             let delay = match wakeup_at {
@@ -743,22 +671,10 @@ impl Worker {
 
             // We do cleanup
             loop {
-                let result = sqlx::query!(
-                    r#"
-                    DELETE FROM durable.task
-                    WHERE task.ctid = ANY(ARRAY(
-                        SELECT ctid
-                        FROM durable.task
-                        WHERE completed_at < NOW() - $1::interval
-                        LIMIT $2
-                        FOR UPDATE
-                    ))
-                    "#,
-                    interval,
-                    limit
-                )
-                .execute(&mut *conn)
-                .await;
+                let result = shared
+                    .storage
+                    .cleanup_old_tasks(&mut conn, interval, limit)
+                    .await;
 
                 match result {
                     Ok(result) if result.rows_affected() < limit as u64 => break,
@@ -810,21 +726,7 @@ impl Worker {
                 }
             };
 
-            let result = sqlx::query!(
-                r#"
-                UPDATE durable.task
-                  SET state = 'ready'
-                WHERE state = 'suspended'
-                  AND EXISTS((
-                    SELECT task_id
-                     FROM durable.notification
-                    WHERE task_id = task.id
-                      AND created_at < NOW() - '10 minutes'::interval
-                  ))
-                "#
-            )
-            .execute(&mut *conn)
-            .await;
+            let result = shared.storage.unwedge_stuck_notifications(&mut conn).await;
 
             match result {
                 Ok(res) if res.rows_affected() != 0 => {
@@ -893,19 +795,11 @@ impl Worker {
                         }
                     }
 
-                    sqlx::query!(
-                        "
-                        UPDATE durable.task
-                          SET state = 'ready',
-                              running_on = NULL
-                        WHERE id = ANY($1::bigint[])
-                          AND running_on = $2
-                        ",
-                        &failed,
-                        self.worker_id
-                    )
-                    .execute(&self.shared.pool)
-                    .await?;
+                    let mut conn = self.shared.pool.acquire().await?;
+                    self.shared
+                        .storage
+                        .reset_failed_tasks(&mut conn, &failed, self.worker_id)
+                        .await?;
 
                     continue;
                 }
@@ -949,19 +843,12 @@ impl Worker {
     }
 
     async fn load_leader_id(&mut self) -> anyhow::Result<()> {
-        let record = sqlx::query!(
-            "
-            SELECT id
-             FROM durable.worker
-            ORDER BY started_at ASC, id ASC
-            LIMIT 1
-            "
-        )
-        .fetch_optional(&self.shared.pool)
-        .await?;
+        let mut conn = self.shared.pool.acquire().await?;
+        let record = self.shared.storage.load_leader_id(&mut conn).await?;
+        drop(conn);
 
         let new_leader = match record {
-            Some(record) => record.id,
+            Some(id) => id,
             None => -1,
         };
 
@@ -991,48 +878,17 @@ impl Worker {
             .await;
 
         let mut tx = self.shared.pool.begin().await?;
-        let tasks = sqlx::query_as!(
-            TaskData,
-            r#"
-            WITH selected AS (
-                SELECT id
-                 FROM durable.task
-                WHERE (state IN ('ready', 'active') AND running_on IS NULL)
-                   OR (state = 'ready' AND running_on = $1)
-                ORDER BY id ASC
-                FOR NO KEY UPDATE SKIP LOCKED
-                LIMIT $2
-            )
-            UPDATE durable.task
-              SET running_on = $1,
-                  state = 'active'
-             FROM selected
-            WHERE selected.id = task.id
-            RETURNING
-                task.id         as id,
-                task.name       as name,
-                task.created_at as created_at,
-                task.wasm       as "wasm!",
-                task.data       as "data!: Json<Box<RawValue>>"
-            "#,
-            self.worker_id,
-            allowed as i64
-        )
-        .fetch_all(&mut *tx)
-        .await?;
+        let tasks = self
+            .shared
+            .storage
+            .claim_tasks(&mut tx, self.worker_id, allowed as i64)
+            .await?;
 
         if tasks.len() + self.tasks.len() >= max_tasks {
-            sqlx::query!(
-                "
-                UPDATE durable.task
-                  SET running_on = NULL
-                WHERE state = 'ready'
-                  AND running_on = $1
-                ",
-                self.worker_id
-            )
-            .execute(&mut *tx)
-            .await?;
+            self.shared
+                .storage
+                .release_owned_ready_tasks(&mut tx, self.worker_id)
+                .await?;
 
             self.blocked = true;
         }
@@ -1128,19 +984,11 @@ impl Worker {
                             //
                             // If this fails then the task failure gets reported to the main event
                             // loop which can ensure it gets retried.
-                            sqlx::query!(
-                                "
-                                UPDATE durable.task
-                                SET state = 'ready',
-                                    running_on = NULL
-                                WHERE id = $1
-                                  AND running_on = $2
-                                ",
-                                task_id,
-                                worker_id
-                            )
-                            .execute(&shared.pool)
-                            .await?;
+                            let mut conn = shared.pool.acquire().await?;
+                            shared
+                                .storage
+                                .reset_task_for_retry(&mut conn, task_id, worker_id)
+                                .await?;
 
                             break TaskStatus::Suspend;
                         }
@@ -1153,14 +1001,13 @@ impl Worker {
 
                     let message = format!("{error:?}\n");
 
-                    let result = sqlx::query!(
-                        "INSERT INTO durable.log(task_id, index, message)
-                        VALUES ($1, $2, $3)",
-                        task_id,
-                        LOG_ERROR_INDEX,
-                        message
-                    )
-                    .execute(&shared.pool)
+                    let result = async {
+                        let mut conn = shared.pool.acquire().await?;
+                        shared
+                            .storage
+                            .insert_log(&mut conn, task_id, LOG_ERROR_INDEX, &message)
+                            .await
+                    }
                     .await;
 
                     if let Err(e) = result {
@@ -1180,14 +1027,18 @@ impl Worker {
 
                     tracing::error!("task {task_id} panicked: {message}");
 
-                    let result = sqlx::query!(
-                        "INSERT INTO durable.log(task_id, index, message)
-                         VALUES ($1, $2, $3)",
-                        task_id,
-                        LOG_PANIC_INDEX,
-                        format!("task panicked: {message}\n")
-                    )
-                    .execute(&shared.pool)
+                    let result = async {
+                        let mut conn = shared.pool.acquire().await?;
+                        shared
+                            .storage
+                            .insert_log(
+                                &mut conn,
+                                task_id,
+                                LOG_PANIC_INDEX,
+                                &format!("task panicked: {message}\n"),
+                            )
+                            .await
+                    }
                     .await;
 
                     if let Err(e) = result {
@@ -1216,18 +1067,8 @@ impl Worker {
                 });
             }
             TaskStatus::ExitSuccess => {
-                sqlx::query!(
-                    "UPDATE durable.task
-                    SET state = 'complete',
-                        completed_at = CURRENT_TIMESTAMP,
-                        running_on = NULL,
-                        wasm = NULL
-                    WHERE id = $1
-                    ",
-                    task_id
-                )
-                .execute(&shared.pool)
-                .await?;
+                let mut conn = shared.pool.acquire().await?;
+                shared.storage.mark_task_complete(&mut conn, task_id).await?;
 
                 shared.metrics.task_complete.increment(1);
                 shared.scheduler.notify(ScheduleEvent::TaskCompleted {
@@ -1236,17 +1077,8 @@ impl Worker {
                 });
             }
             TaskStatus::ExitFailure => {
-                sqlx::query!(
-                    "UPDATE durable.task
-                    SET state = 'failed',
-                        completed_at = CURRENT_TIMESTAMP,
-                        running_on = NULL,
-                        wasm = NULL
-                    WHERE id = $1",
-                    task_id
-                )
-                .execute(&shared.pool)
-                .await?;
+                let mut conn = shared.pool.acquire().await?;
+                shared.storage.mark_task_failed(&mut conn, task_id).await?;
 
                 shared.metrics.task_failed.increment(1);
                 shared.scheduler.notify(ScheduleEvent::TaskCompleted {
@@ -1296,15 +1128,17 @@ impl Worker {
         // once. Compiling one is an expensive operation, so if
         let component = component
             .get_or_compute(|| async {
-                let record = sqlx::query!("SELECT wasm FROM durable.wasm WHERE id = $1", task.wasm)
-                    .fetch_one(&shared.pool)
+                let mut conn = shared.pool.acquire().await.map_err(anyhow::Error::from)?;
+                let wasm = shared
+                    .storage
+                    .fetch_wasm_blob(&mut conn, task.wasm)
                     .await
                     .map_err(anyhow::Error::from)?;
+                drop(conn);
 
                 // If an error occurs then we just allow ourselves to proceed anyway.
                 let _permit = shared.compile_sema.acquire().await;
 
-                let wasm = record.wasm;
                 let start = Instant::now();
                 let component = tokio::task::spawn_blocking({
                     let engine = engine.clone();
@@ -1328,21 +1162,10 @@ impl Worker {
             })
             .await?;
 
-        let events = sqlx::query_as!(
-            RecordedEvent,
-            r#"
-            SELECT
-                index,
-                label,
-                value as "value!: Json<Box<RawValue>>"
-             FROM durable.event
-            WHERE task_id = $1
-            ORDER BY index ASC
-            LIMIT 1000
-            "#,
-            task.id
-        )
-        .fetch_all(&shared.pool)
+        let events = async {
+            let mut conn = shared.pool.acquire().await?;
+            shared.storage.fetch_recorded_events(&mut conn, task.id).await
+        }
         .await
         .unwrap_or_default();
 
@@ -1411,16 +1234,16 @@ impl Worker {
                     logs.trim_end()
                 );
 
-                if let Err(e) = sqlx::query!(
-                    "INSERT INTO durable.log(task_id, index, message)
-                     VALUES ($1, $2, $3)",
-                    task_id,
-                    index,
-                    logs
-                )
-                .execute(&shared.pool)
-                .await
-                {
+                let result = async {
+                    let mut conn = shared.pool.acquire().await?;
+                    shared
+                        .storage
+                        .insert_log(&mut conn, task_id, index, &logs)
+                        .await
+                }
+                .await;
+
+                if let Err(e) = result {
                     tracing::error!("failed to save remaining logs to the database: {e}");
                 }
             }
@@ -1431,17 +1254,13 @@ impl Worker {
 
             tracing::warn!("task failed to execute with an error: {message}");
 
-            let result = sqlx::query!(
-                "INSERT INTO durable.log(task_id, index, message)
-                 VALUES ($1, $2, $3)
-                 ON CONFLICT ON CONSTRAINT log_pkey DO UPDATE
-                 SET message = $3
-                 ",
-                task_id,
-                LOG_ERROR_INDEX,
-                message
-            )
-            .execute(&shared.pool)
+            let result = async {
+                let mut conn = shared.pool.acquire().await?;
+                shared
+                    .storage
+                    .upsert_log_error(&mut conn, task_id, LOG_ERROR_INDEX, &message)
+                    .await
+            }
             .await;
 
             if let Err(e) = result {
