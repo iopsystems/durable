@@ -163,7 +163,6 @@ pub(crate) trait Storage: Send + Sync + 'static {
     async fn fetch_wasm_blob(&self, conn: &mut PgConnection, wasm_id: i64)
         -> sqlx::Result<Vec<u8>>;
 
-    /// Loads up to 1000 events; used to replay completed transactions.
     async fn fetch_recorded_events(
         &self,
         conn: &mut PgConnection,
