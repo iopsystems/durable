@@ -15,7 +15,6 @@ use super::{PolledNotification, Storage, StoredEvent, TaskState, WorkerRecord};
 use crate::task::RecordedEvent;
 use crate::worker::TaskData;
 
-/// Postgres-backed storage.
 #[derive(Clone)]
 pub(crate) struct PgStorage {
     #[allow(dead_code)]
