@@ -432,7 +432,10 @@ impl Worker {
                 .await;
 
             let mut conn = shared.pool.acquire().await?;
-            let alive = shared.storage.heartbeat_worker(&mut conn, worker_id).await?;
+            let alive = shared
+                .storage
+                .heartbeat_worker(&mut conn, worker_id)
+                .await?;
             drop(conn);
 
             // Our record is gone from the database. This means that some other worker
@@ -594,10 +597,7 @@ impl Worker {
             // If we don't do that all the rows here get the same random number.
             let result = shared
                 .storage
-                .wake_suspended_tasks(
-                    &mut conn,
-                    shared.config.suspend_margin.into_pg_interval(),
-                )
+                .wake_suspended_tasks(&mut conn, shared.config.suspend_margin.into_pg_interval())
                 .await?;
 
             let count = result.rows_affected();
@@ -1068,7 +1068,10 @@ impl Worker {
             }
             TaskStatus::ExitSuccess => {
                 let mut conn = shared.pool.acquire().await?;
-                shared.storage.mark_task_complete(&mut conn, task_id).await?;
+                shared
+                    .storage
+                    .mark_task_complete(&mut conn, task_id)
+                    .await?;
 
                 shared.metrics.task_complete.increment(1);
                 shared.scheduler.notify(ScheduleEvent::TaskCompleted {
@@ -1164,7 +1167,10 @@ impl Worker {
 
         let events = async {
             let mut conn = shared.pool.acquire().await?;
-            shared.storage.fetch_recorded_events(&mut conn, task.id).await
+            shared
+                .storage
+                .fetch_recorded_events(&mut conn, task.id)
+                .await
         }
         .await
         .unwrap_or_default();

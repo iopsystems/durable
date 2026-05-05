@@ -321,4 +321,3 @@ impl<'de> serde::Deserialize<'de> for NotifyError {
         RemoteNotifyError::deserialize(de)
     }
 }
-

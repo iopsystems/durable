@@ -15,8 +15,6 @@
 
 mod pg;
 
-pub(crate) use self::pg::PgStorage;
-
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use serde_json::value::RawValue;
@@ -25,6 +23,7 @@ use sqlx::postgres::PgQueryResult;
 use sqlx::types::Json;
 use sqlx::PgConnection;
 
+pub(crate) use self::pg::PgStorage;
 use crate::task::RecordedEvent;
 use crate::worker::TaskData;
 
@@ -93,11 +92,8 @@ pub(crate) trait Storage: Send + Sync + 'static {
 
     /// Refresh the heartbeat for the given worker. Returns `true` if the row
     /// still exists.
-    async fn heartbeat_worker(
-        &self,
-        conn: &mut PgConnection,
-        worker_id: i64,
-    ) -> sqlx::Result<bool>;
+    async fn heartbeat_worker(&self, conn: &mut PgConnection, worker_id: i64)
+        -> sqlx::Result<bool>;
 
     /// Delete the worker we are following if its heartbeat has expired.
     async fn delete_following_expired_worker(
@@ -140,10 +136,7 @@ pub(crate) trait Storage: Send + Sync + 'static {
     ) -> sqlx::Result<PgQueryResult>;
 
     /// Return the earliest `wakeup_at` of any currently suspended task.
-    async fn next_wakeup_at(
-        &self,
-        conn: &mut PgConnection,
-    ) -> sqlx::Result<Option<DateTime<Utc>>>;
+    async fn next_wakeup_at(&self, conn: &mut PgConnection) -> sqlx::Result<Option<DateTime<Utc>>>;
 
     /// Delete a batch of completed tasks older than `cleanup_age`.
     async fn cleanup_old_tasks(
@@ -212,11 +205,8 @@ pub(crate) trait Storage: Send + Sync + 'static {
     // ---------------------------------------------------------------------
 
     /// Fetch the wasm bytecode for a stored program.
-    async fn fetch_wasm_blob(
-        &self,
-        conn: &mut PgConnection,
-        wasm_id: i64,
-    ) -> sqlx::Result<Vec<u8>>;
+    async fn fetch_wasm_blob(&self, conn: &mut PgConnection, wasm_id: i64)
+        -> sqlx::Result<Vec<u8>>;
 
     /// Load up to 1000 recorded events for a task, used for replay.
     async fn fetch_recorded_events(

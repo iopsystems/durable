@@ -199,10 +199,7 @@ impl Storage for PgStorage {
         .await
     }
 
-    async fn next_wakeup_at(
-        &self,
-        conn: &mut PgConnection,
-    ) -> sqlx::Result<Option<DateTime<Utc>>> {
+    async fn next_wakeup_at(&self, conn: &mut PgConnection) -> sqlx::Result<Option<DateTime<Utc>>> {
         let record = sqlx::query!(
             r#"
             SELECT wakeup_at as "wakeup_at!"
