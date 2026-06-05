@@ -301,7 +301,7 @@ pub mod durable {
                     write!(f, "{:?}", self)
                 }
             }
-            impl std::error::Error for NotifyError {}
+            impl ::core::error::Error for NotifyError {}
             #[allow(unused_unsafe, clippy::all)]
             /// Attempt to read the next available notification, if there is one.
             /// notification: func() -> option<event>;
@@ -655,7 +655,7 @@ pub mod wasi {
 }
 #[rustfmt::skip]
 mod _rt {
-    #![allow(dead_code, clippy::all)]
+    #![allow(dead_code, unused_imports, clippy::all)]
     pub use alloc_crate::string::String;
     pub use alloc_crate::vec::Vec;
     pub unsafe fn string_lift(bytes: Vec<u8>) -> String {
@@ -700,7 +700,7 @@ mod _rt {
 #[rustfmt::skip]
 #[cfg(target_arch = "wasm32")]
 #[unsafe(
-    link_section = "component-type:wit-bindgen:0.44.0:durable:core@2.7.0:import-core:encoded world"
+    link_section = "component-type:wit-bindgen:0.57.1:durable:core@2.7.0:import-core:encoded world"
 )]
 #[doc(hidden)]
 #[allow(clippy::octal_escapes)]
@@ -721,7 +721,7 @@ w\0\x07\x04\0\x1dnotification-blocking-timeout\x01\x08\x01j\0\x01\x05\x01@\x03\x
 taskx\x05events\x04datas\0\x09\x04\0\x06notify\x01\x0a\x03\0\x19durable:core/not\
 ify@2.7.0\x05\x03\x04\0\x1edurable:core/import-core@2.7.0\x04\0\x0b\x11\x01\0\x0b\
 import-core\x03\0\0\0G\x09producers\x01\x0cprocessed-by\x02\x0dwit-component\x07\
-0.236.1\x10wit-bindgen-rust\x060.44.0";
+0.247.0\x10wit-bindgen-rust\x060.57.1";
 #[inline(never)]
 #[doc(hidden)]
 pub fn __link_custom_section_describing_imports() {

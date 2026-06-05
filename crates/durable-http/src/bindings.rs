@@ -124,7 +124,7 @@ pub mod durable {
                     write!(f, "{:?}", self)
                 }
             }
-            impl std::error::Error for HttpError {}
+            impl ::core::error::Error for HttpError {}
             #[derive(Debug)]
             #[repr(transparent)]
             pub struct HttpError2 {
@@ -374,7 +374,9 @@ pub mod durable {
                                         let len21 = l20;
                                         HttpHeaderResult {
                                             name: _rt::string_lift(bytes18),
-                                            value: _rt::Vec::from_raw_parts(l19.cast(), len21, len21),
+                                            value: <_ as From<
+                                                _rt::Vec<_>,
+                                            >>::from(_rt::Vec::from_raw_parts(l19.cast(), len21, len21)),
                                         }
                                     };
                                     result22.push(e22);
@@ -394,7 +396,9 @@ pub mod durable {
                                 HttpResponse {
                                     status: l13 as u16,
                                     headers: result22,
-                                    body: _rt::Vec::from_raw_parts(l23.cast(), len25, len25),
+                                    body: <_ as From<
+                                        _rt::Vec<_>,
+                                    >>::from(_rt::Vec::from_raw_parts(l23.cast(), len25, len25)),
                                 }
                             };
                             Ok(e)
@@ -946,7 +950,9 @@ pub mod durable {
                                         let len11 = l10;
                                         HttpHeaderResult {
                                             name: _rt::string_lift(bytes8),
-                                            value: _rt::Vec::from_raw_parts(l9.cast(), len11, len11),
+                                            value: <_ as From<
+                                                _rt::Vec<_>,
+                                            >>::from(_rt::Vec::from_raw_parts(l9.cast(), len11, len11)),
                                         }
                                     };
                                     result12.push(e12);
@@ -966,7 +972,9 @@ pub mod durable {
                                 HttpResponse {
                                     status: l3 as u16,
                                     headers: result12,
-                                    body: _rt::Vec::from_raw_parts(l13.cast(), len15, len15),
+                                    body: <_ as From<
+                                        _rt::Vec<_>,
+                                    >>::from(_rt::Vec::from_raw_parts(l13.cast(), len15, len15)),
                                 }
                             };
                             Ok(e)
@@ -990,7 +998,7 @@ pub mod durable {
 }
 #[rustfmt::skip]
 mod _rt {
-    #![allow(dead_code, clippy::all)]
+    #![allow(dead_code, unused_imports, clippy::all)]
     pub use alloc_crate::string::String;
     pub use alloc_crate::vec::Vec;
     use core::fmt;
@@ -1130,7 +1138,7 @@ mod _rt {
 #[rustfmt::skip]
 #[cfg(target_arch = "wasm32")]
 #[unsafe(
-    link_section = "component-type:wit-bindgen:0.44.0:durable:core@2.7.0:import-http:encoded world"
+    link_section = "component-type:wit-bindgen:0.57.1:durable:core@2.7.0:import-http:encoded world"
 )]
 #[doc(hidden)]
 #[allow(clippy::octal_escapes)]
@@ -1157,7 +1165,7 @@ lf\x15\x07headers\x03\0\x16\x04\0![method]http-request2.set-headers\x01\x19\x01@
 j\x01\x09\x01\x12\x01@\x01\x07request\x11\0\x1e\x04\0\x06fetch2\x01\x1f\x03\0\x17\
 durable:core/http@2.7.0\x05\0\x04\0\x1edurable:core/import-http@2.7.0\x04\0\x0b\x11\
 \x01\0\x0bimport-http\x03\0\0\0G\x09producers\x01\x0cprocessed-by\x02\x0dwit-com\
-ponent\x070.236.1\x10wit-bindgen-rust\x060.44.0";
+ponent\x070.247.0\x10wit-bindgen-rust\x060.57.1";
 #[inline(never)]
 #[doc(hidden)]
 pub fn __link_custom_section_describing_imports() {

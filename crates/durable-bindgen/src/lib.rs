@@ -61,7 +61,7 @@ fn _generate(source: &Path, out: &Path, world: &str, options: Options) -> anyhow
     }
 
     let mut files = Files::default();
-    generator.generate(&resolve, world, &mut files)?;
+    generator.generate(&mut resolve, world, &mut files)?;
 
     let (_, src) = files.iter().next().unwrap();
     let src = std::str::from_utf8(src).unwrap();

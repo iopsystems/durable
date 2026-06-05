@@ -1910,7 +1910,9 @@ pub mod durable {
                                         .add(2 * ::core::mem::size_of::<*const u8>())
                                         .cast::<usize>();
                                     let len5 = l4;
-                                    _rt::Vec::from_raw_parts(l3.cast(), len5, len5)
+                                    <_ as From<
+                                        _rt::Vec<_>,
+                                    >>::from(_rt::Vec::from_raw_parts(l3.cast(), len5, len5))
                                 };
                                 Some(e)
                             }
@@ -2269,7 +2271,9 @@ pub mod durable {
                                         .add(2 * ::core::mem::size_of::<*const u8>())
                                         .cast::<usize>();
                                     let len5 = l4;
-                                    _rt::Vec::from_raw_parts(l3.cast(), len5, len5)
+                                    <_ as From<
+                                        _rt::Vec<_>,
+                                    >>::from(_rt::Vec::from_raw_parts(l3.cast(), len5, len5))
                                 };
                                 Some(e)
                             }
@@ -2319,7 +2323,9 @@ pub mod durable {
                                         .add(2 * ::core::mem::size_of::<*const u8>())
                                         .cast::<usize>();
                                     let len5 = l4;
-                                    _rt::Vec::from_raw_parts(l3.cast(), len5, len5)
+                                    <_ as From<
+                                        _rt::Vec<_>,
+                                    >>::from(_rt::Vec::from_raw_parts(l3.cast(), len5, len5))
                                 };
                                 Some(e)
                             }
@@ -2369,7 +2375,9 @@ pub mod durable {
                                         .add(2 * ::core::mem::size_of::<*const u8>())
                                         .cast::<usize>();
                                     let len5 = l4;
-                                    _rt::Vec::from_raw_parts(l3.cast(), len5, len5)
+                                    <_ as From<
+                                        _rt::Vec<_>,
+                                    >>::from(_rt::Vec::from_raw_parts(l3.cast(), len5, len5))
                                 };
                                 Some(e)
                             }
@@ -2419,7 +2427,9 @@ pub mod durable {
                                         .add(2 * ::core::mem::size_of::<*const u8>())
                                         .cast::<usize>();
                                     let len5 = l4;
-                                    _rt::Vec::from_raw_parts(l3.cast(), len5, len5)
+                                    <_ as From<
+                                        _rt::Vec<_>,
+                                    >>::from(_rt::Vec::from_raw_parts(l3.cast(), len5, len5))
                                 };
                                 Some(e)
                             }
@@ -2469,7 +2479,9 @@ pub mod durable {
                                         .add(2 * ::core::mem::size_of::<*const u8>())
                                         .cast::<usize>();
                                     let len5 = l4;
-                                    _rt::Vec::from_raw_parts(l3.cast(), len5, len5)
+                                    <_ as From<
+                                        _rt::Vec<_>,
+                                    >>::from(_rt::Vec::from_raw_parts(l3.cast(), len5, len5))
                                 };
                                 Some(e)
                             }
@@ -2519,7 +2531,9 @@ pub mod durable {
                                         .add(2 * ::core::mem::size_of::<*const u8>())
                                         .cast::<usize>();
                                     let len5 = l4;
-                                    _rt::Vec::from_raw_parts(l3.cast(), len5, len5)
+                                    <_ as From<
+                                        _rt::Vec<_>,
+                                    >>::from(_rt::Vec::from_raw_parts(l3.cast(), len5, len5))
                                 };
                                 Some(e)
                             }
@@ -2655,7 +2669,9 @@ pub mod durable {
                                                 .add(::core::mem::size_of::<*const u8>())
                                                 .cast::<usize>();
                                             let len7 = l6;
-                                            _rt::Vec::from_raw_parts(l5.cast(), len7, len7)
+                                            <_ as From<
+                                                _rt::Vec<_>,
+                                            >>::from(_rt::Vec::from_raw_parts(l5.cast(), len7, len7))
                                         };
                                         result8.push(e8);
                                     }
@@ -2714,7 +2730,9 @@ pub mod durable {
                                         .add(2 * ::core::mem::size_of::<*const u8>())
                                         .cast::<usize>();
                                     let len5 = l4;
-                                    _rt::Vec::from_raw_parts(l3.cast(), len5, len5)
+                                    <_ as From<
+                                        _rt::Vec<_>,
+                                    >>::from(_rt::Vec::from_raw_parts(l3.cast(), len5, len5))
                                 };
                                 Some(e)
                             }
@@ -2764,7 +2782,9 @@ pub mod durable {
                                         .add(2 * ::core::mem::size_of::<*const u8>())
                                         .cast::<usize>();
                                     let len5 = l4;
-                                    _rt::Vec::from_raw_parts(l3.cast(), len5, len5)
+                                    <_ as From<
+                                        _rt::Vec<_>,
+                                    >>::from(_rt::Vec::from_raw_parts(l3.cast(), len5, len5))
                                 };
                                 Some(e)
                             }
@@ -2814,7 +2834,9 @@ pub mod durable {
                                         .add(2 * ::core::mem::size_of::<*const u8>())
                                         .cast::<usize>();
                                     let len5 = l4;
-                                    _rt::Vec::from_raw_parts(l3.cast(), len5, len5)
+                                    <_ as From<
+                                        _rt::Vec<_>,
+                                    >>::from(_rt::Vec::from_raw_parts(l3.cast(), len5, len5))
                                 };
                                 Some(e)
                             }
@@ -4320,7 +4342,7 @@ pub mod durable {
 }
 #[rustfmt::skip]
 mod _rt {
-    #![allow(dead_code, clippy::all)]
+    #![allow(dead_code, unused_imports, clippy::all)]
     use core::fmt;
     use core::marker;
     use core::sync::atomic::{AtomicU32, Ordering::Relaxed};
@@ -4553,7 +4575,7 @@ mod _rt {
 #[rustfmt::skip]
 #[cfg(target_arch = "wasm32")]
 #[unsafe(
-    link_section = "component-type:wit-bindgen:0.44.0:durable:core@2.7.0:import-sql:encoded world"
+    link_section = "component-type:wit-bindgen:0.57.1:durable:core@2.7.0:import-sql:encoded world"
 )]
 #[doc(hidden)]
 #[allow(clippy::octal_escapes)]
@@ -4655,7 +4677,7 @@ p\x0f\x01@\x03\x03sqls\x06params\x92\x01\x07options\x18\x01\0\x04\0\x05query\x01
 \x93\x01\x01j\x01\x16\x01!\x01k\x94\x01\x01@\0\0\x95\x01\x04\0\x05fetch\x01\x96\x01\
 \x03\0\x16durable:core/sql@2.7.0\x05\0\x04\0\x1ddurable:core/import-sql@2.7.0\x04\
 \0\x0b\x10\x01\0\x0aimport-sql\x03\0\0\0G\x09producers\x01\x0cprocessed-by\x02\x0d\
-wit-component\x070.236.1\x10wit-bindgen-rust\x060.44.0";
+wit-component\x070.247.0\x10wit-bindgen-rust\x060.57.1";
 #[inline(never)]
 #[doc(hidden)]
 pub fn __link_custom_section_describing_imports() {
