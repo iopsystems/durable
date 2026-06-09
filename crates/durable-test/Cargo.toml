@@ -17,5 +17,5 @@ sqlx = { version = "0.8", features = ["postgres", "runtime-tokio-rustls"] }
 tokio = { version = "1.50", features = ["full", "macros"] }
 wasmtime = { workspace = true }
 futures = "0.3.32"
-ctor = "0.6.3"
+ctor = "1.0"
 tracing-subscriber = { version = "0.3.23", features = ["env-filter", "fmt"] }
