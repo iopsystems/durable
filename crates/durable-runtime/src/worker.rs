@@ -56,6 +56,106 @@ pub(crate) struct SharedState {
     pub(crate) metrics: SharedMetrics,
 }
 
+impl SharedState {
+    /// Acquire a connection from the pool, retrying transient pool-acquire
+    /// timeouts with exponential backoff before giving up.
+    ///
+    /// A pool-acquire timeout (`pool timed out while waiting for an open
+    /// connection`) is usually transient: a momentary spike in connection
+    /// demand that clears on its own. Propagating it immediately would tear the
+    /// whole worker down and rely on the supervisor to rebuild it, which is
+    /// heavy-handed for a transient blip. Instead we retry the acquire up to
+    /// [`Config::pool_acquire_max_retries`] times, only escalating to a worker
+    /// teardown once the condition is sustained.
+    ///
+    /// All other errors (and a timeout that outlasts the retry budget) are
+    /// returned to the caller as before.
+    pub(crate) async fn acquire(&self) -> sqlx::Result<sqlx::pool::PoolConnection<sqlx::Postgres>> {
+        let mut retry = PoolRetry::new(self);
+        loop {
+            match self.pool.acquire().await {
+                Ok(conn) => return Ok(conn),
+                Err(error) => retry.handle(error).await?,
+            }
+        }
+    }
+
+    /// Begin a transaction on the pool, retrying transient pool-acquire
+    /// timeouts with exponential backoff before giving up.
+    ///
+    /// See [`SharedState::acquire`] for why transient timeouts are retried
+    /// rather than immediately tearing the worker down.
+    pub(crate) async fn begin(&self) -> sqlx::Result<sqlx::Transaction<'static, sqlx::Postgres>> {
+        let mut retry = PoolRetry::new(self);
+        loop {
+            match self.pool.begin().await {
+                Ok(tx) => return Ok(tx),
+                Err(error) => retry.handle(error).await?,
+            }
+        }
+    }
+}
+
+/// Tracks the exponential-backoff state while retrying transient pool-acquire
+/// timeouts. See [`SharedState::acquire`].
+struct PoolRetry<'a> {
+    shared: &'a SharedState,
+    retries: u32,
+    backoff: Duration,
+}
+
+impl<'a> PoolRetry<'a> {
+    fn new(shared: &'a SharedState) -> Self {
+        Self {
+            shared,
+            retries: 0,
+            backoff: shared.config.pool_acquire_backoff,
+        }
+    }
+
+    /// Decide what to do after a failed pool operation.
+    ///
+    /// If the error is a transient [`sqlx::Error::PoolTimedOut`] and the retry
+    /// budget is not yet exhausted, this sleeps for the current backoff (while
+    /// staying responsive to shutdown) and returns `Ok(())` to signal that the
+    /// operation should be retried. Otherwise it returns the error so the
+    /// caller propagates it, which escalates to a worker teardown.
+    async fn handle(&mut self, error: sqlx::Error) -> sqlx::Result<()> {
+        if !matches!(error, sqlx::Error::PoolTimedOut)
+            || self.retries >= self.shared.config.pool_acquire_max_retries
+        {
+            return Err(error);
+        }
+
+        self.retries += 1;
+        tracing::warn!(
+            retries = self.retries,
+            max_retries = self.shared.config.pool_acquire_max_retries,
+            "timed out acquiring a database connection from the pool; retrying in {}",
+            humantime::Duration::from(self.backoff)
+        );
+
+        // Remain responsive to shutdown so that a graceful shutdown is not
+        // delayed by the full backoff period. If shutdown fires we give up and
+        // propagate the error; the worker is coming down anyway.
+        let mut shutdown = std::pin::pin!(self.shared.shutdown.wait());
+        tokio::select! {
+            biased;
+
+            _ = shutdown.as_mut() => return Err(error),
+            _ = self.shared.clock.sleep(self.backoff) => ()
+        }
+
+        self.backoff = next_backoff(self.backoff, self.shared.config.pool_acquire_max_backoff);
+        Ok(())
+    }
+}
+
+/// Double `backoff`, clamping the result to `max`.
+fn next_backoff(backoff: Duration, max: Duration) -> Duration {
+    backoff.saturating_mul(2).min(max)
+}
+
 pub(crate) struct SharedMetrics {
     task_spawn: Counter,
     task_suspend: Counter,
@@ -341,7 +441,7 @@ impl Worker {
     }
 
     pub async fn run(&mut self) -> anyhow::Result<()> {
-        let mut conn = self.shared.pool.acquire().await?;
+        let mut conn = self.shared.acquire().await?;
         self.worker_id = self.shared.storage.insert_worker(&mut conn).await?;
         drop(conn);
 
@@ -431,7 +531,7 @@ impl Worker {
                 .acquire(SchedulerComponent::Heartbeat { worker_id })
                 .await;
 
-            let mut conn = shared.pool.acquire().await?;
+            let mut conn = shared.acquire().await?;
             let alive = shared
                 .storage
                 .heartbeat_worker(&mut conn, worker_id)
@@ -492,7 +592,7 @@ impl Worker {
                 .acquire(SchedulerComponent::ValidateWorkers { worker_id })
                 .await;
 
-            let mut tx = shared.pool.begin().await?;
+            let mut tx = shared.begin().await?;
             let timeout = shared.config.heartbeat_timeout.into_pg_interval();
 
             let mut result = if let Some(following) = following.take() {
@@ -589,7 +689,7 @@ impl Worker {
                 .acquire(SchedulerComponent::Leader { worker_id })
                 .await;
 
-            let mut conn = shared.pool.acquire().await?;
+            let mut conn = shared.acquire().await?;
 
             // Note that we include the task id in the subquery ORDER BY clause so that
             // postgresql is forced to evaluate it for each row.
@@ -795,7 +895,7 @@ impl Worker {
                         }
                     }
 
-                    let mut conn = self.shared.pool.acquire().await?;
+                    let mut conn = self.shared.acquire().await?;
                     self.shared
                         .storage
                         .reset_failed_tasks(&mut conn, &failed, self.worker_id)
@@ -843,7 +943,7 @@ impl Worker {
     }
 
     async fn load_leader_id(&mut self) -> anyhow::Result<()> {
-        let mut conn = self.shared.pool.acquire().await?;
+        let mut conn = self.shared.acquire().await?;
         let record = self.shared.storage.load_leader_id(&mut conn).await?;
         drop(conn);
 
@@ -874,7 +974,7 @@ impl Worker {
             })
             .await;
 
-        let mut tx = self.shared.pool.begin().await?;
+        let mut tx = self.shared.begin().await?;
         let tasks = self
             .shared
             .storage
@@ -1392,4 +1492,44 @@ fn is_recoverable_error(error: &anyhow::Error) -> bool {
     }
 
     false
+}
+
+#[cfg(test)]
+mod tests {
+    use std::time::Duration;
+
+    use super::next_backoff;
+
+    #[test]
+    fn next_backoff_doubles_until_clamped() {
+        let max = Duration::from_secs(30);
+
+        // The backoff doubles on each step...
+        assert_eq!(
+            next_backoff(Duration::from_secs(1), max),
+            Duration::from_secs(2)
+        );
+        assert_eq!(
+            next_backoff(Duration::from_secs(2), max),
+            Duration::from_secs(4)
+        );
+        assert_eq!(
+            next_backoff(Duration::from_secs(8), max),
+            Duration::from_secs(16)
+        );
+
+        // ...up until it reaches the maximum, after which it stays clamped.
+        assert_eq!(next_backoff(Duration::from_secs(16), max), max);
+        assert_eq!(next_backoff(Duration::from_secs(30), max), max);
+        assert_eq!(next_backoff(Duration::from_secs(60), max), max);
+    }
+
+    #[test]
+    fn next_backoff_does_not_overflow() {
+        let max = Duration::from_secs(30);
+
+        // Doubling near the representable maximum must saturate rather than
+        // panic, and the clamp still applies.
+        assert_eq!(next_backoff(Duration::MAX, max), max);
+    }
 }

@@ -166,6 +166,47 @@ pub struct Config {
     #[serde(default = "default_usize::<4>")]
     pub max_concurrent_compilations: usize,
 
+    /// The maximum number of times the worker will retry acquiring a database
+    /// connection after a transient pool-acquire timeout before giving up.
+    ///
+    /// When the connection pool is momentarily saturated, `pool.acquire()` can
+    /// fail with a transient `pool timed out while waiting for an open
+    /// connection` error. Propagating that error immediately tears the whole
+    /// worker down and relies on the supervisor to rebuild it, which is
+    /// heavy-handed for what is often a momentary spike. Instead the worker
+    /// retries the acquire with exponential backoff up to this many times,
+    /// only escalating to a teardown if the condition is sustained.
+    ///
+    /// Setting this to `0` disables retries and restores the previous behaviour
+    /// of failing on the first timeout.
+    ///
+    /// The default is 5 retries.
+    #[serde(default = "default_u32::<5>")]
+    pub pool_acquire_max_retries: u32,
+
+    /// The initial backoff between retries after a transient pool-acquire
+    /// timeout.
+    ///
+    /// The backoff doubles after each failed retry, up to
+    /// [`pool_acquire_max_backoff`](Config::pool_acquire_max_backoff).
+    ///
+    /// The default is 1 second.
+    #[serde(default = "default_seconds::<1>")]
+    #[serde(with = "duration_seconds")]
+    pub pool_acquire_backoff: Duration,
+
+    /// The maximum backoff between retries after a transient pool-acquire
+    /// timeout.
+    ///
+    /// The exponential backoff started from
+    /// [`pool_acquire_backoff`](Config::pool_acquire_backoff) is clamped to
+    /// this value so that retries do not back off indefinitely.
+    ///
+    /// The default is 30 seconds.
+    #[serde(default = "default_seconds::<30>")]
+    #[serde(with = "duration_seconds")]
+    pub pool_acquire_max_backoff: Duration,
+
     /// Print task logs directly to stdout while running.
     ///
     /// This is mainly meant as a debugging option for use in tests.
