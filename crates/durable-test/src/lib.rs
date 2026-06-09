@@ -121,7 +121,7 @@ impl Drop for WorkerShutdownGuard {
     }
 }
 
-#[ctor::ctor]
+#[ctor::ctor(unsafe)]
 fn setup_tracing() {
     use tracing_subscriber::prelude::*;
 
