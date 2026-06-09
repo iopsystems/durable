@@ -21,7 +21,7 @@ futures-util = "0.3.32"
 log = "0.4.29"
 serde = "1.0.228"
 serde_json = { version = "1.0.149", features = ["raw_value"] }
-tabled = "0.20.0"
+tabled = "0.21.0"
 tokio = { version = "1.50.0", features = ["full"] }
 tracing-subscriber = { version = "0.3.23", features = ["fmt", "env-filter"] }
 
