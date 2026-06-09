@@ -22,8 +22,8 @@ durable-runtime = { version = "0.8.0", registry = "iop-systems", path = "crates/
 durable-bindgen = { version = "0.1.3", registry = "iop-systems", path = "crates/durable-bindgen" }
 
 wasmtime         = { version = "45.0", features = ["anyhow"] }
-wit-bindgen-core = { version = "0.57.1" }
-wit-bindgen-rust = { version = "0.57.1" }
+wit-bindgen-core = { version = "0.58" }
+wit-bindgen-rust = { version = "0.58" }
 wit-bindgen-rt   = { version = "0.44.0" }
 
 [workspace.dependencies.durable-sqlx-macros]
