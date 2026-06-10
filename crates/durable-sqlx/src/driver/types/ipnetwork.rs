@@ -11,7 +11,7 @@ use crate::driver::{Durable, TypeInfo, Value};
 impl sqlx::Encode<'_, Durable> for IpNetwork {
     fn encode_by_ref(
         &self,
-        buf: &mut <Durable as sqlx::Database>::ArgumentBuffer<'_>,
+        buf: &mut <Durable as sqlx::Database>::ArgumentBuffer,
     ) -> Result<IsNull, BoxDynError> {
         buf.push(Value(sql::Value::inet((*self).into())?));
         Ok(IsNull::No)
@@ -21,7 +21,7 @@ impl sqlx::Encode<'_, Durable> for IpNetwork {
 impl sqlx::Encode<'_, Durable> for Ipv4Network {
     fn encode_by_ref(
         &self,
-        buf: &mut <Durable as sqlx::Database>::ArgumentBuffer<'_>,
+        buf: &mut <Durable as sqlx::Database>::ArgumentBuffer,
     ) -> Result<IsNull, BoxDynError> {
         <IpNetwork as sqlx::Encode<Durable>>::encode(IpNetwork::V4(*self), buf)
     }
@@ -30,7 +30,7 @@ impl sqlx::Encode<'_, Durable> for Ipv4Network {
 impl sqlx::Encode<'_, Durable> for Ipv6Network {
     fn encode_by_ref(
         &self,
-        buf: &mut <Durable as sqlx::Database>::ArgumentBuffer<'_>,
+        buf: &mut <Durable as sqlx::Database>::ArgumentBuffer,
     ) -> Result<IsNull, BoxDynError> {
         <IpNetwork as sqlx::Encode<Durable>>::encode(IpNetwork::V6(*self), buf)
     }
@@ -67,7 +67,7 @@ impl sqlx::Type<Durable> for Ipv6Network {
 impl sqlx::Encode<'_, Durable> for IpAddr {
     fn encode_by_ref(
         &self,
-        buf: &mut <Durable as sqlx::Database>::ArgumentBuffer<'_>,
+        buf: &mut <Durable as sqlx::Database>::ArgumentBuffer,
     ) -> Result<IsNull, BoxDynError> {
         let inet = match *self {
             Self::V4(v4) => IpNetwork::V4(Ipv4Network::new(v4, 32)?),
@@ -81,7 +81,7 @@ impl sqlx::Encode<'_, Durable> for IpAddr {
 impl sqlx::Encode<'_, Durable> for Ipv4Addr {
     fn encode_by_ref(
         &self,
-        buf: &mut <Durable as sqlx::Database>::ArgumentBuffer<'_>,
+        buf: &mut <Durable as sqlx::Database>::ArgumentBuffer,
     ) -> Result<IsNull, BoxDynError> {
         let inet = IpNetwork::V4(Ipv4Network::new(*self, 32)?);
 
@@ -92,7 +92,7 @@ impl sqlx::Encode<'_, Durable> for Ipv4Addr {
 impl sqlx::Encode<'_, Durable> for Ipv6Addr {
     fn encode_by_ref(
         &self,
-        buf: &mut <Durable as sqlx::Database>::ArgumentBuffer<'_>,
+        buf: &mut <Durable as sqlx::Database>::ArgumentBuffer,
     ) -> Result<IsNull, BoxDynError> {
         let inet = IpNetwork::V6(Ipv6Network::new(*self, 128)?);
 

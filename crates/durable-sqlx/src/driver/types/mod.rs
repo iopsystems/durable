@@ -10,7 +10,7 @@ macro_rules! generic_slice_decl {
         impl<'q> sqlx::Encode<'q, Durable> for [$type] {
             fn encode_by_ref(
                 &self,
-                buf: &mut <Durable as sqlx::Database>::ArgumentBuffer<'q>,
+                buf: &mut <Durable as sqlx::Database>::ArgumentBuffer,
             ) -> Result<IsNull, BoxDynError> {
                 buf.push(Value::new(sql::Value::$ctor(self)));
                 Ok(IsNull::No)
@@ -48,7 +48,7 @@ macro_rules! forward_encode_deref {
         impl<'q> sqlx::Encode<'q, Durable> for $type {
             fn encode_by_ref(
                 &self,
-                buf: &mut <Durable as sqlx::Database>::ArgumentBuffer<'q>,
+                buf: &mut <Durable as sqlx::Database>::ArgumentBuffer,
             ) -> Result<IsNull, BoxDynError> {
                 <$target as sqlx::Encode<'q, Durable>>::encode_by_ref(self, buf)
             }
@@ -57,10 +57,10 @@ macro_rules! forward_encode_deref {
 }
 macro_rules! forward_slice_encode_deref {
     ($elem:ty) => {
-        forward_encode_deref!(&'_ [$elem] => [$elem]);
+        // `&T` and `Cow<'_, T>` are covered by blanket `Encode` impls in sqlx 0.9,
+        // so we only forward for the wrappers without such blanket impls.
         forward_encode_deref!(Vec<$elem> => [$elem]);
         forward_encode_deref!(Box<[$elem]> => [$elem]);
-        forward_encode_deref!(std::borrow::Cow<'_, [$elem]> => [$elem]);
     }
 }
 
@@ -76,9 +76,9 @@ macro_rules! forward_type {
 
 macro_rules! forward_slice_type {
     ($elem:ty) => {
+        // `Box<T>` and `Cow<'_, T>` are covered by blanket `Type` impls in sqlx 0.9,
+        // which forward to `<[$elem] as Type>::type_info()` via this base impl.
         forward_type!([$elem] => Vec<$elem>);
-        forward_type!(Box<[$elem]> => Vec<$elem>);
-        forward_type!(std::borrow::Cow<'_, [$elem]> => Vec<$elem>);
     }
 }
 
@@ -111,7 +111,7 @@ fn unexpected_nonnull_type(expected: &TypeInfo, value: &Value) -> BoxDynError {
 
 fn encode_by_ref<'q, T>(
     value: &T,
-    buf: &mut <Durable as sqlx::Database>::ArgumentBuffer<'q>,
+    buf: &mut <Durable as sqlx::Database>::ArgumentBuffer,
 ) -> Result<IsNull, BoxDynError>
 where
     T: sqlx::Encode<'q, Durable> + ?Sized,

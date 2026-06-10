@@ -60,6 +60,11 @@ pub mod types {
     pub use sqlx::types::{Json, JsonRawValue};
 }
 
+/// Re-exported from sqlx for use with the [`query`]-family helpers, which take
+/// an `impl SqlSafeStr`. Dynamic SQL strings must be wrapped in
+/// [`AssertSqlSafe`] after auditing them for injection vulnerabilities.
+pub use sqlx::{AssertSqlSafe, SqlSafeStr, SqlStr};
+
 #[doc(inline)]
 pub use crate::driver::Connection;
 pub use crate::error::Error;
@@ -116,7 +121,7 @@ where
 /// // DO NOT DO THIS unless you're ABSOLUTELY CERTAIN it's what you need!
 /// let query = format!("SELECT * FROM articles WHERE content LIKE '%{user_input}%'");
 /// // where `conn` is some type that implements `Executor`.
-/// let results = durable::sqlx::query(&query).fetch_all(&mut conn)?;
+/// let results = durable::sqlx::query(durable::sqlx::AssertSqlSafe(query)).fetch_all(&mut conn)?;
 /// # Ok(())
 /// # }
 /// ```
@@ -206,7 +211,7 @@ where
 /// As an additional benefit, query parameters are usually sent in a compact
 /// binary encoding instead of a human-readable text encoding, which saves
 /// bandwidth.
-pub fn query(sql: &str) -> Query<'_, driver::Arguments> {
+pub fn query<'q>(sql: impl sqlx::SqlSafeStr) -> Query<'q, driver::Arguments> {
     Query(sqlx::query(sql))
 }
 
@@ -214,23 +219,23 @@ pub fn query(sql: &str) -> Query<'_, driver::Arguments> {
 /// given arguments.
 ///
 /// See [`query()`][query] for details, such as supported syntax.
-pub fn query_with<'q, A>(sql: &'q str, arguments: A) -> Query<'q, A>
+pub fn query_with<'q, A>(sql: impl sqlx::SqlSafeStr, arguments: A) -> Query<'q, A>
 where
-    A: sqlx::IntoArguments<'q, Durable>,
+    A: sqlx::IntoArguments<Durable>,
 {
     Query(sqlx::query_with(sql, arguments))
 }
 
-pub fn query_as<'q, O>(sql: &'q str) -> QueryAs<'q, O, driver::Arguments>
+pub fn query_as<'q, O>(sql: impl sqlx::SqlSafeStr) -> QueryAs<'q, O, driver::Arguments>
 where
     O: for<'r> sqlx::FromRow<'r, Row>,
 {
     QueryAs(sqlx::query_as(sql))
 }
 
-pub fn query_as_with<'q, O, A>(sql: &'q str, arguments: A) -> QueryAs<'q, O, A>
+pub fn query_as_with<'q, O, A>(sql: impl sqlx::SqlSafeStr, arguments: A) -> QueryAs<'q, O, A>
 where
-    A: sqlx::IntoArguments<'q, Durable>,
+    A: sqlx::IntoArguments<Durable>,
     O: for<'r> sqlx::FromRow<'r, Row>,
 {
     QueryAs(sqlx::query_as_with(sql, arguments))
@@ -241,7 +246,7 @@ where
 ///
 /// This is a thin wrapper around [`sqlx::query_scalar`]. See the docs there for
 /// more.
-pub fn query_scalar<'q, O>(sql: &'q str) -> QueryScalar<'q, O, driver::Arguments>
+pub fn query_scalar<'q, O>(sql: impl sqlx::SqlSafeStr) -> QueryScalar<'q, O, driver::Arguments>
 where
     (O,): for<'r> sqlx::FromRow<'r, Row>,
 {
@@ -252,9 +257,12 @@ where
 /// given arguments, and extract the first column of each row.
 ///
 /// See [`query_scalar()`] for details.
-pub fn query_scalar_with<'q, O, A>(sql: &'q str, arguments: A) -> QueryScalar<'q, O, A>
+pub fn query_scalar_with<'q, O, A>(
+    sql: impl sqlx::SqlSafeStr,
+    arguments: A,
+) -> QueryScalar<'q, O, A>
 where
-    A: sqlx::IntoArguments<'q, Durable>,
+    A: sqlx::IntoArguments<Durable>,
     (O,): for<'r> sqlx::FromRow<'r, Row>,
 {
     QueryScalar(sqlx::query_scalar_with(sql, arguments))
@@ -295,7 +303,7 @@ impl<'q> Query<'q, driver::Arguments> {
 
 impl<'q, A> Query<'q, A>
 where
-    A: sqlx::IntoArguments<'q, Durable> + Send + 'q,
+    A: sqlx::IntoArguments<Durable> + Send + 'q,
 {
     /// Map each row in the result to another type.
     ///
@@ -424,7 +432,7 @@ impl<'q, O> QueryAs<'q, O, driver::Arguments> {
 
 impl<'q, O, A> QueryAs<'q, O, A>
 where
-    A: sqlx::IntoArguments<'q, Durable> + 'q,
+    A: sqlx::IntoArguments<Durable> + 'q,
     O: for<'r> sqlx::FromRow<'r, Row> + Send + Unpin,
 {
     /// Execute the query and return the generated results as a iterator.
@@ -519,7 +527,7 @@ impl<'q, F, O, A> Map<'q, F, A>
 where
     F: FnMut(Row) -> sqlx::Result<O> + Send,
     O: Send + Unpin,
-    A: sqlx::IntoArguments<'q, Durable> + Send + 'q,
+    A: sqlx::IntoArguments<Durable> + Send + 'q,
 {
     /// Map each row in the result to another type.
     ///
@@ -629,19 +637,19 @@ pub struct QueryScalar<'q, O, A>(sqlx::query::QueryScalar<'q, Durable, O, A>);
 impl<'q, O, A> sqlx::Execute<'q, Durable> for QueryScalar<'q, O, A>
 where
     O: Send,
-    A: sqlx::IntoArguments<'q, Durable> + Send + 'q,
+    A: sqlx::IntoArguments<Durable> + Send + 'q,
 {
-    fn sql(&self) -> &'q str {
+    fn sql(self) -> sqlx::SqlStr {
         self.0.sql()
     }
 
-    fn statement(&self) -> Option<&<Durable as sqlx::Database>::Statement<'q>> {
+    fn statement(&self) -> Option<&<Durable as sqlx::Database>::Statement> {
         self.0.statement()
     }
 
     fn take_arguments(
         &mut self,
-    ) -> std::result::Result<Option<<Durable as sqlx::Database>::Arguments<'q>>, BoxDynError> {
+    ) -> std::result::Result<Option<<Durable as sqlx::Database>::Arguments>, BoxDynError> {
         self.0.take_arguments()
     }
 
@@ -665,7 +673,7 @@ impl<'q, O> QueryScalar<'q, O, driver::Arguments> {
 impl<'q, O, A> QueryScalar<'q, O, A>
 where
     O: Send + Unpin,
-    A: sqlx::IntoArguments<'q, Durable> + 'q,
+    A: sqlx::IntoArguments<Durable> + 'q,
     (O,): Send + Unpin,
     (O,): for<'r> sqlx::FromRow<'r, driver::Row>,
 {

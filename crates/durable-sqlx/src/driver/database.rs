@@ -16,9 +16,9 @@ impl sqlx::Database for Durable {
     type TypeInfo = TypeInfo;
     type Value = Value;
     type ValueRef<'r> = &'r Value;
-    type Arguments<'q> = Arguments;
-    type ArgumentBuffer<'q> = Vec<Value>;
-    type Statement<'q> = Statement<'q>;
+    type Arguments = Arguments;
+    type ArgumentBuffer = Vec<Value>;
+    type Statement = Statement;
 
     const NAME: &'static str = "durable";
     const URL_SCHEMES: &'static [&'static str] = &[];

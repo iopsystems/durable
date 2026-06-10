@@ -6,7 +6,13 @@
       {
         "ordinal": 0,
         "name": "wakeup_at!",
-        "type_info": "Timestamptz"
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "durable.task",
+            "name": "wakeup_at"
+          }
+        }
       }
     ],
     "parameters": {

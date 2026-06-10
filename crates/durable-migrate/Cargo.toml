@@ -16,7 +16,7 @@ thiserror = "2.0"
 tracing = { version = "0.1.44", optional = true }
 
 [dependencies.sqlx]
-version = "0.8.6"
+version = "0.9"
 optional = true
 default-features = false
 features = ["postgres"]

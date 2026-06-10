@@ -12,7 +12,7 @@ enum TaskState {
 impl sqlx::Encode<'_, Durable> for TaskState {
     fn encode_by_ref(
         &self,
-        buf: &mut <Durable as sqlx::Database>::ArgumentBuffer<'_>,
+        buf: &mut <Durable as sqlx::Database>::ArgumentBuffer,
     ) -> Result<sqlx::encode::IsNull, sqlx::error::BoxDynError> {
         let value = match self {
             Self::Ready => "ready",

@@ -9,7 +9,7 @@ use crate::driver::{Durable, TypeInfo, Value};
 impl<Tz: TimeZone> sqlx::Encode<'_, Durable> for DateTime<Tz> {
     fn encode_by_ref(
         &self,
-        buf: &mut <Durable as sqlx::Database>::ArgumentBuffer<'_>,
+        buf: &mut <Durable as sqlx::Database>::ArgumentBuffer,
     ) -> Result<IsNull, BoxDynError> {
         buf.push(Value::new(sql::Value::timestamptz(self.into())));
         Ok(IsNull::No)
@@ -48,7 +48,7 @@ impl<Tz: TimeZone> sqlx::Type<Durable> for DateTime<Tz> {
 impl sqlx::Encode<'_, Durable> for NaiveDateTime {
     fn encode_by_ref(
         &self,
-        buf: &mut <Durable as sqlx::Database>::ArgumentBuffer<'_>,
+        buf: &mut <Durable as sqlx::Database>::ArgumentBuffer,
     ) -> Result<IsNull, BoxDynError> {
         buf.push(Value::new(sql::Value::timestamp((*self).into())));
         Ok(IsNull::No)
@@ -74,7 +74,7 @@ impl sqlx::Type<Durable> for NaiveDateTime {
 impl<Tz: TimeZone> sqlx::Encode<'_, Durable> for &'_ [DateTime<Tz>] {
     fn encode_by_ref(
         &self,
-        buf: &mut <Durable as sqlx::Database>::ArgumentBuffer<'_>,
+        buf: &mut <Durable as sqlx::Database>::ArgumentBuffer,
     ) -> Result<IsNull, BoxDynError> {
         let values: Vec<_> = self.iter().map(|ts| ts.into()).collect();
         buf.push(Value::new(sql::Value::timestamptz_array(&values)));
@@ -85,7 +85,7 @@ impl<Tz: TimeZone> sqlx::Encode<'_, Durable> for &'_ [DateTime<Tz>] {
 impl<Tz: TimeZone> sqlx::Encode<'_, Durable> for Vec<DateTime<Tz>> {
     fn encode_by_ref(
         &self,
-        buf: &mut <Durable as sqlx::Database>::ArgumentBuffer<'_>,
+        buf: &mut <Durable as sqlx::Database>::ArgumentBuffer,
     ) -> Result<IsNull, BoxDynError> {
         <&[DateTime<Tz>] as sqlx::Encode<Durable>>::encode(self, buf)
     }
@@ -157,7 +157,7 @@ impl<Tz: TimeZone> sqlx::Type<Durable> for Vec<DateTime<Tz>> {
 impl sqlx::Encode<'_, Durable> for &'_ [NaiveDateTime] {
     fn encode_by_ref(
         &self,
-        buf: &mut <Durable as sqlx::Database>::ArgumentBuffer<'_>,
+        buf: &mut <Durable as sqlx::Database>::ArgumentBuffer,
     ) -> Result<IsNull, BoxDynError> {
         let values: Vec<_> = self.iter().copied().map(|ts| ts.into()).collect();
         buf.push(Value::new(sql::Value::timestamp_array(&values)));
@@ -168,7 +168,7 @@ impl sqlx::Encode<'_, Durable> for &'_ [NaiveDateTime] {
 impl sqlx::Encode<'_, Durable> for Vec<NaiveDateTime> {
     fn encode_by_ref(
         &self,
-        buf: &mut <Durable as sqlx::Database>::ArgumentBuffer<'_>,
+        buf: &mut <Durable as sqlx::Database>::ArgumentBuffer,
     ) -> Result<IsNull, BoxDynError> {
         <&[NaiveDateTime] as sqlx::Encode<Durable>>::encode(self, buf)
     }

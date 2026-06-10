@@ -978,7 +978,8 @@ impl Host for Task {
 
         txn.start_query(move |conn| {
             Box::pin(try_stream! {
-                let mut query = sqlx::query(&sql).persistent(options.persistent);
+                let mut query =
+                    sqlx::query(sqlx::AssertSqlSafe(sql)).persistent(options.persistent);
                 for param in params {
                     query = query.bind(param);
                 }

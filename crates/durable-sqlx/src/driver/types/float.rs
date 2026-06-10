@@ -8,7 +8,7 @@ use crate::{bindings as sql, Durable};
 impl sqlx::Encode<'_, Durable> for f32 {
     fn encode_by_ref(
         &self,
-        buf: &mut <Durable as sqlx::Database>::ArgumentBuffer<'_>,
+        buf: &mut <Durable as sqlx::Database>::ArgumentBuffer,
     ) -> Result<IsNull, sqlx::error::BoxDynError> {
         buf.push(Value::new(sql::Value::float4(*self)));
         Ok(IsNull::No)
@@ -32,7 +32,7 @@ impl sqlx::Decode<'_, Durable> for f32 {
 impl sqlx::Encode<'_, Durable> for f64 {
     fn encode_by_ref(
         &self,
-        buf: &mut <Durable as sqlx::Database>::ArgumentBuffer<'_>,
+        buf: &mut <Durable as sqlx::Database>::ArgumentBuffer,
     ) -> Result<IsNull, sqlx::error::BoxDynError> {
         buf.push(Value::new(sql::Value::float8(*self)));
         Ok(IsNull::No)

@@ -4,6 +4,7 @@ use std::time::Duration;
 use futures_core::future::BoxFuture;
 use futures_core::stream::BoxStream;
 use log::LevelFilter;
+use sqlx::SqlStr;
 use url::Url;
 
 use crate::bindings as sql;
@@ -20,7 +21,7 @@ impl sqlx::ConnectOptions for ConnectOptions {
         Self::from_str(url.as_str())
     }
 
-    fn connect(&self) -> BoxFuture<'_, Result<Self::Connection, sqlx::Error>> {
+    async fn connect(&self) -> Result<Self::Connection, sqlx::Error> {
         match *self {}
     }
 
@@ -89,28 +90,26 @@ impl sqlx::Connection for Connection {
     type Database = Durable;
     type Options = ConnectOptions;
 
-    fn close(self) -> BoxFuture<'static, Result<(), sqlx::Error>> {
-        Box::pin(std::future::ready(Ok(())))
+    async fn close(self) -> Result<(), sqlx::Error> {
+        Ok(())
     }
 
-    fn close_hard(self) -> BoxFuture<'static, Result<(), sqlx::Error>> {
-        self.close()
+    async fn close_hard(self) -> Result<(), sqlx::Error> {
+        Ok(())
     }
 
-    fn ping(&mut self) -> BoxFuture<'_, Result<(), sqlx::Error>> {
-        Box::pin(std::future::ready(Ok(())))
+    async fn ping(&mut self) -> Result<(), sqlx::Error> {
+        Ok(())
     }
 
-    fn begin(
-        &mut self,
-    ) -> BoxFuture<'_, Result<sqlx::Transaction<'_, Self::Database>, sqlx::Error>> {
-        sqlx::Transaction::begin(self, None)
+    async fn begin(&mut self) -> Result<sqlx::Transaction<'_, Self::Database>, sqlx::Error> {
+        sqlx::Transaction::begin(self, None).await
     }
 
     fn shrink_buffers(&mut self) {}
 
-    fn flush(&mut self) -> BoxFuture<'_, Result<(), sqlx::Error>> {
-        Box::pin(std::future::ready(Ok(())))
+    async fn flush(&mut self) -> Result<(), sqlx::Error> {
+        Ok(())
     }
 
     fn should_flush(&self) -> bool {
@@ -127,7 +126,7 @@ impl<'c> sqlx::Acquire<'c> for &'c mut Connection {
     }
 
     fn begin(self) -> BoxFuture<'c, Result<sqlx::Transaction<'c, Self::Database>, sqlx::Error>> {
-        <Connection as sqlx::Connection>::begin(self)
+        Box::pin(<Connection as sqlx::Connection>::begin(self))
     }
 }
 
@@ -147,8 +146,8 @@ impl<'c> sqlx::Executor<'c> for &'c mut Connection {
     {
         use async_stream::try_stream;
 
-        let sql = query.sql();
         let params = query.take_arguments().map_err(sqlx::Error::Encode);
+        let sql = query.sql();
         let options = sql::Options {
             limit: u8::MAX,
             persistent: true,
@@ -156,7 +155,7 @@ impl<'c> sqlx::Executor<'c> for &'c mut Connection {
 
         Box::pin(try_stream! {
             let params = params?.unwrap_or_default();
-            let iter = self.run(sql, params, options);
+            let iter = self.run(sql.as_str(), params, options);
 
             for item in iter {
                 yield item?;
@@ -172,8 +171,8 @@ impl<'c> sqlx::Executor<'c> for &'c mut Connection {
         'c: 'e,
         E: 'q + sqlx::Execute<'q, Self::Database>,
     {
-        let sql = query.sql();
         let params = query.take_arguments().map_err(sqlx::Error::Encode);
+        let sql = query.sql();
         let options = sql::Options {
             limit: 1,
             persistent: true,
@@ -181,7 +180,7 @@ impl<'c> sqlx::Executor<'c> for &'c mut Connection {
 
         Box::pin(async move {
             let params = params?.unwrap_or_default();
-            let iter = self.run(sql, params, options);
+            let iter = self.run(sql.as_str(), params, options);
 
             for item in iter {
                 if let sqlx::Either::Right(row) = item? {
@@ -193,20 +192,20 @@ impl<'c> sqlx::Executor<'c> for &'c mut Connection {
         })
     }
 
-    fn prepare_with<'e, 'q: 'e>(
+    fn prepare_with<'e>(
         self,
-        sql: &'q str,
+        sql: SqlStr,
         _: &'e [TypeInfo],
-    ) -> BoxFuture<'e, Result<Statement<'q>, sqlx::Error>>
+    ) -> BoxFuture<'e, Result<Statement, sqlx::Error>>
     where
         'c: 'e,
     {
         Box::pin(std::future::ready(Ok(Statement::new(sql))))
     }
 
-    fn describe<'e, 'q: 'e>(
+    fn describe<'e>(
         self,
-        _: &'q str,
+        _: SqlStr,
     ) -> BoxFuture<'e, Result<sqlx::Describe<Self::Database>, sqlx::Error>>
     where
         'c: 'e,

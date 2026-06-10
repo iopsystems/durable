@@ -11,7 +11,7 @@ use crate::driver::{Durable, TypeInfo, Value};
 impl sqlx::Encode<'_, Durable> for Uuid {
     fn encode_by_ref(
         &self,
-        buf: &mut <Durable as sqlx::Database>::ArgumentBuffer<'_>,
+        buf: &mut <Durable as sqlx::Database>::ArgumentBuffer,
     ) -> Result<IsNull, BoxDynError> {
         buf.push(Value::new(sql::Value::uuid((*self).into())));
         Ok(IsNull::No)
@@ -37,7 +37,7 @@ impl sqlx::Type<Durable> for Uuid {
 impl sqlx::Encode<'_, Durable> for [Uuid] {
     fn encode_by_ref(
         &self,
-        buf: &mut <Durable as sqlx::Database>::ArgumentBuffer<'_>,
+        buf: &mut <Durable as sqlx::Database>::ArgumentBuffer,
     ) -> Result<IsNull, BoxDynError> {
         let array: Vec<sql::Uuid> = self.iter().copied().map(From::from).collect();
 
@@ -49,14 +49,14 @@ impl sqlx::Encode<'_, Durable> for [Uuid] {
 impl sqlx::Encode<'_, Durable> for Vec<Uuid> {
     fn encode_by_ref(
         &self,
-        buf: &mut <Durable as sqlx::Database>::ArgumentBuffer<'_>,
+        buf: &mut <Durable as sqlx::Database>::ArgumentBuffer,
     ) -> Result<IsNull, BoxDynError> {
         <&[Uuid] as sqlx::Encode<'_, Durable>>::encode(self, buf)
     }
 
     fn encode(
         self,
-        buf: &mut <Durable as sqlx::Database>::ArgumentBuffer<'_>,
+        buf: &mut <Durable as sqlx::Database>::ArgumentBuffer,
     ) -> Result<IsNull, BoxDynError> {
         let array: Vec<sql::Uuid> = self.into_iter().map(From::from).collect();
 
