@@ -38,8 +38,8 @@ impl Migrator {
             sqlx::query(sqlx::AssertSqlSafe(format!(
                 "CREATE SCHEMA IF NOT EXISTS {schema:?}"
             )))
-                .execute(&mut *conn)
-                .await?;
+            .execute(&mut *conn)
+            .await?;
         }
 
         #[rustfmt::skip]
@@ -53,7 +53,9 @@ impl Migrator {
             ",
             table = options.migration_table.as_sql()
         );
-        sqlx::query(sqlx::AssertSqlSafe(query)).execute(&mut *conn).await?;
+        sqlx::query(sqlx::AssertSqlSafe(query))
+            .execute(&mut *conn)
+            .await?;
 
         Ok(())
     }
@@ -260,7 +262,9 @@ impl Migrator {
                     } => {
                         tracing::debug!("running migration {version} - {name}");
 
-                        sqlx::raw_sql(sqlx::AssertSqlSafe(sql)).execute(&mut *tx).await?;
+                        sqlx::raw_sql(sqlx::AssertSqlSafe(sql))
+                            .execute(&mut *tx)
+                            .await?;
 
                         let query = format!(
                             "INSERT INTO {table}(version, name, revert) VALUES ($1, $2, $3) ",
@@ -289,7 +293,9 @@ impl Migrator {
                             .fetch_one(&mut *tx)
                             .await?;
 
-                        sqlx::raw_sql(sqlx::AssertSqlSafe(revert)).execute(&mut *tx).await?;
+                        sqlx::raw_sql(sqlx::AssertSqlSafe(revert))
+                            .execute(&mut *tx)
+                            .await?;
                     }
                 }
 

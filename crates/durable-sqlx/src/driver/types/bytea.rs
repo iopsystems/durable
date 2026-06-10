@@ -38,7 +38,8 @@ impl sqlx::Type<Durable> for Vec<u8> {
 }
 
 forward_type!([u8] => Vec<u8>);
-// `Type` for `Box<[u8]>` and `Cow<'_, [u8]>` is covered by blanket impls in sqlx 0.9.
+// `Type` for `Box<[u8]>` and `Cow<'_, [u8]>` is covered by blanket impls in
+// sqlx 0.9.
 
 impl<const N: usize> sqlx::Type<Durable> for [u8; N] {
     fn type_info() -> <Durable as sqlx::Database>::TypeInfo {

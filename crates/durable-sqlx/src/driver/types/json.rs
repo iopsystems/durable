@@ -112,6 +112,7 @@ impl<T> sqlx::Type<Durable> for Vec<Json<T>> {
     }
 }
 
-// `Encode`/`Decode` for `JsonRawValue`, `&JsonRawValue` and `Box<JsonRawValue>` are
-// provided by blanket impls in sqlx 0.9 that delegate to `Json<&Self>` / `Json<T>`,
-// which route through the `Json` impls above, so we no longer define them here.
+// `Encode`/`Decode` for `JsonRawValue`, `&JsonRawValue` and `Box<JsonRawValue>`
+// are provided by blanket impls in sqlx 0.9 that delegate to `Json<&Self>` /
+// `Json<T>`, which route through the `Json` impls above, so we no longer define
+// them here.

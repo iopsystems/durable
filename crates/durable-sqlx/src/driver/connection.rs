@@ -102,9 +102,7 @@ impl sqlx::Connection for Connection {
         Ok(())
     }
 
-    async fn begin(
-        &mut self,
-    ) -> Result<sqlx::Transaction<'_, Self::Database>, sqlx::Error> {
+    async fn begin(&mut self) -> Result<sqlx::Transaction<'_, Self::Database>, sqlx::Error> {
         sqlx::Transaction::begin(self, None).await
     }
 
