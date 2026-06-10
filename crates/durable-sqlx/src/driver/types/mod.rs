@@ -57,8 +57,11 @@ macro_rules! forward_encode_deref {
 }
 macro_rules! forward_slice_encode_deref {
     ($elem:ty) => {
-        // `&T` and `Cow<'_, T>` are covered by blanket `Encode` impls in sqlx 0.9,
-        // so we only forward for the wrappers without such blanket impls.
+        // sqlx 0.9's blanket `impl Encode for &T` requires `T: Sized`, so it does
+        // *not* cover `&[$elem]` (the pointee `[$elem]` is unsized). Forward it here
+        // explicitly so slice references stay bindable. `Cow<'_, [$elem]>` is covered
+        // by a blanket `Encode` impl in sqlx 0.9.
+        forward_encode_deref!(&'_ [$elem] => [$elem]);
         forward_encode_deref!(Vec<$elem> => [$elem]);
         forward_encode_deref!(Box<[$elem]> => [$elem]);
     }
@@ -117,4 +120,32 @@ where
     T: sqlx::Encode<'q, Durable> + ?Sized,
 {
     value.encode_by_ref(buf)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::Durable;
+
+    /// Regression test for #114: binding a `&[T]` slice reference as an array
+    /// parameter must compile for every element type declared via the slice
+    /// macros, matching the hand-written `uuid` impls. sqlx 0.9's blanket
+    /// `impl Encode for &T` requires `T: Sized`, so it does not cover `&[T]`
+    /// (the pointee `[T]` is unsized) — the forwarding impls are what make
+    /// these bindable.
+    fn assert_encode<'q, T: sqlx::Encode<'q, Durable>>() {}
+
+    #[test]
+    fn slice_refs_implement_encode() {
+        assert_encode::<&[i8]>();
+        assert_encode::<&[i16]>();
+        assert_encode::<&[i32]>();
+        assert_encode::<&[i64]>();
+        assert_encode::<&[f32]>();
+        assert_encode::<&[f64]>();
+        assert_encode::<&[bool]>();
+        assert_encode::<&[&str]>();
+        assert_encode::<&[String]>();
+        #[cfg(feature = "uuid")]
+        assert_encode::<&[::uuid::Uuid]>();
+    }
 }
