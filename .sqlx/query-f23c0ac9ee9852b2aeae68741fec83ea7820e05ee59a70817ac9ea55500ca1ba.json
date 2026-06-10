@@ -6,7 +6,13 @@
       {
         "ordinal": 0,
         "name": "last_used",
-        "type_info": "Timestamptz"
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "durable.wasm",
+            "name": "last_used"
+          }
+        }
       }
     ],
     "parameters": {
