@@ -60,13 +60,14 @@ pub mod types {
     pub use sqlx::types::{Json, JsonRawValue};
 }
 
-#[doc(inline)]
-pub use crate::driver::Connection;
-pub use crate::error::Error;
 /// Re-exported from sqlx for use with the [`query`]-family helpers, which take
 /// an `impl SqlSafeStr`. Dynamic SQL strings must be wrapped in
 /// [`AssertSqlSafe`] after auditing them for injection vulnerabilities.
 pub use sqlx::{AssertSqlSafe, SqlSafeStr, SqlStr};
+
+#[doc(inline)]
+pub use crate::driver::Connection;
+pub use crate::error::Error;
 
 pub type Result<T, E = Error> = std::result::Result<T, E>;
 
@@ -120,8 +121,7 @@ where
 /// // DO NOT DO THIS unless you're ABSOLUTELY CERTAIN it's what you need!
 /// let query = format!("SELECT * FROM articles WHERE content LIKE '%{user_input}%'");
 /// // where `conn` is some type that implements `Executor`.
-/// let results =
-///     durable::sqlx::query(durable::sqlx::AssertSqlSafe(query)).fetch_all(&mut conn)?;
+/// let results = durable::sqlx::query(durable::sqlx::AssertSqlSafe(query)).fetch_all(&mut conn)?;
 /// # Ok(())
 /// # }
 /// ```
