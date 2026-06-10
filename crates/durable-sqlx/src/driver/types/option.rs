@@ -9,7 +9,7 @@ where
 {
     fn encode_by_ref(
         &self,
-        buf: &mut <Durable as sqlx::Database>::ArgumentBuffer<'r>,
+        buf: &mut <Durable as sqlx::Database>::ArgumentBuffer,
     ) -> Result<IsNull, BoxDynError> {
         match self {
             Some(value) => value.encode_by_ref(buf),

@@ -2,7 +2,7 @@ use serde::de::DeserializeOwned;
 use serde::Serialize;
 use sqlx::encode::IsNull;
 use sqlx::error::BoxDynError;
-use sqlx::types::{Json, JsonRawValue};
+use sqlx::types::Json;
 
 use super::{encode_by_ref, unexpected_nonnull_type};
 use crate::bindings::durable::core::sql;
@@ -14,7 +14,7 @@ where
 {
     fn encode_by_ref(
         &self,
-        buf: &mut <Durable as sqlx::Database>::ArgumentBuffer<'_>,
+        buf: &mut <Durable as sqlx::Database>::ArgumentBuffer,
     ) -> Result<IsNull, BoxDynError> {
         let json = serde_json::to_string(&self.0)?;
         buf.push(Value(sql::Value::jsonb(&json)));
@@ -46,7 +46,7 @@ impl<T> sqlx::Type<Durable> for Json<T> {
 impl<T: Serialize> sqlx::Encode<'_, Durable> for [Json<T>] {
     fn encode_by_ref(
         &self,
-        buf: &mut <Durable as sqlx::Database>::ArgumentBuffer<'_>,
+        buf: &mut <Durable as sqlx::Database>::ArgumentBuffer,
     ) -> Result<IsNull, BoxDynError> {
         let mut json = Vec::with_capacity(self.len());
 
@@ -63,7 +63,7 @@ impl<T: Serialize> sqlx::Encode<'_, Durable> for [Json<T>] {
 impl<T: Serialize> sqlx::Encode<'_, Durable> for &'_ [Json<T>] {
     fn encode_by_ref(
         &self,
-        buf: &mut <Durable as sqlx::Database>::ArgumentBuffer<'_>,
+        buf: &mut <Durable as sqlx::Database>::ArgumentBuffer,
     ) -> Result<IsNull, BoxDynError> {
         encode_by_ref::<[Json<T>]>(self, buf)
     }
@@ -75,7 +75,7 @@ where
 {
     fn encode_by_ref(
         &self,
-        buf: &mut <Durable as sqlx::Database>::ArgumentBuffer<'_>,
+        buf: &mut <Durable as sqlx::Database>::ArgumentBuffer,
     ) -> Result<IsNull, BoxDynError> {
         <&[Json<T>] as sqlx::Encode<Durable>>::encode(self, buf)
     }
@@ -112,40 +112,6 @@ impl<T> sqlx::Type<Durable> for Vec<Json<T>> {
     }
 }
 
-impl sqlx::Encode<'_, Durable> for JsonRawValue {
-    fn encode_by_ref(
-        &self,
-        buf: &mut <Durable as sqlx::Database>::ArgumentBuffer<'_>,
-    ) -> Result<IsNull, BoxDynError> {
-        buf.push(Value(sql::Value::jsonb(self.get())));
-        Ok(IsNull::No)
-    }
-}
-
-impl sqlx::Encode<'_, Durable> for Box<JsonRawValue> {
-    fn encode_by_ref(
-        &self,
-        buf: &mut <Durable as sqlx::Database>::ArgumentBuffer<'_>,
-    ) -> Result<IsNull, BoxDynError> {
-        encode_by_ref::<JsonRawValue>(self, buf)
-    }
-}
-
-impl sqlx::Decode<'_, Durable> for Box<JsonRawValue> {
-    fn decode(value: <Durable as sqlx::Database>::ValueRef<'_>) -> Result<Self, BoxDynError> {
-        if let Some(json) = value.0.as_json() {
-            let _: &JsonRawValue = serde_json::from_str(&json)?;
-            let json: Box<str> = json.into_boxed_str();
-
-            // SAFETY: JsonRawValue is a repr(transparent) wrapper around a str. This is not
-            //         necessarily a guarantee of the serde_json API but seems unlikely to
-            //         change anytime soon given that serde_json takes advantage of it
-            //         internally.
-            let json: Box<JsonRawValue> = unsafe { std::mem::transmute(json) };
-
-            return Ok(json);
-        }
-
-        Err(unexpected_nonnull_type(&TypeInfo::jsonb(), value))
-    }
-}
+// `Encode`/`Decode` for `JsonRawValue`, `&JsonRawValue` and `Box<JsonRawValue>` are
+// provided by blanket impls in sqlx 0.9 that delegate to `Json<&Self>` / `Json<T>`,
+// which route through the `Json` impls above, so we no longer define them here.

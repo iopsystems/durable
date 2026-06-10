@@ -10,7 +10,7 @@ use crate::{bindings as sql, Durable};
 impl sqlx::Encode<'_, Durable> for [u8] {
     fn encode_by_ref(
         &self,
-        buf: &mut <Durable as sqlx::Database>::ArgumentBuffer<'_>,
+        buf: &mut <Durable as sqlx::Database>::ArgumentBuffer,
     ) -> Result<IsNull, sqlx::error::BoxDynError> {
         buf.push(Value::new(sql::Value::bytea(self)));
         Ok(IsNull::No)
@@ -25,7 +25,7 @@ forward_encode_deref!(Cow<'_, [u8]> => [u8]);
 impl<const N: usize> sqlx::Encode<'_, Durable> for [u8; N] {
     fn encode_by_ref(
         &self,
-        buf: &mut <Durable as sqlx::Database>::ArgumentBuffer<'_>,
+        buf: &mut <Durable as sqlx::Database>::ArgumentBuffer,
     ) -> Result<IsNull, sqlx::error::BoxDynError> {
         encode_by_ref::<[u8]>(self, buf)
     }
@@ -38,8 +38,7 @@ impl sqlx::Type<Durable> for Vec<u8> {
 }
 
 forward_type!([u8] => Vec<u8>);
-forward_type!(Box<[u8]> => Vec<u8>);
-forward_type!(Cow<'_, [u8]> => Vec<u8>);
+// `Type` for `Box<[u8]>` and `Cow<'_, [u8]>` is covered by blanket impls in sqlx 0.9.
 
 impl<const N: usize> sqlx::Type<Durable> for [u8; N] {
     fn type_info() -> <Durable as sqlx::Database>::TypeInfo {
@@ -50,7 +49,7 @@ impl<const N: usize> sqlx::Type<Durable> for [u8; N] {
 impl sqlx::Encode<'_, Durable> for [&[u8]] {
     fn encode_by_ref(
         &self,
-        buf: &mut <Durable as sqlx::Database>::ArgumentBuffer<'_>,
+        buf: &mut <Durable as sqlx::Database>::ArgumentBuffer,
     ) -> Result<IsNull, BoxDynError> {
         buf.push(Value::new(sql::Value::bytea_array(self)));
         Ok(IsNull::No)
@@ -60,7 +59,7 @@ impl sqlx::Encode<'_, Durable> for [&[u8]] {
 impl sqlx::Encode<'_, Durable> for [Vec<u8>] {
     fn encode_by_ref(
         &self,
-        buf: &mut <Durable as sqlx::Database>::ArgumentBuffer<'_>,
+        buf: &mut <Durable as sqlx::Database>::ArgumentBuffer,
     ) -> Result<IsNull, BoxDynError> {
         let vec: Vec<_> = self.iter().map(|x| &x[..]).collect();
         encode_by_ref::<[&[u8]]>(&vec, buf)

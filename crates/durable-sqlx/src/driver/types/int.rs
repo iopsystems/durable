@@ -9,7 +9,7 @@ use crate::driver::{Durable, TypeInfo, Value};
 impl Encode<'_, Durable> for i8 {
     fn encode_by_ref(
         &self,
-        buf: &mut <Durable as sqlx::Database>::ArgumentBuffer<'_>,
+        buf: &mut <Durable as sqlx::Database>::ArgumentBuffer,
     ) -> Result<IsNull, sqlx::error::BoxDynError> {
         buf.push(Value::new(sql::Value::int1(*self)));
         Ok(IsNull::No)
@@ -19,7 +19,7 @@ impl Encode<'_, Durable> for i8 {
 impl Encode<'_, Durable> for i16 {
     fn encode_by_ref(
         &self,
-        buf: &mut <Durable as sqlx::Database>::ArgumentBuffer<'_>,
+        buf: &mut <Durable as sqlx::Database>::ArgumentBuffer,
     ) -> Result<IsNull, sqlx::error::BoxDynError> {
         buf.push(Value::new(sql::Value::int2(*self)));
         Ok(IsNull::No)
@@ -29,7 +29,7 @@ impl Encode<'_, Durable> for i16 {
 impl Encode<'_, Durable> for i32 {
     fn encode_by_ref(
         &self,
-        buf: &mut <Durable as sqlx::Database>::ArgumentBuffer<'_>,
+        buf: &mut <Durable as sqlx::Database>::ArgumentBuffer,
     ) -> Result<IsNull, sqlx::error::BoxDynError> {
         buf.push(Value::new(sql::Value::int4(*self)));
         Ok(IsNull::No)
@@ -39,7 +39,7 @@ impl Encode<'_, Durable> for i32 {
 impl Encode<'_, Durable> for i64 {
     fn encode_by_ref(
         &self,
-        buf: &mut <Durable as sqlx::Database>::ArgumentBuffer<'_>,
+        buf: &mut <Durable as sqlx::Database>::ArgumentBuffer,
     ) -> Result<IsNull, sqlx::error::BoxDynError> {
         buf.push(Value::new(sql::Value::int8(*self)));
         Ok(IsNull::No)

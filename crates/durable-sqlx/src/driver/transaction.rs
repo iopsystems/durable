@@ -1,6 +1,4 @@
-use std::borrow::Cow;
-
-use futures_core::future::BoxFuture;
+use sqlx::{AssertSqlSafe, SqlStr};
 
 use crate::driver::{Connection, Durable};
 
@@ -9,7 +7,7 @@ pub enum TransactionManager {}
 impl TransactionManager {
     async fn begin(conn: &mut Connection) -> Result<(), sqlx::Error> {
         let sql = format!("SAVEPOINT savepoint_{}", conn.txn_depth);
-        sqlx::query(&sql).execute(&mut *conn).await?;
+        sqlx::query(AssertSqlSafe(sql)).execute(&mut *conn).await?;
         conn.txn_depth += 1;
 
         Ok(())
@@ -23,7 +21,7 @@ impl TransactionManager {
         }
 
         let sql = format!("RELEASE savepoint_{}", conn.txn_depth - 1);
-        sqlx::query(&sql).execute(&mut *conn).await?;
+        sqlx::query(AssertSqlSafe(sql)).execute(&mut *conn).await?;
         conn.txn_depth -= 1;
 
         Ok(())
@@ -38,29 +36,26 @@ impl TransactionManager {
         }
 
         let sql = format!("ROLLBACK TO savepoint_{}", conn.txn_depth - 1);
-        sqlx::query(&sql).execute(&mut *conn).await?;
+        sqlx::query(AssertSqlSafe(sql)).execute(&mut *conn).await?;
         conn.txn_depth -= 1;
 
         Ok(())
     }
 }
 
-impl sqlx::TransactionManager for TransactionManager {
+impl sqlx_core::transaction::TransactionManager for TransactionManager {
     type Database = Durable;
 
-    fn begin<'conn>(
-        conn: &'conn mut Connection,
-        _statement: Option<Cow<'static, str>>,
-    ) -> BoxFuture<'conn, Result<(), sqlx::Error>> {
-        Box::pin(Self::begin(conn))
+    async fn begin(conn: &mut Connection, _statement: Option<SqlStr>) -> Result<(), sqlx::Error> {
+        Self::begin(conn).await
     }
 
-    fn commit(conn: &mut Connection) -> BoxFuture<'_, Result<(), sqlx::Error>> {
-        Box::pin(Self::commit(conn))
+    async fn commit(conn: &mut Connection) -> Result<(), sqlx::Error> {
+        Self::commit(conn).await
     }
 
-    fn rollback(conn: &mut Connection) -> BoxFuture<'_, Result<(), sqlx::Error>> {
-        Box::pin(Self::rollback(conn))
+    async fn rollback(conn: &mut Connection) -> Result<(), sqlx::Error> {
+        Self::rollback(conn).await
     }
 
     fn start_rollback(conn: &mut Connection) {

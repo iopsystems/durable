@@ -26,5 +26,5 @@ version = "2.0.117"
 features = ["full", "parsing", "proc-macro", "visit-mut"]
 
 [dependencies.sqlx-macros-core]
-version = "0.8.6"
+version = "0.9"
 features = ["macros", "postgres", "_rt-tokio"]

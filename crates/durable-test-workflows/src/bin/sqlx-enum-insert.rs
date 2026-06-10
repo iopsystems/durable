@@ -11,7 +11,7 @@ enum TestDummy {
 impl sqlx::Encode<'_, Durable> for TestDummy {
     fn encode_by_ref(
         &self,
-        buf: &mut <Durable as sqlx::Database>::ArgumentBuffer<'_>,
+        buf: &mut <Durable as sqlx::Database>::ArgumentBuffer,
     ) -> Result<sqlx::encode::IsNull, sqlx::error::BoxDynError> {
         let tyinfo = <Self as sqlx::Type<Durable>>::type_info();
         let value = match self {

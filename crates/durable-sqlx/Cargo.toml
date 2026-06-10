@@ -24,12 +24,16 @@ async-stream = "0.3.6"
 chrono = { version = "0.4.44", optional = true }
 futures-core = "0.3.32"
 futures-util = "0.3.32"
-ipnetwork = { version = "0.20.0", features = ["serde"], optional = true }
+ipnetwork = { version = "0.21.0", features = ["serde"], optional = true }
 log = "0.4.29"
 serde = "1.0.228"
 serde_json = { version = "1.0", features = ["raw_value"] }
-sqlx = { version = "0.8.6", default-features = false }
-sqlx-core = { version = "0.8.6", default-features = false }
+sqlx = { version = "0.9", default-features = false }
+# The `offline` feature gates the `Executor::describe` method in sqlx-core. It is
+# enabled unconditionally elsewhere in the workspace (via sqlx-postgres), so we
+# enable it here too to keep our `Executor` impl consistent regardless of which
+# crates are compiled together.
+sqlx-core = { version = "0.9", default-features = false, features = ["offline"] }
 url = "2.5.8"
 wit-bindgen-rt = { workspace = true }
 thiserror = "2.0.18"

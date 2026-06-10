@@ -10,7 +10,7 @@ use crate::{bindings as sql, Durable};
 impl sqlx::Encode<'_, Durable> for str {
     fn encode_by_ref(
         &self,
-        buf: &mut <Durable as sqlx::Database>::ArgumentBuffer<'_>,
+        buf: &mut <Durable as sqlx::Database>::ArgumentBuffer,
     ) -> Result<IsNull, BoxDynError> {
         buf.push(Value::new(sql::Value::text(self)));
         Ok(IsNull::No)
@@ -29,12 +29,6 @@ impl sqlx::Decode<'_, Durable> for String {
         }
 
         Err(unexpected_nonnull_type(&TypeInfo::text(), value))
-    }
-}
-
-impl<'r> sqlx::Decode<'r, Durable> for Cow<'_, str> {
-    fn decode(value: <Durable as sqlx::Database>::ValueRef<'r>) -> Result<Self, BoxDynError> {
-        <String as sqlx::Decode<Durable>>::decode(value).map(Cow::Owned)
     }
 }
 
@@ -57,7 +51,7 @@ forward_type!(Cow<'_, str> => String);
 impl sqlx::Encode<'_, Durable> for [&str] {
     fn encode_by_ref(
         &self,
-        buf: &mut <Durable as sqlx::Database>::ArgumentBuffer<'_>,
+        buf: &mut <Durable as sqlx::Database>::ArgumentBuffer,
     ) -> Result<IsNull, BoxDynError> {
         buf.push(Value::new(sql::Value::text_array(self)));
         Ok(IsNull::No)
@@ -69,7 +63,7 @@ forward_slice_encode_deref!(&'_ str);
 impl sqlx::Encode<'_, Durable> for [String] {
     fn encode_by_ref(
         &self,
-        buf: &mut <Durable as sqlx::Database>::ArgumentBuffer<'_>,
+        buf: &mut <Durable as sqlx::Database>::ArgumentBuffer,
     ) -> Result<IsNull, BoxDynError> {
         let values = self.iter().map(|s| s.as_str()).collect();
         <Vec<&str> as sqlx::Encode<Durable>>::encode(values, buf)

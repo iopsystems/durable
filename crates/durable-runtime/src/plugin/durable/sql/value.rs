@@ -123,11 +123,11 @@ impl sqlx::Type<sqlx::Postgres> for ValueResource {
 impl<'a> sqlx::Encode<'a, sqlx::Postgres> for ValueResource {
     fn encode_by_ref(
         &self,
-        buf: &mut <sqlx::Postgres as sqlx::Database>::ArgumentBuffer<'a>,
+        buf: &mut <sqlx::Postgres as sqlx::Database>::ArgumentBuffer,
     ) -> Result<IsNull, BoxDynError> {
         fn encode_by_ref<'a, T>(
             val: &T,
-            buf: &mut <sqlx::Postgres as sqlx::Database>::ArgumentBuffer<'a>,
+            buf: &mut <sqlx::Postgres as sqlx::Database>::ArgumentBuffer,
         ) -> Result<IsNull, BoxDynError>
         where
             T: sqlx::Encode<'a, sqlx::Postgres>,
@@ -145,11 +145,11 @@ impl<'a> sqlx::Encode<'a, sqlx::Postgres> for ValueResource {
 
     fn encode(
         self,
-        buf: &mut <sqlx::Postgres as sqlx::Database>::ArgumentBuffer<'a>,
+        buf: &mut <sqlx::Postgres as sqlx::Database>::ArgumentBuffer,
     ) -> Result<IsNull, BoxDynError> {
         fn encode<'a, T>(
             val: T,
-            buf: &mut <sqlx::Postgres as sqlx::Database>::ArgumentBuffer<'a>,
+            buf: &mut <sqlx::Postgres as sqlx::Database>::ArgumentBuffer,
         ) -> Result<IsNull, BoxDynError>
         where
             T: sqlx::Encode<'a, sqlx::Postgres>,

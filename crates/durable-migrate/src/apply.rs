@@ -35,7 +35,9 @@ impl<'a> Operation<'a> {
 impl Migrator {
     async fn setup(&self, conn: &mut sqlx::PgConnection, options: &Options) -> Result<(), Error> {
         if let Some(schema) = options.migration_table.schema.as_deref() {
-            sqlx::query(&format!("CREATE SCHEMA IF NOT EXISTS {schema:?}"))
+            sqlx::query(sqlx::AssertSqlSafe(format!(
+                "CREATE SCHEMA IF NOT EXISTS {schema:?}"
+            )))
                 .execute(&mut *conn)
                 .await?;
         }
@@ -51,7 +53,7 @@ impl Migrator {
             ",
             table = options.migration_table.as_sql()
         );
-        sqlx::query(&query).execute(&mut *conn).await?;
+        sqlx::query(sqlx::AssertSqlSafe(query)).execute(&mut *conn).await?;
 
         Ok(())
     }
@@ -66,7 +68,7 @@ impl Migrator {
             table = options.migration_table.as_sql()
         );
 
-        let migrations = sqlx::query(&query)
+        let migrations = sqlx::query(sqlx::AssertSqlSafe(query))
             .try_map(|record: PgRow| {
                 Ok(DatabaseMigration {
                     version: record.get::<i64, _>("version"),
@@ -258,13 +260,13 @@ impl Migrator {
                     } => {
                         tracing::debug!("running migration {version} - {name}");
 
-                        sqlx::raw_sql(sql).execute(&mut *tx).await?;
+                        sqlx::raw_sql(sqlx::AssertSqlSafe(sql)).execute(&mut *tx).await?;
 
                         let query = format!(
                             "INSERT INTO {table}(version, name, revert) VALUES ($1, $2, $3) ",
                             table = options.migration_table.as_sql()
                         );
-                        sqlx::query(&query)
+                        sqlx::query(sqlx::AssertSqlSafe(query))
                             .bind(version)
                             .bind(name)
                             .bind(revert)
@@ -282,12 +284,12 @@ impl Migrator {
                             "DELETE FROM {table} WHERE version = $1 RETURNING version",
                             table = options.migration_table.as_sql()
                         );
-                        sqlx::query(&query)
+                        sqlx::query(sqlx::AssertSqlSafe(query))
                             .bind(version)
                             .fetch_one(&mut *tx)
                             .await?;
 
-                        sqlx::raw_sql(revert).execute(&mut *tx).await?;
+                        sqlx::raw_sql(sqlx::AssertSqlSafe(revert)).execute(&mut *tx).await?;
                     }
                 }
 
