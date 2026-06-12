@@ -1,0 +1,16 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            DELETE FROM durable.worker\n            WHERE id = $1\n              AND $3::timestamptz - heartbeat_at > $2\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Int8",
+        "Interval",
+        "Timestamptz"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "c9e163b93b396a00e90309fbad934cb218c8fbb1fcd3c49cad3d0fa39e7e0dd5"
+}

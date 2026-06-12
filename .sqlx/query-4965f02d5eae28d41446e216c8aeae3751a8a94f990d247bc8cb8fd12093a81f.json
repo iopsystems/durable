@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            UPDATE durable.task\n              SET state = 'ready',\n                  wakeup_at = NULL,\n                  running_on = (\n                    SELECT id\n                     FROM durable.worker\n                    ORDER BY random() + task.id\n                    LIMIT 1\n                  )\n            WHERE state = 'suspended'\n              AND wakeup_at <= ($2::timestamptz - $1::interval)\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Interval",
+        "Timestamptz"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "4965f02d5eae28d41446e216c8aeae3751a8a94f990d247bc8cb8fd12093a81f"
+}

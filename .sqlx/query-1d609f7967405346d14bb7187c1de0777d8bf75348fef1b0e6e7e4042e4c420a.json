@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "UPDATE durable.worker\n              SET heartbeat_at = CURRENT_TIMESTAMP\n            WHERE id = $1\n            RETURNING id",
+  "query": "UPDATE durable.worker\n              SET heartbeat_at = $2\n            WHERE id = $1\n            RETURNING id",
   "describe": {
     "columns": [
       {
@@ -17,12 +17,13 @@
     ],
     "parameters": {
       "Left": [
-        "Int8"
+        "Int8",
+        "Timestamptz"
       ]
     },
     "nullable": [
       false
     ]
   },
-  "hash": "50e935d0a6e5dd395bb86c7866c01ebdb7cc711e0c41b0f116b518b3b26156c9"
+  "hash": "1d609f7967405346d14bb7187c1de0777d8bf75348fef1b0e6e7e4042e4c420a"
 }
