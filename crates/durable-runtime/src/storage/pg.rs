@@ -33,13 +33,18 @@ impl Storage for PgStorage {
         &self.pool
     }
 
-    async fn insert_worker(&self, conn: &mut PgConnection) -> sqlx::Result<i64> {
+    async fn insert_worker(
+        &self,
+        conn: &mut PgConnection,
+        now: DateTime<Utc>,
+    ) -> sqlx::Result<i64> {
         let record = sqlx::query!(
             "
             INSERT INTO durable.worker(heartbeat_at)
-            VALUES (CURRENT_TIMESTAMP)
+            VALUES ($1)
             RETURNING id
-            "
+            ",
+            now
         )
         .fetch_one(&mut *conn)
         .await?;
@@ -61,13 +66,15 @@ impl Storage for PgStorage {
         &self,
         conn: &mut PgConnection,
         worker_id: i64,
+        now: DateTime<Utc>,
     ) -> sqlx::Result<bool> {
         let record = sqlx::query!(
             "UPDATE durable.worker
-              SET heartbeat_at = CURRENT_TIMESTAMP
+              SET heartbeat_at = $2
             WHERE id = $1
             RETURNING id",
-            worker_id
+            worker_id,
+            now
         )
         .fetch_optional(&mut *conn)
         .await?;
@@ -80,15 +87,17 @@ impl Storage for PgStorage {
         conn: &mut PgConnection,
         following: i64,
         timeout: PgInterval,
+        now: DateTime<Utc>,
     ) -> sqlx::Result<PgQueryResult> {
         sqlx::query!(
             "
             DELETE FROM durable.worker
             WHERE id = $1
-              AND CURRENT_TIMESTAMP - heartbeat_at > $2
+              AND $3::timestamptz - heartbeat_at > $2
             ",
             following,
-            timeout
+            timeout,
+            now
         )
         .execute(&mut *conn)
         .await
@@ -99,15 +108,17 @@ impl Storage for PgStorage {
         conn: &mut PgConnection,
         worker_id: i64,
         timeout: PgInterval,
+        now: DateTime<Utc>,
     ) -> sqlx::Result<PgQueryResult> {
         sqlx::query!(
             "
             DELETE FROM durable.worker
-            WHERE CURRENT_TIMESTAMP - heartbeat_at > $2
+            WHERE $3::timestamptz - heartbeat_at > $2
             AND NOT id = $1
             ",
             worker_id,
-            timeout
+            timeout,
+            now
         )
         .execute(&mut *conn)
         .await
@@ -177,6 +188,7 @@ impl Storage for PgStorage {
         &self,
         conn: &mut PgConnection,
         suspend_margin: PgInterval,
+        now: DateTime<Utc>,
     ) -> sqlx::Result<PgQueryResult> {
         sqlx::query!(
             "
@@ -190,9 +202,10 @@ impl Storage for PgStorage {
                     LIMIT 1
                   )
             WHERE state = 'suspended'
-              AND wakeup_at <= (NOW() - $1::interval)
+              AND wakeup_at <= ($2::timestamptz - $1::interval)
             ",
-            suspend_margin
+            suspend_margin,
+            now
         )
         .execute(&mut *conn)
         .await
