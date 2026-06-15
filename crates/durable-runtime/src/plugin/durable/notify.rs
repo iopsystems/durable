@@ -168,7 +168,8 @@ impl Host for Task {
 
         // Durably record the absolute deadline as a recorded event *before* the
         // result. This is what gives the timed wait a timer fallback: it is
-        // - computed from the injected `Clock` (so a `DstClock` controls it), and
+        // - computed from the injected `Clock` (so a `DstClock` controls it),
+        //   and
         // - persisted, so it survives a suspend/replay cycle. On replay we read
         //   the recorded value back rather than recomputing a fresh deadline.
         let deadline_options =
@@ -209,9 +210,9 @@ impl Host for Task {
             tx.rollback().await?;
 
             // Compute the time remaining until the user deadline using the
-            // injected clock. If it has already elapsed (e.g. we were revived by
-            // the wakeup timer at `deadline`), `user_deadline` is now and the
-            // select below resolves the timeout immediately.
+            // injected clock. If it has already elapsed (e.g. we were revived
+            // by the wakeup timer at `deadline`), `user_deadline` is now and
+            // the select below resolves the timeout immediately.
             let remaining = (deadline - self.state.clock().now())
                 .to_std()
                 .unwrap_or(std::time::Duration::ZERO);
@@ -268,8 +269,8 @@ impl Host for Task {
 
                 // The suspend timeout expired. Suspend the task to free up the
                 // worker slot, recording `deadline` as the wakeup time so the
-                // task is revived by the timer even if its notification is never
-                // re-delivered.
+                // task is revived by the timer even if its notification is
+                // never re-delivered.
                 Some(Expired::Suspend) => {
                     if !try_suspend(self, Some(deadline)).await? {
                         continue;

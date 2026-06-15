@@ -734,10 +734,11 @@ impl Worker {
 
             let now = shared.clock.now();
             let delay = match wakeup_at {
-                // A task becomes wakeable once `now >= wakeup_at + suspend_margin`
-                // (see `wake_suspended_tasks`), so sleep until that point rather
-                // than `now - wakeup_at`, which is negative for a future wakeup
-                // and would otherwise collapse to zero and busy-loop.
+                // A task becomes wakeable once `now >= wakeup_at +
+                // suspend_margin` (see `wake_suspended_tasks`), so sleep until
+                // that point rather than `now - wakeup_at`, which is negative
+                // for a future wakeup and would otherwise collapse to zero and
+                // busy-loop.
                 Some(wakeup_at) => (wakeup_at + shared.config.suspend_margin)
                     .signed_duration_since(now)
                     .to_std()
