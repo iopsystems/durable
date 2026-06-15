@@ -119,8 +119,8 @@ impl Host for Task {
         // Durably record the absolute deadline as a recorded event *before* the
         // result. This is what gives the timed wait a timer fallback: it is
         // - computed from the injected `Clock` (so a `DstClock` controls it), and
-        // - persisted, so it survives a suspend/replay cycle. On replay we read
-        //   the recorded value back rather than recomputing a fresh deadline.
+        // - persisted, so it survives a suspend/replay cycle. On replay we read the
+        //   recorded value back rather than recomputing a fresh deadline.
         let deadline_options =
             TransactionOptions::new("durable:core/notify.notification-blocking-timeout.deadline");
         let deadline: DateTime<Utc> =
