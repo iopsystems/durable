@@ -442,7 +442,11 @@ impl Worker {
 
     pub async fn run(&mut self) -> anyhow::Result<()> {
         let mut conn = self.shared.acquire().await?;
-        self.worker_id = self.shared.storage.insert_worker(&mut conn).await?;
+        self.worker_id = self
+            .shared
+            .storage
+            .insert_worker(&mut conn, self.shared.clock.now())
+            .await?;
         drop(conn);
 
         tracing::info!("durable worker id is {}", self.worker_id);
@@ -534,7 +538,7 @@ impl Worker {
             let mut conn = shared.acquire().await?;
             let alive = shared
                 .storage
-                .heartbeat_worker(&mut conn, worker_id)
+                .heartbeat_worker(&mut conn, worker_id, shared.clock.now())
                 .await?;
             drop(conn);
 
@@ -598,7 +602,12 @@ impl Worker {
             let mut result = if let Some(following) = following.take() {
                 shared
                     .storage
-                    .delete_following_expired_worker(&mut tx, following, timeout)
+                    .delete_following_expired_worker(
+                        &mut tx,
+                        following,
+                        timeout,
+                        shared.clock.now(),
+                    )
                     .await?
             } else {
                 Default::default()
@@ -608,7 +617,12 @@ impl Worker {
                 result.extend(std::iter::once(
                     shared
                         .storage
-                        .delete_other_expired_workers(&mut tx, worker_id, timeout)
+                        .delete_other_expired_workers(
+                            &mut tx,
+                            worker_id,
+                            timeout,
+                            shared.clock.now(),
+                        )
                         .await?,
                 ));
 
@@ -697,7 +711,11 @@ impl Worker {
             // If we don't do that all the rows here get the same random number.
             let result = shared
                 .storage
-                .wake_suspended_tasks(&mut conn, shared.config.suspend_margin.into_pg_interval())
+                .wake_suspended_tasks(
+                    &mut conn,
+                    shared.config.suspend_margin.into_pg_interval(),
+                    shared.clock.now(),
+                )
                 .await?;
 
             let count = result.rows_affected();
@@ -710,8 +728,12 @@ impl Worker {
 
             let now = shared.clock.now();
             let delay = match wakeup_at {
-                Some(wakeup_at) => now
-                    .signed_duration_since(wakeup_at)
+                // A task becomes wakeable once `now >= wakeup_at + suspend_margin`
+                // (see `wake_suspended_tasks`), so sleep until that point rather
+                // than `now - wakeup_at`, which is negative for a future wakeup
+                // and would otherwise collapse to zero and busy-loop.
+                Some(wakeup_at) => (wakeup_at + shared.config.suspend_margin)
+                    .signed_duration_since(now)
                     .to_std()
                     .unwrap_or(Duration::ZERO),
                 None => Duration::from_secs(60),

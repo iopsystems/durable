@@ -420,7 +420,14 @@ impl TaskState {
                 std::any::type_name::<T>()
             )
         }) {
-            Ok(value) => Ok(Some(value)),
+            Ok(value) => {
+                // Advance past the replayed event, mirroring the database hit
+                // path in `enter_impl` (the guest does not call `exit` on
+                // replay, so nothing else advances the index). Without this a
+                // second cached `enter` would re-read this same event.
+                self.txn_index += 1;
+                Ok(Some(value))
+            }
             Err(e) => {
                 self.events.clear();
                 Err(e)
