@@ -83,8 +83,9 @@ impl Host for Task {
                     .await?;
 
                 if poll_notification(&mut *self, &mut tx).await?.is_some() {
-                    // A new notification barged in while we were updating. Roll back the
-                    // transaction and go through the main loop again.
+                    // A new notification barged in while we were updating. Roll
+                    // back the transaction and go through
+                    // the main loop again.
                     tx.rollback().await?;
                     break 'inner;
                 }

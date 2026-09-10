@@ -114,8 +114,8 @@ impl sqlx::Type<sqlx::Postgres> for ValueResource {
     }
 
     fn compatible(_: &PgTypeInfo) -> bool {
-        // We could check that types are compatible here but it is better to leave that
-        // to the decode impl.
+        // We could check that types are compatible here but it is better to
+        // leave that to the decode impl.
         true
     }
 }

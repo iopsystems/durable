@@ -140,9 +140,9 @@ impl Transaction {
     pub fn stream<'t>(&'t mut self) -> Option<&'t mut QueryStream<'t>> {
         let stream = self.stream.as_mut()?;
 
-        // SAFETY: The actual lifetime of the stream is 't. This is just changing it
-        //         back to match reality instead of the 'static we need for the
-        //         self-reference to be allowed.
+        // SAFETY: The actual lifetime of the stream is 't. This is just
+        // changing it         back to match reality instead of the
+        // 'static we need for the         self-reference to be allowed.
         let stream: &'t mut QueryStream<'t> =
             unsafe { &mut *(stream as *mut QueryStream as *mut QueryStream<'t>) };
 
@@ -170,8 +170,8 @@ impl Transaction {
 
         let stream: QueryStream = func(conn);
 
-        // SAFETY: We ensure that self.stream does not outlive the transaction it was
-        //         created from.
+        // SAFETY: We ensure that self.stream does not outlive the transaction
+        // it was         created from.
         let stream: QueryStream<'static> = unsafe { std::mem::transmute(stream) };
         self.stream = Some(stream);
 
@@ -521,15 +521,17 @@ impl TaskState {
             None => anyhow::bail!("attempted to exit a transaction without having entered one"),
         };
 
-        // If the transaction has a database connection then we need to use that,
-        // otherwise grab a new connection from the pool. exit_impl doesn't require that
-        // we be in a database transaction, so there is no need to enter one if we are
+        // If the transaction has a database connection then we need to use
+        // that, otherwise grab a new connection from the pool.
+        // exit_impl doesn't require that we be in a database
+        // transaction, so there is no need to enter one if we are
         // not already in one.
         let mut tx = None;
         let mut conn;
         let conn: &mut PgConnection = match txn.take_conn() {
             Some(mut txn) => {
-                // Check if the transaction is not in an aborted state by running a query
+                // Check if the transaction is not in an aborted state by
+                // running a query
                 if sqlx::query("SELECT 1").execute(&mut *txn).await.is_ok() {
                     let tx = tx.insert(txn);
                     tx
@@ -589,12 +591,13 @@ impl TaskState {
         // This complicated query here does a few different things:
         // 1. It inserts an event into the event table,
         // 2. It inserts a log event into the log table, and,
-        // 3. It fetches the running_on field for the task we are currently running.
+        // 3. It fetches the running_on field for the task we are currently
+        //    running.
         //
         // Doing this all at once has multiple advantages:
         // - We avoid multiple roundtrips to the database.
-        // - Since all the statements are conditional on running_on = worker_id, we can
-        //   run this outside of a transaction with no issues.
+        // - Since all the statements are conditional on running_on = worker_id,
+        //   we can run this outside of a transaction with no issues.
         let value = serde_json::value::to_raw_value(data)?;
         let running_on = self
             .shared
@@ -617,8 +620,8 @@ impl TaskState {
         );
 
         if running_on != Some(self.worker_id) {
-            // This task is no longer running on the current worker. Don't commit anything,
-            // and abort the task.
+            // This task is no longer running on the current worker. Don't
+            // commit anything, and abort the task.
             return Err(anyhow::Error::new(TaskStatus::NotScheduledOnWorker));
         }
 

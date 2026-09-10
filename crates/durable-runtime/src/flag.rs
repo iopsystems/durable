@@ -38,12 +38,12 @@ impl ShutdownFlag {
     }
 
     pub fn wait(&self) -> ShutdownFuture<'_> {
-        // Early check since there is no reason to create a Notified if it is not
-        // necessary.
+        // Early check since there is no reason to create a Notified if it is
+        // not necessary.
         //
-        // We still need to check after creating the notified to avoid the case where
-        // raise is called between when we checked the flag and when we constructed the
-        // Notified.
+        // We still need to check after creating the notified to avoid the case
+        // where raise is called between when we checked the flag and
+        // when we constructed the Notified.
         if self.is_raised() {
             return ShutdownFuture(None);
         }

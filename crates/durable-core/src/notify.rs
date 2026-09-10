@@ -39,10 +39,10 @@ pub fn wait() -> Notification {
     );
 
     // SAFETY:
-    // - RawValue is a #[repr(transparent)] wrapper around str, so the transmute is
-    //   safe. This is also unlikely to change in future serde versions.
-    // - We have just validated that event.data is valid json, so this doesn't break
-    //   RawValue's invariants.
+    // - RawValue is a #[repr(transparent)] wrapper around str, so the transmute
+    //   is safe. This is also unlikely to change in future serde versions.
+    // - We have just validated that event.data is valid json, so this doesn't
+    //   break RawValue's invariants.
     let data = unsafe { std::mem::transmute::<Box<str>, Box<RawValue>>(data) };
 
     Notification {
@@ -73,7 +73,8 @@ pub fn wait_with_timeout(timeout: Duration) -> Option<Notification> {
              invalid json data",
         );
 
-        // SAFETY: Same as in wait() - RawValue is #[repr(transparent)] around str.
+        // SAFETY: Same as in wait() - RawValue is #[repr(transparent)] around
+        // str.
         let data = unsafe { std::mem::transmute::<Box<str>, Box<RawValue>>(data) };
 
         Notification {

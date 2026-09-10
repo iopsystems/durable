@@ -471,11 +471,11 @@ impl Worker {
             .instrument(tracing::info_span!("process"));
 
         let span = tracing::info_span!("worker", id = worker_id);
-        // We want to run these all in the same tokio task so that if it has problems
-        // then the heartbeat will fail.
+        // We want to run these all in the same tokio task so that if it has
+        // problems then the heartbeat will fail.
         //
-        // Spawned tasks are put into their own joinset because running everything in a
-        // single task is not reasonable.
+        // Spawned tasks are put into their own joinset because running
+        // everything in a single task is not reasonable.
         let (heartbeat, validate, leader, process, cleanup, stuck_notify) =
             (heartbeat, validate, leader, process, cleanup, stuck_notify)
                 .join()
@@ -538,10 +538,11 @@ impl Worker {
                 .await?;
             drop(conn);
 
-            // Our record is gone from the database. This means that some other worker
-            // determined that we were inactive.
+            // Our record is gone from the database. This means that some other
+            // worker determined that we were inactive.
             //
-            // We should shutdown and then (optionally) restart with a new worker id.
+            // We should shutdown and then (optionally) restart with a new
+            // worker id.
             if !alive {
                 shared.shutdown.raise();
                 anyhow::bail!("worker entry was deleted from the database");
@@ -561,17 +562,19 @@ impl Worker {
     /// the table are still live.
     async fn validate_workers(shared: Arc<SharedState>, worker_id: i64) -> anyhow::Result<()> {
         // When detecting whether workers are live we want two main things:
-        // - Dead workers should be removed promptly, as soon as they fail to update
-        //   their heartbeat within the requested interval.
-        // - We would like to avoid having the database melt down when there are a few
-        //   workers.
+        // - Dead workers should be removed promptly, as soon as they fail to
+        //   update their heartbeat within the requested interval.
+        // - We would like to avoid having the database melt down when there are
+        //   a few workers.
         //
-        // Explicitly out of consideration is working well when there are 1000+ workers.
+        // Explicitly out of consideration is working well when there are 1000+
+        // workers.
         //
-        // How we do things here is that we order workers by id, each worker looks at
-        // the one just in front of it and schedules a liveness check for just after
-        // that worker would expire. The worker with the oldest ID is then responsible
-        // for checking the one with the newest ID.
+        // How we do things here is that we order workers by id, each worker
+        // looks at the one just in front of it and schedules a liveness
+        // check for just after that worker would expire. The worker
+        // with the oldest ID is then responsible for checking the one
+        // with the newest ID.
 
         let _guard = ShutdownGuard::new(&shared.shutdown);
         let mut shutdown = std::pin::pin!(shared.shutdown.wait());
@@ -619,7 +622,8 @@ impl Worker {
                 );
             }
 
-            // Select either the next worker in sequence, or the newest id in the sequence.
+            // Select either the next worker in sequence, or the newest id in
+            // the sequence.
             let record = shared
                 .storage
                 .next_worker_in_sequence(&mut tx, worker_id)
@@ -691,8 +695,9 @@ impl Worker {
 
             let mut conn = shared.acquire().await?;
 
-            // Note that we include the task id in the subquery ORDER BY clause so that
-            // postgresql is forced to evaluate it for each row.
+            // Note that we include the task id in the subquery ORDER BY clause
+            // so that postgresql is forced to evaluate it for each
+            // row.
             //
             // If we don't do that all the rows here get the same random number.
             let result = shared
@@ -1026,8 +1031,9 @@ impl Worker {
                 {
                     tracing::error!(task_id, "worker task exited with an error: {e}");
 
-                    // An error here means we are already shutting down and normal shutdown recovery
-                    // should take care of any remaining tasks.
+                    // An error here means we are already shutting down and
+                    // normal shutdown recovery should take
+                    // care of any remaining tasks.
                     let _ = failures.send(task_id).await;
                 }
             };
@@ -1077,9 +1083,11 @@ impl Worker {
                             | sqlx::Error::WorkerCrashed
                             | sqlx::Error::Io(_),
                         ) => {
-                            // Attempt to reset the task state so it can be picked up again.
+                            // Attempt to reset the task state so it can be
+                            // picked up again.
                             //
-                            // If this fails then the task failure gets reported to the main event
+                            // If this fails then the task failure gets reported
+                            // to the main event
                             // loop which can ensure it gets retried.
                             let mut conn = shared.pool.acquire().await?;
                             shared
@@ -1090,7 +1098,8 @@ impl Worker {
                             break TaskStatus::Suspend;
                         }
                         Some(sqlx::Error::PoolClosed) => {
-                            // Nothing we can do, since we can't make database queries.
+                            // Nothing we can do, since we can't make database
+                            // queries.
                             break TaskStatus::Suspend;
                         }
                         _ => (),
@@ -1224,8 +1233,8 @@ impl Worker {
             }
         };
 
-        // Compile the component, but perform request coalescing so that it only happens
-        // once. Compiling one is an expensive operation, so if
+        // Compile the component, but perform request coalescing so that it only
+        // happens once. Compiling one is an expensive operation, so if
         let component = component
             .get_or_compute(|| async {
                 let mut conn = shared.pool.acquire().await.map_err(anyhow::Error::from)?;
@@ -1236,7 +1245,8 @@ impl Worker {
                     .map_err(anyhow::Error::from)?;
                 drop(conn);
 
-                // If an error occurs then we just allow ourselves to proceed anyway.
+                // If an error occurs then we just allow ourselves to proceed
+                // anyway.
                 let _permit = shared.compile_sema.acquire().await;
 
                 let start = Instant::now();
@@ -1318,8 +1328,8 @@ impl Worker {
             return Ok(status);
         }
 
-        // Some errors are recoverable. We handle those at up one method so that retries
-        // can propagate upwards if recovery fails.
+        // Some errors are recoverable. We handle those at up one method so that
+        // retries can propagate upwards if recovery fails.
         let error = match error {
             Some(error) if is_recoverable_error(&error) => return Err(error),
             error => error,

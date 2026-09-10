@@ -157,7 +157,8 @@ impl Migrator {
 
         let target = match options.target {
             Target::Latest => {
-                // Since we want to go to the latest version, don't undo applied migrations.
+                // Since we want to go to the latest version, don't undo applied
+                // migrations.
                 if applied.len() >= known.len() {
                     return Ok(Vec::new());
                 }
@@ -343,8 +344,8 @@ impl Migrator {
 
         let applied = self.applied_migrations(&mut *conn, &options).await?;
 
-        // Emit an error if our migrations are invalid or the diverge from those in the
-        // database.
+        // Emit an error if our migrations are invalid or the diverge from those
+        // in the database.
         let _ = self.operations(&applied, &options)?;
 
         Ok(applied.last().map(|migration| migration.version as u64))

@@ -28,8 +28,8 @@ where
 }
 
 pub fn in_transaction() -> bool {
-    // SAFETY: Workflows are only run in a single-threaded environment so this is
-    //         safe.
+    // SAFETY: Workflows are only run in a single-threaded environment so this
+    // is         safe.
     unsafe { std::ptr::read(IN_TRANSACTION.get()) }
 }
 
@@ -131,11 +131,13 @@ where
         Ok(json) => {
             crate::bindings::transaction_exit(&json);
 
-            // We need to roundtrip the result through json so that the resulting type is
-            // consistent if the workflow is restarted.
+            // We need to roundtrip the result through json so that the
+            // resulting type is consistent if the workflow is
+            // restarted.
             //
-            // This is also relevant for the seralization wrappers of some resources that
-            // track the transaction they were created in.
+            // This is also relevant for the seralization wrappers of some
+            // resources that track the transaction they were
+            // created in.
             let result = serde_json::from_str::<TransactionResult<T>>(&json)
                 .expect("failed to deserialize the transaction result from json");
 

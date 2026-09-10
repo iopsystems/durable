@@ -116,7 +116,8 @@ async fn dst_notify_timeout_wake_before_suspend(pool: sqlx::PgPool) -> anyhow::R
     let entropy = Arc::new(DstEntropy::new(42));
     let (event_source, event_handle) = DstEventSource::new();
 
-    // Use a long suspend timeout so suspension does NOT happen during this test.
+    // Use a long suspend timeout so suspension does NOT happen during this
+    // test.
     let config = Config::new()
         .suspend_margin(Duration::from_secs(1))
         .suspend_timeout(Duration::from_secs(300));

@@ -18,8 +18,9 @@ impl wasi::random::random::Host for Task {
                 getrandom::fill_uninit(data.spare_capacity_mut())
                     .context("get-random-bytes: failed to call getrandom")?;
 
-                // SAFETY: getrandom_uninit returned successfully so all bytes in the spare
-                //         capacity of the vector are initialized.
+                // SAFETY: getrandom_uninit returned successfully so all bytes
+                // in the spare         capacity of the vector
+                // are initialized.
                 unsafe { data.set_len(data.capacity()) };
 
                 Ok(data)

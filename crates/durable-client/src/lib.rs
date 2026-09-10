@@ -35,9 +35,9 @@ struct ClientData {
 impl DurableClient {
     /// Create a new durable client from a PgPool instance.
     pub fn new(pool: sqlx::PgPool) -> Result<Self, DurableError> {
-        // At the moment this constructor is infallible. However, we return an error
-        // here in case we want to validate that we are actually connecting to a
-        // compatible database change.
+        // At the moment this constructor is infallible. However, we return an
+        // error here in case we want to validate that we are actually
+        // connecting to a compatible database change.
 
         Ok(Self {
             pool,
@@ -211,7 +211,8 @@ impl DurableClient {
             .unzip();
 
         let workflows = loop {
-            // Create a savepoint so that we can rollback if something goes wrong here.
+            // Create a savepoint so that we can rollback if something goes
+            // wrong here.
             let mut stx = tx.begin().await?;
             let result = sqlx::query_scalar!(
                 r#"

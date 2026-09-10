@@ -29,8 +29,8 @@ pub fn task_data() -> Box<RawValue> {
     // SAFETY:
     // 1. RawValue is a #[repr(transparent)] wrapper around a Box<str> so the
     //    transmute is safe on its own.
-    // 2. The runtime guarantees that the task data is valid json, so this does not
-    //    create an invalid RawValue instance.
+    // 2. The runtime guarantees that the task data is valid json, so this does
+    //    not create an invalid RawValue instance.
     unsafe { std::mem::transmute(data) }
 }
 
@@ -50,7 +50,7 @@ pub fn abort(message: &str) -> ! {
         std::process::exit(1);
     });
 
-    // This line should never be reached, but if it does then we can panic with an
-    // unreachable instruction.
+    // This line should never be reached, but if it does then we can panic with
+    // an unreachable instruction.
     std::process::abort()
 }
