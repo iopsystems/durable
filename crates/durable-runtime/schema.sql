@@ -244,6 +244,18 @@ CREATE TRIGGER task_updated
     )
     EXECUTE FUNCTION durable.notify_task();
 
+-- Deleting a worker hands its tasks back by way of `fk_worker`'s
+-- `ON DELETE SET NULL`, which clears `running_on` without touching `state`.
+-- `task_updated` above does not fire for that, so this announces it.
+CREATE TRIGGER task_released
+    AFTER UPDATE OF running_on ON durable.task
+    FOR EACH ROW WHEN (
+        NEW.running_on IS NULL
+        AND
+        NEW.state IN ('active', 'ready')
+    )
+    EXECUTE FUNCTION durable.notify_task();
+
 CREATE TRIGGER task_suspended
     AFTER INSERT OR UPDATE OF state ON durable.task
     FOR EACH ROW WHEN (NEW.state = 'suspended')
