@@ -40,8 +40,8 @@ impl wasi::clocks::wall_clock::Host for Task {
 
     async fn resolution(&mut self) -> anyhow::Result<Datetime> {
         // The underlying clocks on the host don't necessarily have a consistent
-        // resolution. This is especially true since the workflow may move between
-        // hosts.
+        // resolution. This is especially true since the workflow may move
+        // between hosts.
         //
         // Instead we just lie and say we've got a resolution of 1us.
         Ok(Duration::from_micros(1).into())
@@ -64,8 +64,8 @@ impl wasi::clocks::monotonic_clock::Host for Task {
 
     async fn resolution(&mut self) -> anyhow::Result<monotonic::Duration> {
         // The underlying clocks on the host don't necessarily have a consistent
-        // resolution. This is especially true since the workflow may move between
-        // hosts.
+        // resolution. This is especially true since the workflow may move
+        // between hosts.
         //
         // Instead we just lie and say we've got a resolution of 1us.
         Ok(1000)

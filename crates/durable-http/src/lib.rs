@@ -793,8 +793,8 @@ fn replace_headers(dst: &mut HeaderMap, src: HeaderMap) {
     // This method is stolen from reqwest's util.rs.
     //
     // IntoIter of HeaderMap yields (Option<HeaderName>, HeaderValue). The first
-    // time a nme is yielded it will be Some(name) and if there are more values with
-    // the same name then the next yield will be None.
+    // time a nme is yielded it will be Some(name) and if there are more values
+    // with the same name then the next yield will be None.
 
     use http::header::{Entry, OccupiedEntry};
 

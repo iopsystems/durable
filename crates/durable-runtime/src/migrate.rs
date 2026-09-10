@@ -57,8 +57,8 @@ impl Migrator {
     ) -> Result<(), Error> {
         let mut options = options.clone();
 
-        // Note that changing this means that all previously applied migrations in the
-        // database will be forgotten.
+        // Note that changing this means that all previously applied migrations
+        // in the database will be forgotten.
         options.migration_table = Table::new("durable", "migrations");
 
         self.0.run(conn, &options).await

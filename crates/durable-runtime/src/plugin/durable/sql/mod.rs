@@ -1063,9 +1063,9 @@ impl Host for Task {
 fn convert_sqlx_error(err: sqlx::Error) -> anyhow::Result<sql::Error> {
     use sqlx::error::ErrorKind;
 
-    // Most errors basically convert directly to sql::Error::Other because they are
-    // either extremely unlikely or not something the workflow program can usefully
-    // do something with.
+    // Most errors basically convert directly to sql::Error::Other because they
+    // are either extremely unlikely or not something the workflow program
+    // can usefully do something with.
     Ok(match err {
         sqlx::Error::ColumnDecode { index, source } => {
             sql::Error::ColumnDecode(sql::ColumnDecodeError {

@@ -50,8 +50,8 @@ async fn worker_lifecycle_with_dst_hooks(pool: sqlx::PgPool) -> anyhow::Result<(
         "expected WorkerRegistered event, got: {events:?}"
     );
 
-    // Verify LeaderChanged event was emitted (worker becomes leader since it's the
-    // only one)
+    // Verify LeaderChanged event was emitted (worker becomes leader since it's
+    // the only one)
     assert!(
         events
             .iter()
@@ -71,8 +71,8 @@ async fn worker_lifecycle_with_dst_hooks(pool: sqlx::PgPool) -> anyhow::Result<(
         .iter()
         .any(|c| matches!(c, Component::ProcessEvents { .. }));
 
-    // The heartbeat should fire on the first iteration since sleep_duration starts
-    // at ZERO
+    // The heartbeat should fire on the first iteration since sleep_duration
+    // starts at ZERO
     assert!(
         has_heartbeat,
         "expected Heartbeat acquire, got: {acquires:?}"
@@ -138,8 +138,8 @@ async fn worker_uses_dst_clock(pool: sqlx::PgPool) -> anyhow::Result<()> {
         .filter(|c| matches!(c, Component::Heartbeat { .. }))
         .count();
 
-    // Now advance the clock by the heartbeat interval (default is 5s) to trigger
-    // another heartbeat cycle.
+    // Now advance the clock by the heartbeat interval (default is 5s) to
+    // trigger another heartbeat cycle.
     clock.advance(Duration::from_secs(10));
 
     // Give the worker a moment to process
@@ -168,7 +168,8 @@ async fn worker_uses_dst_clock(pool: sqlx::PgPool) -> anyhow::Result<()> {
 /// sequence of entropy values.
 #[sqlx::test]
 async fn dst_entropy_determinism(pool: sqlx::PgPool) -> anyhow::Result<()> {
-    // Run two workers with the same seed sequentially and compare acquire patterns.
+    // Run two workers with the same seed sequentially and compare acquire
+    // patterns.
     let seed = 12345u64;
 
     // First run
@@ -330,7 +331,8 @@ async fn multi_worker_shared_scheduler(pool: sqlx::PgPool) -> anyhow::Result<()>
             if deleted_count >= 2 {
                 break;
             }
-            // Keep advancing clock so sleeping components wake up and notice shutdown
+            // Keep advancing clock so sleeping components wake up and notice
+            // shutdown
             clock.advance(Duration::from_secs(5));
             tokio::task::yield_now().await;
         }
@@ -372,7 +374,8 @@ async fn validate_workers_uses_dst_clock(pool: sqlx::PgPool) -> anyhow::Result<(
             if has_validate {
                 break;
             }
-            // ValidateWorkers sleeps after its first check; advance clock to wake it
+            // ValidateWorkers sleeps after its first check; advance clock to
+            // wake it
             clock.advance(Duration::from_secs(30));
             tokio::task::yield_now().await;
         }

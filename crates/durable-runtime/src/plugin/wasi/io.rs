@@ -45,8 +45,8 @@ impl wasi::io::streams::HostInputStream for Task {
         _: Resource<InputStream>,
         _: u64,
     ) -> anyhow::Result<Result<Vec<u8>, StreamError>> {
-        // Workflows have no input streams. We model this by always indicating that
-        // the stream is closed.
+        // Workflows have no input streams. We model this by always indicating
+        // that the stream is closed.
         Ok(Err(StreamError::Closed))
     }
 
@@ -268,7 +268,8 @@ impl wasi::io::poll::HostPollable for Task {
             .unwrap_or(Duration::ZERO);
 
         if is_external && delta > suspend_timeout + suspend_margin {
-            // Avoid holding on to a db connection if we are suspending this task anyway
+            // Avoid holding on to a db connection if we are suspending this
+            // task anyway
             txn.take_conn();
 
             let mut conn = self.state.pool().acquire().await?;
@@ -333,9 +334,9 @@ impl wasi::io::poll::Host for Task {
         let resources = self.plugins.expect::<WasiResources>();
 
         // Check whether any of the pollables was created within the current
-        // transaction. If this is the case then we can't suspend the task because it
-        // might be sleeping based on an impure current time acquired from within the
-        // transaction.
+        // transaction. If this is the case then we can't suspend the task
+        // because it might be sleeping based on an impure current time
+        // acquired from within the transaction.
         let mut has_internal = false;
         {
             let txn = self.state.transaction_mut().unwrap();
@@ -393,7 +394,8 @@ impl wasi::io::poll::Host for Task {
                 .unwrap_or(Duration::ZERO);
 
             if !has_internal && duration > suspend_timeout + SUSPEND_PREWAKE {
-                // Avoid holding on to a db connection if we are suspending this task anyway
+                // Avoid holding on to a db connection if we are suspending this
+                // task anyway
                 if let Some(txn) = self.state.transaction_mut() {
                     txn.take_conn();
                 }

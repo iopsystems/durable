@@ -130,7 +130,8 @@ impl Dev {
         let mut interval = tokio::time::interval(Duration::from_secs(1));
         interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
 
-        // Skip the first tick since there is no chance of the database being ready yet.
+        // Skip the first tick since there is no chance of the database being
+        // ready yet.
         interval.tick().await;
 
         loop {
@@ -209,8 +210,8 @@ impl<F: FnOnce()> Defer<F> {
 
 impl<F: FnOnce()> Drop for Defer<F> {
     fn drop(&mut self) {
-        // SAFETY: We have sole ownership over self and nothing else will be touching it
-        //         so removing `func` is safe.
+        // SAFETY: We have sole ownership over self and nothing else will be
+        // touching it         so removing `func` is safe.
         let func = unsafe { ManuallyDrop::take(&mut self.0) };
 
         func()
