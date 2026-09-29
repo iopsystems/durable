@@ -28,6 +28,54 @@ async fn poll_notification(
     Ok(data)
 }
 
+/// Try to suspend a task that is waiting on a notification.
+///
+/// Returns `true` if the task was suspended and `false` if a notification
+/// was pending, in which case nothing was changed and the caller should go
+/// back to polling.
+///
+/// The task row is locked `FOR UPDATE` before anything else. A notification
+/// inserted by another transaction holds `FOR KEY SHARE` on the task row from
+/// its `fk_task` check until that transaction commits, and `FOR UPDATE`
+/// conflicts with it:
+///
+/// - If the insert happened first, this waits for it to commit. The poll below
+///   then runs with a new snapshot, sees the notification, and the suspend is
+///   abandoned.
+/// - If this lock is taken first, the insert waits for the suspend to commit.
+///   The `notify_notification` trigger then sees `state = 'suspended'` and
+///   wakes the task.
+///
+/// The suspend `UPDATE` alone only takes `FOR NO KEY UPDATE`, which does not
+/// conflict with `FOR KEY SHARE`. Without the explicit lock, a notification
+/// whose trigger ran while the task was still active and which committed after
+/// this poll was invisible to both sides, and the task stayed suspended until
+/// `unwedge_stuck_notifications` swept it up.
+async fn try_suspend(task: &mut Task) -> anyhow::Result<bool> {
+    let task_id = task.task_id();
+    let mut tx = task.state.pool().begin().await?;
+
+    task.state
+        .storage()
+        .fetch_task_state_locked(&mut tx, task_id)
+        .await?;
+
+    task.state
+        .storage()
+        .suspend_task_no_wakeup(&mut tx, task_id)
+        .await?;
+
+    if poll_notification(&mut *task, &mut tx).await?.is_some() {
+        // A notification arrived before we took the lock. Roll back so it
+        // stays queued and the suspend is undone.
+        tx.rollback().await?;
+        return Ok(false);
+    }
+
+    tx.commit().await?;
+    Ok(true)
+}
+
 impl Host for Task {
     async fn notification_blocking(&mut self) -> anyhow::Result<Event> {
         if self.state.transaction().is_some() {
@@ -75,25 +123,9 @@ impl Host for Task {
                 }
 
                 // The timer expired, so we need to attempt to suspend.
-                let mut tx = self.state.pool().begin().await?;
-
-                self.state
-                    .storage()
-                    .suspend_task_no_wakeup(&mut tx, self.task_id())
-                    .await?;
-
-                if poll_notification(&mut *self, &mut tx).await?.is_some() {
-                    // A new notification barged in while we were updating. Roll
-                    // back the transaction and go through
-                    // the main loop again.
-                    tx.rollback().await?;
+                if !try_suspend(self).await? {
                     break 'inner;
                 }
-
-                // At this point the lock on the current task will block any
-                // competing transactions until after we are completely
-                // suspended.
-                tx.commit().await?;
 
                 return Err(anyhow::Error::new(TaskStatus::Suspend));
             }
@@ -190,21 +222,10 @@ impl Host for Task {
                 // The suspend timeout expired. Attempt to suspend the task so
                 // we free up the worker slot, just like notification_blocking.
                 Some(Expired::Suspend) => {
-                    let mut tx = self.state.pool().begin().await?;
-
-                    self.state
-                        .storage()
-                        .suspend_task_no_wakeup(&mut tx, self.task_id())
-                        .await?;
-
-                    if poll_notification(&mut *self, &mut tx).await?.is_some() {
-                        // A new notification barged in while we were updating.
-                        // Roll back the suspend and go through the main loop.
-                        tx.rollback().await?;
+                    if !try_suspend(self).await? {
                         continue;
                     }
 
-                    tx.commit().await?;
                     return Err(anyhow::Error::new(TaskStatus::Suspend));
                 }
             }

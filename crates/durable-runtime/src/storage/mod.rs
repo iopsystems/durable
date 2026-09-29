@@ -227,8 +227,13 @@ pub(crate) trait Storage: Send + Sync + 'static {
         task_id: i64,
     ) -> sqlx::Result<Option<PolledNotification>>;
 
-    /// Locks the row for the duration of the surrounding transaction so a
-    /// concurrent notification poll cannot consume the task.
+    /// Locks the row `FOR UPDATE` for the duration of the surrounding
+    /// transaction.
+    ///
+    /// Sending a notification takes this lock so a concurrent notification
+    /// poll cannot consume the task. Suspending a task that waits on a
+    /// notification takes it so an uncommitted notification insert, which
+    /// holds `FOR KEY SHARE` on the row, is serialized against the suspend.
     async fn fetch_task_state_locked(
         &self,
         conn: &mut PgConnection,
