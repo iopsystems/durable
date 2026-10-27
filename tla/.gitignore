@@ -1,0 +1,6 @@
+# TLC output and the downloaded tools.
+/.tools/
+/states/
+*_TTrace_*.tla
+*.bin
+*.out
