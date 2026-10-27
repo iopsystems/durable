@@ -382,7 +382,8 @@ impl WorkerBuilder {
             engine,
             event_source,
 
-            // A worker id of -1 should never overlap with an existing worker id.
+            // A worker id of -1 should never overlap with an existing worker
+            // id.
             worker_id: -1,
             tasks: JoinSet::new(),
             blocked: false,
@@ -914,7 +915,8 @@ impl Worker {
                 Event::Notification(notif) => {
                     let _ = self.shared.notifications.send(notif);
                 }
-                // Check if the task is scheduled to another worker. Don't do anything in that case.
+                // Check if the task is scheduled to another worker. Don't do
+                // anything in that case.
                 Event::Task(event::Task {
                     running_on: Some(id),
                     ..
@@ -1072,12 +1074,15 @@ impl Worker {
                 Ok(Ok(status)) => status,
                 Ok(Err(error)) => {
                     match find_sqlx_error(&error) {
-                        // These errors are external to the runtime and should usually be resolvable
-                        // if the workflow is retried somewhere else at a later point in time.
+                        // These errors are external to the runtime and should
+                        // usually be resolvable if the workflow is retried
+                        // somewhere else at a later point in time.
                         //
-                        // This should also help to reduce the number of workflow aborts that are
-                        // "not the fault" of the workflow itself. These will (eventually) instead
-                        // get turned into worker errors, which can be handled at a higher level.
+                        // This should also help to reduce the number of
+                        // workflow aborts that are "not the fault" of the
+                        // workflow itself. These will (eventually) instead
+                        // get turned into worker errors, which can be handled
+                        // at a higher level.
                         Some(
                             sqlx::Error::PoolTimedOut
                             | sqlx::Error::WorkerCrashed

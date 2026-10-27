@@ -251,15 +251,18 @@ impl DurableClient {
             match error {
                 sqlx::Error::Database(err) if err.is_foreign_key_violation() => {
                     match err.constraint() {
-                        // The worker got deleted out from underneath us as we were running the
-                        // query.
+                        // The worker got deleted out from underneath us as we
+                        // were running the query.
                         //
-                        // This is unlikely but can be solved with a retry anyway.
+                        // This is unlikely but can be solved with a retry
+                        // anyway.
                         Some("fk_worker") => continue,
 
-                        // The WASM module we thought we had doesn't exist anymore.
+                        // The WASM module we thought we had doesn't exist
+                        // anymore.
                         //
-                        // In this case we just need to recreate it in the database.
+                        // In this case we just need to recreate it in the
+                        // database.
                         Some("fk_wasm") => {
                             program.0.reregister(&mut tx).await?;
                             continue;

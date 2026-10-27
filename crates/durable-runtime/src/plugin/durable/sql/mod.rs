@@ -1091,25 +1091,26 @@ fn convert_sqlx_error(err: sqlx::Error) -> anyhow::Result<sql::Error> {
         sqlx::Error::Decode(e) => sql::Error::Decode(e.to_string()),
         sqlx::Error::TypeNotFound { type_name } => sql::Error::TypeNotFound(type_name),
 
-        // These errors _shouldn't_ happen but should be passed on up if they do anyway.
+        // These errors _shouldn't_ happen but should be passed on up if they do
+        // anyway.
         e @ sqlx::Error::Configuration(_) => sql::Error::Other(e.to_string()),
         e @ sqlx::Error::RowNotFound => sql::Error::Other(e.to_string()),
 
-        // These errors should be impossible or otherwise indicate a bug in our code.
-        // =============
-        // This should never happen because we are just iterating over the list of columns that we
-        // got from postgresql.
+        // These errors should be impossible or otherwise indicate a bug in our
+        // code. =============
+        // This should never happen because we are just iterating over the list
+        // of columns that we got from postgresql.
         e @ sqlx::Error::ColumnIndexOutOfBounds { .. } => {
             unreachable!("sqlx driver requested a column that was out of bounds: {e}")
         }
-        // This should never happen because we don't request columns by name. That happens within
-        // the guest program.
+        // This should never happen because we don't request columns by name.
+        // That happens within the guest program.
         e @ sqlx::Error::ColumnNotFound(_) => {
             unreachable!("sqlx driver failed to get a column by name: {e}")
         }
 
-        // Fallback: The error is not one that should be passed on up to the worker so we emit a
-        // trap.
+        // Fallback: The error is not one that should be passed on up to the
+        // worker so we emit a trap.
         e => return Err(anyhow::Error::new(e)),
     })
 }

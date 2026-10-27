@@ -55,11 +55,12 @@ pub struct Transaction {
     index: i32,
 
     // SAFETY NOTE:
-    // When Some this stream contains a reference to conn. It must be cleared before it is safe to
-    // access conn.
+    // When Some this stream contains a reference to conn. It must be cleared
+    // before it is safe to access conn.
     stream: Option<QueryStream<'static>>,
 
-    // We box this field so that it has a stable address for `stream` to refer to.
+    // We box this field so that it has a stable address for `stream` to refer
+    // to.
     conn: Option<Box<sqlx::Transaction<'static, sqlx::Postgres>>>,
 
     /// The log messages emitted during this transaction.
