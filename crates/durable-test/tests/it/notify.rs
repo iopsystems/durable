@@ -316,3 +316,83 @@ async fn notify_wait_timeout_after_suspend(pool: sqlx::PgPool) -> anyhow::Result
 
     Ok(())
 }
+
+/// A notification inserted by a transaction that is still open when the
+/// worker tries to suspend the task must still wake the task.
+///
+/// The insert's `notify_notification` trigger runs while the task is active,
+/// so it does not wake anything, and the row is invisible to the worker's
+/// pre-suspend poll until the transaction commits. The suspend has to wait for
+/// that commit; otherwise the task is suspended with a notification pending
+/// and nothing wakes it until the stuck-notification sweep.
+#[sqlx::test]
+async fn notify_uncommitted_during_suspend(pool: sqlx::PgPool) -> anyhow::Result<()> {
+    let client = DurableClient::new(pool.clone())?;
+    let program = crate::load_binary(&client, "notify-wait.wasm").await?;
+    let task = client
+        .launch(
+            "notify uncommitted test",
+            &program,
+            &serde_json::json!(null),
+        )
+        .await?;
+
+    // Insert the notification but leave the transaction open.
+    let mut tx = pool.begin().await?;
+    task.notify_with("notification", &(), &mut *tx).await?;
+
+    // A zero suspend timeout sends the worker straight to the suspend path.
+    let _guard = durable_test::spawn_worker_with(
+        pool.clone(),
+        Config::new()
+            .suspend_margin(Duration::ZERO)
+            .suspend_timeout(Duration::ZERO),
+    )
+    .await?;
+
+    // Wait until the worker has either suspended the task, which is the race
+    // being tested for, or is blocked on the task row lock held by the open
+    // insert, which is the fix. Committing before either would let the
+    // worker's ordinary poll find the notification and test nothing.
+    let reached_suspend = async {
+        loop {
+            let (suspended, blocked): (bool, bool) = sqlx::query_as(
+                r#"
+                SELECT
+                    (SELECT state = 'suspended' FROM durable.task WHERE id = $1),
+                    EXISTS(
+                        SELECT 1
+                         FROM pg_stat_activity
+                        WHERE datname = current_database()
+                          AND wait_event_type = 'Lock'
+                          AND query LIKE '%FROM durable.task%FOR UPDATE%'
+                    )
+                "#,
+            )
+            .bind(task.id())
+            .fetch_one(&pool)
+            .await?;
+
+            if suspended || blocked {
+                break;
+            }
+
+            tokio::time::sleep(Duration::from_millis(10)).await;
+        }
+
+        anyhow::Ok(())
+    };
+
+    timeout(Duration::from_secs(30), reached_suspend)
+        .await
+        .context("worker never reached the suspend path within 30s")??;
+
+    tx.commit().await?;
+
+    let status = timeout(Duration::from_secs(30), task.wait(&client))
+        .await
+        .context("task was not woken by a notification committed during its suspend")??;
+    assert!(status.success());
+
+    Ok(())
+}
