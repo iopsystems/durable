@@ -192,7 +192,7 @@ async fn stale_execution_does_not_record_events(pool: sqlx::PgPool) -> anyhow::R
     let _guard = durable_test::spawn_worker_with(pool.clone(), config).await?;
 
     let client = DurableClient::new(pool.clone())?;
-    let program = crate::load_binary(&client, "notify-wait-timeout-expire.wasm").await?;
+    let program = crate::load_binary(&client, "notify-wait-short-timeout.wasm").await?;
     let task = client
         .launch("stale commit", &program, &serde_json::json!(null))
         .await?;

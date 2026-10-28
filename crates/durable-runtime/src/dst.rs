@@ -237,14 +237,20 @@ impl Entropy for DstEntropy {
 /// A deterministic event source for controlling when and whether PostgreSQL
 /// LISTEN/NOTIFY events are delivered to the worker.
 ///
-/// This wraps a real [`PgEventSource`] (or any other `EventSource`) and
-/// interposes a channel through which the test harness can:
+/// `DstEventSource` interposes a channel through which the test harness can:
 ///
-/// - **Inject events** directly via [`send`](DstEventSource::send), without
+/// - **Inject events** directly via [`send`](DstEventHandle::send), without
 ///   waiting for PostgreSQL notifications.
 /// - **Simulate connection loss** by sending [`Event::Lagged`].
 /// - **Block event delivery** by not sending any events, pausing the worker's
 ///   event loop until the test is ready.
+///
+/// By default ([`DstEventSource::new`]) the only events the worker sees are
+/// the ones injected through the handle. To also deliver real events, use
+/// [`DstEventSource::wrapping`] to wrap another [`EventSource`] (typically a
+/// [`PgEventSource`]). Events from the wrapped source can be dropped,
+/// rewritten, or turned into [`Event::Lagged`] by installing a filter with
+/// [`DstEventSource::with_filter`].
 ///
 /// # Architecture
 ///
@@ -252,11 +258,35 @@ impl Entropy for DstEntropy {
 /// - [`DstEventSource`] implements [`EventSource`] and is given to the worker.
 /// - [`DstEventHandle`] is retained by the test harness to inject events.
 ///
-/// Create both with [`DstEventSource::new`].
+/// Create both with [`DstEventSource::new`] or [`DstEventSource::wrapping`].
 ///
-/// [`PgEventSource`]: crate::worker::PgEventSource
+/// # Example
+///
+/// ```rust,no_run
+/// use durable_runtime::dst::DstEventSource;
+/// use durable_runtime::event::{Event, PgEventSource};
+///
+/// # async fn example(pool: sqlx::PgPool) -> anyhow::Result<()> {
+/// let inner = PgEventSource::new(&pool).await?;
+/// let (source, handle) = DstEventSource::wrapping(Box::new(inner));
+///
+/// // Drop all notification events coming from postgres.
+/// let source = source.with_filter(|event| match event {
+///     Event::Notification(_) => None,
+///     event => Some(event),
+/// });
+///
+/// // Events injected via the handle bypass the filter.
+/// handle.send_lagged();
+/// # Ok(())
+/// # }
+/// ```
+///
+/// [`PgEventSource`]: crate::event::PgEventSource
 pub struct DstEventSource {
     rx: tokio::sync::mpsc::UnboundedReceiver<Event>,
+    inner: Option<Box<dyn EventSource>>,
+    filter: Option<Box<dyn FnMut(Event) -> Option<Event> + Send>>,
 }
 
 /// Handle for injecting events into a [`DstEventSource`].
@@ -275,21 +305,74 @@ impl DstEventSource {
     /// The returned `DstEventSource` should be passed to
     /// [`WorkerBuilder::event_source`]. The `DstEventHandle` is retained by
     /// the test harness.
+    ///
+    /// [`WorkerBuilder::event_source`]: crate::WorkerBuilder::event_source
     pub fn new() -> (Self, DstEventHandle) {
         let (tx, rx) = tokio::sync::mpsc::unbounded_channel();
-        (Self { rx }, DstEventHandle { tx })
+        let source = Self {
+            rx,
+            inner: None,
+            filter: None,
+        };
+
+        (source, DstEventHandle { tx })
+    }
+
+    /// Create a new DST event source that wraps `inner`, along with its
+    /// corresponding handle.
+    ///
+    /// Events from `inner` are delivered to the worker alongside any events
+    /// injected via the handle. If both have an event ready then the injected
+    /// event is delivered first.
+    pub fn wrapping(inner: Box<dyn EventSource>) -> (Self, DstEventHandle) {
+        let (mut source, handle) = Self::new();
+        source.inner = Some(inner);
+        (source, handle)
+    }
+
+    /// Install a filter that is applied to every event from the wrapped
+    /// source.
+    ///
+    /// The filter can pass the event through unchanged, replace it with a
+    /// different event (e.g. [`Event::Lagged`]), or drop it by returning
+    /// `None`. Events injected via the [`DstEventHandle`] are not filtered.
+    pub fn with_filter<F>(mut self, filter: F) -> Self
+    where
+        F: FnMut(Event) -> Option<Event> + Send + 'static,
+    {
+        self.filter = Some(Box::new(filter));
+        self
     }
 }
 
 #[async_trait::async_trait]
 impl EventSource for DstEventSource {
     async fn next(&mut self) -> anyhow::Result<Event> {
-        match self.rx.recv().await {
-            Some(event) => Ok(event),
-            None => {
-                // Channel closed — the test handle was dropped. Return Lagged
-                // and then pend forever so the worker doesn't spin.
-                std::future::pending().await
+        let Self { rx, inner, filter } = self;
+
+        loop {
+            let event = match inner {
+                Some(inner) => tokio::select! {
+                    biased;
+
+                    Some(event) = rx.recv() => return Ok(event),
+                    event = inner.next() => event?,
+                },
+                None => match rx.recv().await {
+                    Some(event) => return Ok(event),
+                    // Channel closed — the test handle was dropped. Pend
+                    // forever so the worker doesn't spin.
+                    None => std::future::pending().await,
+                },
+            };
+
+            let event = match filter {
+                Some(filter) => filter(event),
+                None => Some(event),
+            };
+
+            if let Some(event) = event {
+                return Ok(event);
             }
         }
     }
@@ -526,6 +609,97 @@ mod tests {
 
         assert!(matches!(e1, Event::Task(ref t) if t.id == 1));
         assert!(matches!(e2, Event::Task(ref t) if t.id == 2));
+    }
+
+    /// A simple event source that yields a fixed sequence of events and then
+    /// pends forever.
+    struct VecEventSource(std::collections::VecDeque<Event>);
+
+    #[async_trait::async_trait]
+    impl EventSource for VecEventSource {
+        async fn next(&mut self) -> anyhow::Result<Event> {
+            match self.0.pop_front() {
+                Some(event) => Ok(event),
+                None => std::future::pending().await,
+            }
+        }
+    }
+
+    fn vec_source(events: impl IntoIterator<Item = Event>) -> Box<dyn EventSource> {
+        Box::new(VecEventSource(events.into_iter().collect()))
+    }
+
+    #[tokio::test]
+    async fn dst_event_source_wrapping_delivers_inner_events() {
+        let inner = vec_source([
+            Event::Task(crate::event::Task {
+                id: 1,
+                running_on: None,
+            }),
+            Event::Worker(crate::event::Worker { worker_id: 2 }),
+        ]);
+        let (mut source, handle) = DstEventSource::wrapping(inner);
+
+        // Injected events take priority over events from the inner source.
+        handle.send_task_suspend(3);
+
+        let e1 = source.next().await.unwrap();
+        assert!(matches!(e1, Event::TaskSuspend(ref t) if t.id == 3));
+
+        let e2 = source.next().await.unwrap();
+        assert!(matches!(e2, Event::Task(ref t) if t.id == 1));
+
+        let e3 = source.next().await.unwrap();
+        assert!(matches!(e3, Event::Worker(ref w) if w.worker_id == 2));
+    }
+
+    #[tokio::test]
+    async fn dst_event_source_wrapping_survives_dropped_handle() {
+        let inner = vec_source([Event::Task(crate::event::Task {
+            id: 1,
+            running_on: None,
+        })]);
+        let (mut source, handle) = DstEventSource::wrapping(inner);
+        drop(handle);
+
+        let event = tokio::time::timeout(Duration::from_secs(1), source.next())
+            .await
+            .expect("should complete")
+            .unwrap();
+        assert!(matches!(event, Event::Task(ref t) if t.id == 1));
+    }
+
+    #[tokio::test]
+    async fn dst_event_source_filter_applies_to_inner_only() {
+        let inner = vec_source([
+            Event::Task(crate::event::Task {
+                id: 1,
+                running_on: None,
+            }),
+            Event::Worker(crate::event::Worker { worker_id: 2 }),
+            Event::Task(crate::event::Task {
+                id: 3,
+                running_on: None,
+            }),
+        ]);
+        let (source, handle) = DstEventSource::wrapping(inner);
+        let mut source = source.with_filter(|event| match event {
+            Event::Task(_) => None,
+            Event::Worker(_) => Some(Event::Lagged),
+            event => Some(event),
+        });
+
+        let e1 = source.next().await.unwrap();
+        assert!(matches!(e1, Event::Lagged));
+
+        // Injected task events are not filtered out.
+        handle.send_task(4, None);
+        let e2 = source.next().await.unwrap();
+        assert!(matches!(e2, Event::Task(ref t) if t.id == 4));
+
+        // The remaining inner event is filtered out, so next() blocks.
+        let result = tokio::time::timeout(Duration::from_millis(50), source.next()).await;
+        assert!(result.is_err());
     }
 
     #[tokio::test]

@@ -396,6 +396,143 @@ async fn dst_notify_timeout_recovers_from_lag(pool: sqlx::PgPool) -> anyhow::Res
     Ok(())
 }
 
+/// Regression test for timed notification waits being stranded when they
+/// suspend (iopsystems/systemslab#5412).
+///
+/// A task that waits on a notification *with a timeout* and suspends must
+/// record a `wakeup_at` so the timer can revive it even if its notification is
+/// never re-delivered. Crucially, that timer must be resolved against the
+/// injected [`DstClock`] rather than the database wall clock — otherwise a
+/// custom clock can never drive the wakeup.
+///
+/// This test never delivers a notification. The task suspends, and we advance
+/// the simulated clock past the user deadline. The runtime must then wake the
+/// task purely on the basis of the clock, and the wait must return `None`
+/// (timeout) so the workflow completes successfully.
+#[sqlx::test]
+async fn dst_notify_timeout_timer_wakeup_under_clock(pool: sqlx::PgPool) -> anyhow::Result<()> {
+    let scheduler = Arc::new(DstScheduler::new(42));
+    let start = Utc::now();
+    let clock = Arc::new(DstClock::new(start));
+    let entropy = Arc::new(DstEntropy::new(42));
+    let (event_source, event_handle) = DstEventSource::new();
+
+    // Zero suspend timeout/margin: the task suspends as soon as it enters the
+    // wait loop, and becomes wakeable the instant the clock reaches its
+    // recorded `wakeup_at`.
+    let config = Config::new()
+        .suspend_margin(Duration::ZERO)
+        .suspend_timeout(Duration::ZERO);
+
+    let _guard = durable_test::spawn_worker_with_dst_events(
+        pool.clone(),
+        config,
+        scheduler.clone(),
+        clock.clone(),
+        entropy.clone(),
+        Box::new(event_source),
+    )
+    .await?;
+
+    let client = DurableClient::new(pool.clone())?;
+    let program = crate::load_binary(&client, "notify-wait-timeout-expire.wasm").await?;
+
+    let task = client
+        .launch("dst timer wakeup", &program, &serde_json::json!(null))
+        .await?;
+
+    // Start the task.
+    event_handle.send_task(task.id(), None);
+
+    // Wait for the task to suspend, and confirm it recorded a `wakeup_at`. The
+    // workflow waits with a 120s timeout, so the deadline should land ~120s
+    // after the simulated start time. Without the fix the suspended row would
+    // have a NULL `wakeup_at` and could only be revived by a re-delivered
+    // notification.
+    let wakeup_at = timeout(Duration::from_secs(30), async {
+        loop {
+            let row = sqlx::query!(
+                r#"
+                SELECT state = 'suspended' as "suspended!", wakeup_at
+                FROM durable.task
+                WHERE id = $1
+                "#,
+                task.id()
+            )
+            .fetch_one(&pool)
+            .await?;
+
+            if row.suspended {
+                break anyhow::Ok(row.wakeup_at);
+            }
+
+            tokio::task::yield_now().await;
+        }
+    })
+    .await
+    .context("task did not suspend within 30s")??;
+
+    let wakeup_at = wakeup_at.context("suspended task must record a wakeup_at for the timer")?;
+    assert!(
+        wakeup_at >= start + Duration::from_secs(60),
+        "wakeup_at ({wakeup_at}) should be ~120s after the simulated start ({start})"
+    );
+
+    // Advance the simulated clock past the user deadline. This is the crux: the
+    // only timeline that has moved is the injected clock, so the runtime must
+    // resolve the wakeup timer against it. We never deliver a notification.
+    clock.advance(Duration::from_secs(121));
+
+    // The leader should now mark the task ready purely on the basis of the
+    // clock. Poke the worker so it re-claims the readied task.
+    timeout(Duration::from_secs(30), async {
+        loop {
+            let suspended = sqlx::query_scalar!(
+                r#"
+                SELECT state = 'suspended' as "suspended!"
+                FROM durable.task
+                WHERE id = $1
+                "#,
+                task.id()
+            )
+            .fetch_one(&pool)
+            .await?;
+
+            if !suspended {
+                break anyhow::Ok(());
+            }
+
+            event_handle.send_task(task.id(), None);
+            tokio::task::yield_now().await;
+        }
+    })
+    .await
+    .context("clock-driven wakeup did not move the task out of 'suspended' within 30s")??;
+
+    // Keep nudging the worker until it re-claims and runs the task to
+    // completion. The wait must return `None` (timeout), so the workflow
+    // asserts and exits successfully.
+    let status = timeout(Duration::from_secs(30), async {
+        loop {
+            event_handle.send_task(task.id(), None);
+            if let Ok(status) =
+                tokio::time::timeout(Duration::from_millis(250), task.wait(&client)).await
+            {
+                break status;
+            }
+        }
+    })
+    .await
+    .context("task did not complete after clock-driven wakeup")??;
+
+    assert!(
+        status.success(),
+        "task should time out cleanly and complete successfully"
+    );
+
+    Ok(())
+}
+
 /// Similar to the lag recovery test above, but the notification arrives
 /// *after* the lag event. This exercises the path where lag causes a re-poll
 /// that finds nothing, the task loops back into the select, and then the
@@ -462,4 +599,81 @@ async fn dst_notify_timeout_recovers_from_lag_then_notified(
     );
 
     Ok(())
+}
+
+/// Regression test for iopsystems/durable#121.
+///
+/// When the event source emits [`Event::Lagged`], a notification event may
+/// have been the one that was lost. Tasks blocked in memory waiting on a
+/// notification must re-poll the database instead of sleeping until
+/// `suspend_timeout` runs out.
+///
+/// The notification is inserted into the database but its event is never
+/// delivered; only an `Event::Lagged` is sent. With a 300s suspend timeout
+/// the task only completes promptly if the lag wakes it.
+///
+/// [`Event::Lagged`]: durable_runtime::event::Event::Lagged
+async fn dst_notify_lagged_wakes_waiter(pool: sqlx::PgPool, binary: &str) -> anyhow::Result<()> {
+    let scheduler = Arc::new(DstScheduler::new(42));
+    let clock = Arc::new(DstClock::new(Utc::now()));
+    let entropy = Arc::new(DstEntropy::new(42));
+    let (event_source, event_handle) = DstEventSource::new();
+
+    let config = Config::new()
+        .suspend_margin(Duration::from_secs(1))
+        .suspend_timeout(Duration::from_secs(300));
+
+    let _guard = durable_test::spawn_worker_with_dst_events(
+        pool.clone(),
+        config,
+        scheduler.clone(),
+        clock.clone(),
+        entropy.clone(),
+        Box::new(event_source),
+    )
+    .await?;
+
+    let client = DurableClient::new(pool.clone())?;
+    let program = crate::load_binary(&client, binary).await?;
+
+    let task = client
+        .launch(
+            "dst lagged wakes waiter",
+            &program,
+            &serde_json::json!(null),
+        )
+        .await?;
+
+    event_handle.send_task(task.id(), None);
+
+    // Let the task enter the wait loop.
+    tokio::time::sleep(Duration::from_secs(2)).await;
+
+    // Insert the notification but drop its event. Only report the lag.
+    task.notify("wakeup", &(), &client).await?;
+    event_handle.send_lagged();
+
+    let start = tokio::time::Instant::now();
+    let status = timeout(Duration::from_secs(15), task.wait(&client))
+        .await
+        .context("task did not complete within 15s — Event::Lagged did not wake the waiter")??;
+    let elapsed = start.elapsed();
+
+    assert!(status.success(), "task should have succeeded");
+    assert!(
+        elapsed < Duration::from_secs(10),
+        "task took {elapsed:?} after Event::Lagged, expected < 10s"
+    );
+
+    Ok(())
+}
+
+#[sqlx::test]
+async fn dst_notify_lagged_wakes_blocking_waiter(pool: sqlx::PgPool) -> anyhow::Result<()> {
+    dst_notify_lagged_wakes_waiter(pool, "notify-wait.wasm").await
+}
+
+#[sqlx::test]
+async fn dst_notify_lagged_wakes_timeout_waiter(pool: sqlx::PgPool) -> anyhow::Result<()> {
+    dst_notify_lagged_wakes_waiter(pool, "notify-wait-timeout-wakeup.wasm").await
 }

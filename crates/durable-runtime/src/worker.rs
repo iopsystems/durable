@@ -3,7 +3,6 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use anyhow::Context;
-use async_trait::async_trait;
 use cache_compute::Cached;
 use cfg_if::cfg_if;
 use chrono::{DateTime, Utc};
@@ -11,7 +10,6 @@ use futures_concurrency::future::Join;
 use futures_util::FutureExt;
 use metrics::{Counter, Gauge, Histogram};
 use serde_json::value::RawValue;
-use sqlx::postgres::PgNotification;
 use sqlx::types::Json;
 use tokio::sync::{broadcast, mpsc, Mutex, Notify, Semaphore};
 use tokio::task::JoinSet;
@@ -20,7 +18,7 @@ use tracing::Instrument;
 use wasmtime::component::Component;
 
 use crate::error::{ClonableAnyhowError, TaskStatus};
-use crate::event::{self, Event, EventSource, Notification};
+use crate::event::{self, Event, EventSource, Notification, PgEventSource};
 use crate::flag::{ShutdownFlag, ShutdownGuard};
 use crate::plugin::{DurablePlugin, Plugin};
 use crate::scheduler::{Component as SchedulerComponent, ScheduleEvent};
@@ -37,6 +35,10 @@ pub(crate) struct SharedState {
     pub(crate) storage: Arc<dyn crate::storage::Storage>,
     pub client: reqwest::Client,
     pub notifications: broadcast::Sender<Notification>,
+    /// Fired when the event source reports [`Event::Lagged`]. Notification
+    /// events may have been lost, so tasks blocked waiting on a notification
+    /// should re-poll the `notification` table.
+    pub(crate) notification_resync: broadcast::Sender<()>,
     pub config: Config,
     pub plugins: Vec<Box<dyn Plugin>>,
 
@@ -343,6 +345,7 @@ impl WorkerBuilder {
             shutdown: ShutdownFlag::new(),
             client: self.client.unwrap_or_default(),
             notifications: broadcast::channel(128).0,
+            notification_resync: broadcast::channel(1).0,
             scheduler: self
                 .scheduler
                 .unwrap_or_else(|| Arc::new(crate::scheduler::NoopScheduler)),
@@ -443,7 +446,11 @@ impl Worker {
 
     pub async fn run(&mut self) -> anyhow::Result<()> {
         let mut conn = self.shared.acquire().await?;
-        self.worker_id = self.shared.storage.insert_worker(&mut conn).await?;
+        self.worker_id = self
+            .shared
+            .storage
+            .insert_worker(&mut conn, self.shared.clock.now())
+            .await?;
         drop(conn);
 
         tracing::info!("durable worker id is {}", self.worker_id);
@@ -535,7 +542,7 @@ impl Worker {
             let mut conn = shared.acquire().await?;
             let alive = shared
                 .storage
-                .heartbeat_worker(&mut conn, worker_id)
+                .heartbeat_worker(&mut conn, worker_id, shared.clock.now())
                 .await?;
             drop(conn);
 
@@ -602,7 +609,12 @@ impl Worker {
             let mut result = if let Some(following) = following.take() {
                 shared
                     .storage
-                    .delete_following_expired_worker(&mut tx, following, timeout)
+                    .delete_following_expired_worker(
+                        &mut tx,
+                        following,
+                        timeout,
+                        shared.clock.now(),
+                    )
                     .await?
             } else {
                 Default::default()
@@ -612,7 +624,12 @@ impl Worker {
                 result.extend(std::iter::once(
                     shared
                         .storage
-                        .delete_other_expired_workers(&mut tx, worker_id, timeout)
+                        .delete_other_expired_workers(
+                            &mut tx,
+                            worker_id,
+                            timeout,
+                            shared.clock.now(),
+                        )
                         .await?,
                 ));
 
@@ -703,7 +720,11 @@ impl Worker {
             // If we don't do that all the rows here get the same random number.
             let result = shared
                 .storage
-                .wake_suspended_tasks(&mut conn, shared.config.suspend_margin.into_pg_interval())
+                .wake_suspended_tasks(
+                    &mut conn,
+                    shared.config.suspend_margin.into_pg_interval(),
+                    shared.clock.now(),
+                )
                 .await?;
 
             let count = result.rows_affected();
@@ -716,8 +737,13 @@ impl Worker {
 
             let now = shared.clock.now();
             let delay = match wakeup_at {
-                Some(wakeup_at) => now
-                    .signed_duration_since(wakeup_at)
+                // A task becomes wakeable once `now >= wakeup_at +
+                // suspend_margin` (see `wake_suspended_tasks`), so sleep until
+                // that point rather than `now - wakeup_at`, which is negative
+                // for a future wakeup and would otherwise collapse to zero and
+                // busy-loop.
+                Some(wakeup_at) => (wakeup_at + shared.config.suspend_margin)
+                    .signed_duration_since(now)
                     .to_std()
                     .unwrap_or(Duration::ZERO),
                 None => Duration::from_secs(60),
@@ -939,6 +965,7 @@ impl Worker {
 
                 // We don't know what we missed so do everything.
                 Event::Lagged => {
+                    let _ = self.shared.notification_resync.send(());
                     self.spawn_new_tasks(&tx).await?;
                     self.load_leader_id().await?;
                     self.shared.suspend.notify_waiters();
@@ -1440,93 +1467,6 @@ fn as_task_exit(error: &anyhow::Error) -> Option<TaskStatus> {
         .filter_map(|e| e.downcast_ref::<TaskStatus>())
         .copied()
         .next()
-}
-
-pub struct PgEventSource {
-    listener: sqlx::postgres::PgListener,
-}
-
-impl PgEventSource {
-    pub async fn new(pool: &sqlx::PgPool) -> sqlx::Result<Self> {
-        let mut listener = sqlx::postgres::PgListener::connect_with(pool).await?;
-
-        listener
-            .listen_all([
-                "durable:task",
-                "durable:task-suspend",
-                "durable:notification",
-                "durable:worker",
-            ])
-            .await?;
-
-        Ok(Self { listener })
-    }
-}
-
-#[async_trait]
-impl EventSource for PgEventSource {
-    async fn next(&mut self) -> anyhow::Result<Event> {
-        fn parse_event<T, F>(name: &str, event: &PgNotification, func: F) -> Event
-        where
-            F: FnOnce(T) -> Event,
-            T: serde::de::DeserializeOwned,
-        {
-            match serde_json::from_str(event.payload()) {
-                Ok(payload) => func(payload),
-                Err(e) => {
-                    tracing::warn!("listener received an invalid `{name}` notification: {e}");
-                    Event::Lagged
-                }
-            }
-        }
-
-        loop {
-            break match self.listener.try_recv().await {
-                Ok(Some(event)) => {
-                    tracing::trace!("received event {}: {}", event.channel(), event.payload());
-
-                    match event.channel() {
-                        "durable:task" => Ok(parse_event("durable:task", &event, Event::Task)),
-                        "durable:task-suspend" => Ok(parse_event(
-                            "durable:task-suspend",
-                            &event,
-                            Event::TaskSuspend,
-                        )),
-                        "durable:notification" => Ok(parse_event(
-                            "durable:notification",
-                            &event,
-                            Event::Notification,
-                        )),
-                        "durable:worker" => {
-                            Ok(parse_event("durable:worker", &event, Event::Worker))
-                        }
-                        _ => continue,
-                    }
-                }
-                Ok(None) => {
-                    while let Err(e) = sqlx::query("SELECT 1").execute(&mut self.listener).await {
-                        tracing::warn!("listener received an error: {e}");
-                        tokio::time::sleep(Duration::from_secs(1)).await;
-                    }
-
-                    Ok(Event::Lagged)
-                }
-                Err(mut e) => {
-                    loop {
-                        tracing::warn!("listener received an error: {e}");
-
-                        match sqlx::query("SELECT 1").execute(&mut self.listener).await {
-                            Ok(_) => break,
-                            Err(err) => e = err,
-                        }
-                        tokio::time::sleep(Duration::from_secs(1)).await;
-                    }
-
-                    Ok(Event::Lagged)
-                }
-            };
-        }
-    }
 }
 
 enum LoopEvent {
