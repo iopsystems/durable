@@ -110,6 +110,7 @@ impl Host for Task {
         let deadline = Instant::now() + self.state.config().suspend_timeout;
         let task_id = self.state.task_id();
         let mut rx = self.state.subscribe_notifications();
+        let mut resync = self.state.subscribe_notification_resync();
 
         let data = loop {
             let mut tx = self.state.pool().begin().await?;
@@ -132,6 +133,14 @@ impl Host for Task {
                         Ok(notif) if notif.task_id == task_id => break 'inner,
                         Ok(_) => continue 'inner,
                         Err(RecvError::Lagged(_)) => break 'inner,
+                        Err(RecvError::Closed) => {
+                            return Err(anyhow::Error::new(TaskStatus::NotScheduledOnWorker))
+                        }
+                    },
+                    // The event source lagged, so our notification event may
+                    // have been dropped. Re-poll the database.
+                    result = resync.recv() => match result {
+                        Ok(()) | Err(RecvError::Lagged(_)) => break 'inner,
                         Err(RecvError::Closed) => {
                             return Err(anyhow::Error::new(TaskStatus::NotScheduledOnWorker))
                         }
@@ -195,6 +204,7 @@ impl Host for Task {
         let suspend_timeout = self.state.config().suspend_timeout;
         let task_id = self.state.task_id();
         let mut rx = self.state.subscribe_notifications();
+        let mut resync = self.state.subscribe_notification_resync();
 
         let data = loop {
             let mut tx = self.state.pool().begin().await?;
@@ -234,6 +244,14 @@ impl Host for Task {
                         Ok(notif) if notif.task_id == task_id => break 'inner None,
                         Ok(_) => continue 'inner,
                         Err(RecvError::Lagged(_)) => break 'inner None,
+                        Err(RecvError::Closed) => {
+                            return Err(anyhow::Error::new(TaskStatus::NotScheduledOnWorker))
+                        }
+                    },
+                    // The event source lagged, so our notification event may
+                    // have been dropped. Re-poll the database.
+                    result = resync.recv() => match result {
+                        Ok(()) | Err(RecvError::Lagged(_)) => break 'inner None,
                         Err(RecvError::Closed) => {
                             return Err(anyhow::Error::new(TaskStatus::NotScheduledOnWorker))
                         }

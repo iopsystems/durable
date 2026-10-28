@@ -271,6 +271,12 @@ impl TaskState {
         self.shared.notifications.subscribe()
     }
 
+    /// Subscribe to signals that notification events may have been lost and
+    /// waiters should re-poll the database.
+    pub(crate) fn subscribe_notification_resync(&self) -> Receiver<()> {
+        self.shared.notification_resync.subscribe()
+    }
+
     /// Access the database connection pool for the worker.
     pub fn pool(&self) -> &sqlx::PgPool {
         &self.shared.pool
