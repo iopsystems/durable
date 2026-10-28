@@ -9,6 +9,7 @@ mod notify;
 mod orphaned;
 mod shutdown;
 mod sqlx;
+mod zombie;
 
 async fn load_binary(client: &DurableClient, name: &str) -> anyhow::Result<Program> {
     let program = client

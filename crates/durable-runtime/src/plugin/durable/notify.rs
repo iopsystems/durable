@@ -5,7 +5,7 @@ use tokio::sync::broadcast::error::RecvError;
 use tokio::time::Instant;
 
 use crate::bindings::durable::core::notify::{Event, Host, NotifyError};
-use crate::storage::TaskState;
+use crate::storage::{LockedTask, TaskState};
 use crate::task::TransactionOptions;
 use crate::{Task, TaskStatus};
 
@@ -32,7 +32,9 @@ async fn poll_notification(
 ///
 /// Returns `true` if the task was suspended and `false` if a notification
 /// was pending, in which case nothing was changed and the caller should go
-/// back to polling.
+/// back to polling. Returns a [`TaskStatus::NotScheduledOnWorker`] error,
+/// again without changing anything, if the task is no longer active on this
+/// worker.
 ///
 /// `wakeup_at` is the timer fallback written onto the suspended task. A plain
 /// notification wait passes `None` (it has no deadline and must not clobber an
@@ -56,30 +58,54 @@ async fn poll_notification(
 /// whose trigger ran while the task was still active and which committed after
 /// this poll was invisible to both sides, and the task stayed suspended until
 /// `unwedge_stuck_notifications` swept it up.
+///
+/// The ownership check also has to happen under the lock. If this worker's
+/// row was deleted and another worker claimed the task, that worker may have
+/// already consumed the notification. Suspending here would then leave the task
+/// suspended with nothing left to wake it.
 async fn try_suspend(task: &mut Task, wakeup_at: Option<DateTime<Utc>>) -> anyhow::Result<bool> {
     let task_id = task.task_id();
+    let worker_id = task.state.worker_id();
     let mut tx = task.state.pool().begin().await?;
 
-    task.state
+    let locked = task
+        .state
         .storage()
         .fetch_task_state_locked(&mut tx, task_id)
         .await?;
 
-    match wakeup_at {
+    let owned = matches!(
+        locked,
+        Some(LockedTask {
+            state: TaskState::Active,
+            running_on: Some(running_on),
+        }) if running_on == worker_id
+    );
+
+    if !owned {
+        tx.rollback().await?;
+        return Err(anyhow::Error::new(TaskStatus::NotScheduledOnWorker));
+    }
+
+    let storage = task.state.storage();
+    let result = match wakeup_at {
         // A timed wait records its deadline so the wakeup timer can revive it.
         Some(wakeup_at) => {
-            task.state
-                .storage()
-                .suspend_task(&mut tx, task_id, Some(wakeup_at))
-                .await?;
+            storage
+                .suspend_task(&mut tx, task_id, worker_id, Some(wakeup_at))
+                .await?
         }
         // A plain notification wait suspends without touching `wakeup_at`.
         None => {
-            task.state
-                .storage()
-                .suspend_task_no_wakeup(&mut tx, task_id)
-                .await?;
+            storage
+                .suspend_task_no_wakeup(&mut tx, task_id, worker_id)
+                .await?
         }
+    };
+
+    if result.rows_affected() == 0 {
+        tx.rollback().await?;
+        return Err(anyhow::Error::new(TaskStatus::NotScheduledOnWorker));
     }
 
     if poll_notification(&mut *task, &mut tx).await?.is_some() {
@@ -331,7 +357,10 @@ impl Host for Task {
 
             // Note: We lock the row here so that concurrent notification polls
             //       cannot barge in here.
-            let state = storage.fetch_task_state_locked(&mut *tx, task).await?;
+            let state = storage
+                .fetch_task_state_locked(&mut *tx, task)
+                .await?
+                .map(|locked| locked.state);
 
             match state {
                 Some(TaskState::Complete | TaskState::Failed) => {

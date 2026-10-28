@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n            SELECT state as \"state!: TaskState\"\n             FROM durable.task\n            WHERE task.id = $1\n            FOR UPDATE\n            ",
+  "query": "\n            SELECT\n                state as \"state!: TaskState\",\n                running_on\n             FROM durable.task\n            WHERE task.id = $1\n            FOR UPDATE\n            ",
   "describe": {
     "columns": [
       {
@@ -26,6 +26,17 @@
             "name": "state"
           }
         }
+      },
+      {
+        "ordinal": 1,
+        "name": "running_on",
+        "type_info": "Int8",
+        "origin": {
+          "Table": {
+            "table": "durable.task",
+            "name": "running_on"
+          }
+        }
       }
     ],
     "parameters": {
@@ -34,8 +45,9 @@
       ]
     },
     "nullable": [
-      false
+      false,
+      true
     ]
   },
-  "hash": "9586a1de8c2d853dc4c2e33b5b930023315c5ce96b9b77b8d32e143f05d55f51"
+  "hash": "22dcfcc570fc9b220e8c6d450f9697023aa58e4fa768162057fb264265fb7572"
 }

@@ -50,6 +50,12 @@ pub(crate) struct StoredEvent {
 }
 
 #[derive(Debug)]
+pub(crate) struct LockedTask {
+    pub state: TaskState,
+    pub running_on: Option<i64>,
+}
+
+#[derive(Debug)]
 pub(crate) struct PolledNotification {
     pub created_at: DateTime<Utc>,
     pub event: String,
@@ -170,16 +176,20 @@ pub(crate) trait Storage: Send + Sync + 'static {
         worker_id: i64,
     ) -> sqlx::Result<PgQueryResult>;
 
+    /// Only completes the task if it is still owned by `worker_id`.
     async fn mark_task_complete(
         &self,
         conn: &mut PgConnection,
         task_id: i64,
+        worker_id: i64,
     ) -> sqlx::Result<PgQueryResult>;
 
+    /// Only fails the task if it is still owned by `worker_id`.
     async fn mark_task_failed(
         &self,
         conn: &mut PgConnection,
         task_id: i64,
+        worker_id: i64,
     ) -> sqlx::Result<PgQueryResult>;
 
     async fn fetch_wasm_blob(&self, conn: &mut PgConnection, wasm_id: i64)
@@ -200,29 +210,39 @@ pub(crate) trait Storage: Send + Sync + 'static {
 
     /// Inserts an event row, optionally inserts a log row, and returns the
     /// task's `running_on` value in a single round-trip.
+    ///
+    /// The event and log rows are only inserted if the task is owned by
+    /// `worker_id`.
+    #[allow(clippy::too_many_arguments)]
     async fn commit_event_with_log(
         &self,
         conn: &mut PgConnection,
         task_id: i64,
+        worker_id: i64,
         index: i32,
         label: &str,
         value: Json<&RawValue>,
         message: Option<&str>,
     ) -> sqlx::Result<Option<i64>>;
 
+    /// Only suspends the task if it is still owned by `worker_id`.
     async fn suspend_task(
         &self,
         conn: &mut PgConnection,
         task_id: i64,
+        worker_id: i64,
         wakeup_at: Option<DateTime<Utc>>,
     ) -> sqlx::Result<PgQueryResult>;
 
     /// Suspends without touching `wakeup_at`. Used by the notification
     /// blocking path, which must not clobber an existing wakeup deadline.
+    ///
+    /// Only suspends the task if it is still owned by `worker_id`.
     async fn suspend_task_no_wakeup(
         &self,
         conn: &mut PgConnection,
         task_id: i64,
+        worker_id: i64,
     ) -> sqlx::Result<PgQueryResult>;
 
     async fn insert_log(
@@ -260,7 +280,7 @@ pub(crate) trait Storage: Send + Sync + 'static {
         &self,
         conn: &mut PgConnection,
         task_id: i64,
-    ) -> sqlx::Result<Option<TaskState>>;
+    ) -> sqlx::Result<Option<LockedTask>>;
 
     async fn insert_notification(
         &self,
