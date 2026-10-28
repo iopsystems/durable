@@ -223,6 +223,28 @@ event_handle.is_closed()             // check if worker dropped its receiver
 
 When no events are sent, the worker's event loop blocks waiting — this lets you control exactly when the worker sees new work.
 
+### Wrapping a real event source
+
+`DstEventSource::new` delivers only the events you inject. To have the worker
+also receive real PostgreSQL notifications, wrap a `PgEventSource` (exported as
+`durable_runtime::event::PgEventSource`) with `DstEventSource::wrapping`.
+A filter installed with `with_filter` can drop or rewrite events coming from
+the wrapped source to inject faults. Events sent through the handle bypass the
+filter and take priority over events from the wrapped source.
+
+```rust
+use durable_runtime::event::{Event, PgEventSource};
+
+let inner = PgEventSource::new(&pool).await?;
+let (event_source, event_handle) = DstEventSource::wrapping(Box::new(inner));
+
+// Drop every notification event, replacing it with a lagged event.
+let event_source = event_source.with_filter(|event| match event {
+    Event::Notification(_) => Some(Event::Lagged),
+    event => Some(event),
+});
+```
+
 ## Common Patterns
 
 ### Advancing the Clock in a Loop
@@ -301,6 +323,7 @@ crates/durable-runtime/src/
 ├── entropy.rs          # Entropy trait, SystemEntropy
 ├── dst.rs              # DstScheduler, DstClock, DstEntropy, DstEventSource/Handle
 ├── event/mod.rs        # Event enum, EventSource trait
+├── event/pg.rs         # PgEventSource (LISTEN/NOTIFY on the durable:* channels)
 └── worker.rs           # WorkerBuilder (accepts scheduler/clock/entropy/event_source)
 
 crates/durable-test/

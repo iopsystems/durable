@@ -3,7 +3,6 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use anyhow::Context;
-use async_trait::async_trait;
 use cache_compute::Cached;
 use cfg_if::cfg_if;
 use chrono::{DateTime, Utc};
@@ -11,7 +10,6 @@ use futures_concurrency::future::Join;
 use futures_util::FutureExt;
 use metrics::{Counter, Gauge, Histogram};
 use serde_json::value::RawValue;
-use sqlx::postgres::PgNotification;
 use sqlx::types::Json;
 use tokio::sync::{broadcast, mpsc, Mutex, Notify, Semaphore};
 use tokio::task::JoinSet;
@@ -20,7 +18,7 @@ use tracing::Instrument;
 use wasmtime::component::Component;
 
 use crate::error::{ClonableAnyhowError, TaskStatus};
-use crate::event::{self, Event, EventSource, Notification};
+use crate::event::{self, Event, EventSource, Notification, PgEventSource};
 use crate::flag::{ShutdownFlag, ShutdownGuard};
 use crate::plugin::{DurablePlugin, Plugin};
 use crate::scheduler::{Component as SchedulerComponent, ScheduleEvent};
@@ -1419,93 +1417,6 @@ fn as_task_exit(error: &anyhow::Error) -> Option<TaskStatus> {
         .filter_map(|e| e.downcast_ref::<TaskStatus>())
         .copied()
         .next()
-}
-
-pub struct PgEventSource {
-    listener: sqlx::postgres::PgListener,
-}
-
-impl PgEventSource {
-    pub async fn new(pool: &sqlx::PgPool) -> sqlx::Result<Self> {
-        let mut listener = sqlx::postgres::PgListener::connect_with(pool).await?;
-
-        listener
-            .listen_all([
-                "durable:task",
-                "durable:task-suspend",
-                "durable:notification",
-                "durable:worker",
-            ])
-            .await?;
-
-        Ok(Self { listener })
-    }
-}
-
-#[async_trait]
-impl EventSource for PgEventSource {
-    async fn next(&mut self) -> anyhow::Result<Event> {
-        fn parse_event<T, F>(name: &str, event: &PgNotification, func: F) -> Event
-        where
-            F: FnOnce(T) -> Event,
-            T: serde::de::DeserializeOwned,
-        {
-            match serde_json::from_str(event.payload()) {
-                Ok(payload) => func(payload),
-                Err(e) => {
-                    tracing::warn!("listener received an invalid `{name}` notification: {e}");
-                    Event::Lagged
-                }
-            }
-        }
-
-        loop {
-            break match self.listener.try_recv().await {
-                Ok(Some(event)) => {
-                    tracing::trace!("received event {}: {}", event.channel(), event.payload());
-
-                    match event.channel() {
-                        "durable:task" => Ok(parse_event("durable:task", &event, Event::Task)),
-                        "durable:task-suspend" => Ok(parse_event(
-                            "durable:task-suspend",
-                            &event,
-                            Event::TaskSuspend,
-                        )),
-                        "durable:notification" => Ok(parse_event(
-                            "durable:notification",
-                            &event,
-                            Event::Notification,
-                        )),
-                        "durable:worker" => {
-                            Ok(parse_event("durable:worker", &event, Event::Worker))
-                        }
-                        _ => continue,
-                    }
-                }
-                Ok(None) => {
-                    while let Err(e) = sqlx::query("SELECT 1").execute(&mut self.listener).await {
-                        tracing::warn!("listener received an error: {e}");
-                        tokio::time::sleep(Duration::from_secs(1)).await;
-                    }
-
-                    Ok(Event::Lagged)
-                }
-                Err(mut e) => {
-                    loop {
-                        tracing::warn!("listener received an error: {e}");
-
-                        match sqlx::query("SELECT 1").execute(&mut self.listener).await {
-                            Ok(_) => break,
-                            Err(err) => e = err,
-                        }
-                        tokio::time::sleep(Duration::from_secs(1)).await;
-                    }
-
-                    Ok(Event::Lagged)
-                }
-            };
-        }
-    }
 }
 
 enum LoopEvent {
