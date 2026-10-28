@@ -11,7 +11,7 @@ use sqlx::postgres::PgQueryResult;
 use sqlx::types::Json;
 use sqlx::PgConnection;
 
-use super::{PolledNotification, Storage, StoredEvent, TaskState, WorkerRecord};
+use super::{LockedTask, PolledNotification, Storage, StoredEvent, TaskState, WorkerRecord};
 use crate::task::RecordedEvent;
 use crate::worker::TaskData;
 
@@ -361,6 +361,7 @@ impl Storage for PgStorage {
         &self,
         conn: &mut PgConnection,
         task_id: i64,
+        worker_id: i64,
     ) -> sqlx::Result<PgQueryResult> {
         sqlx::query!(
             "UPDATE durable.task
@@ -369,8 +370,10 @@ impl Storage for PgStorage {
                 running_on = NULL,
                 wasm = NULL
             WHERE id = $1
+              AND running_on = $2
             ",
-            task_id
+            task_id,
+            worker_id
         )
         .execute(&mut *conn)
         .await
@@ -380,6 +383,7 @@ impl Storage for PgStorage {
         &self,
         conn: &mut PgConnection,
         task_id: i64,
+        worker_id: i64,
     ) -> sqlx::Result<PgQueryResult> {
         sqlx::query!(
             "UPDATE durable.task
@@ -387,8 +391,10 @@ impl Storage for PgStorage {
                 completed_at = CURRENT_TIMESTAMP,
                 running_on = NULL,
                 wasm = NULL
-            WHERE id = $1",
-            task_id
+            WHERE id = $1
+              AND running_on = $2",
+            task_id,
+            worker_id
         )
         .execute(&mut *conn)
         .await
@@ -456,10 +462,12 @@ impl Storage for PgStorage {
         }))
     }
 
+    #[allow(clippy::too_many_arguments)]
     async fn commit_event_with_log(
         &self,
         conn: &mut PgConnection,
         task_id: i64,
+        worker_id: i64,
         index: i32,
         label: &str,
         value: Json<&RawValue>,
@@ -482,6 +490,7 @@ impl Storage for PgStorage {
                         $3 as label,
                         $4 as value
                     FROM current_task
+                    WHERE running_on = $6
                     RETURNING task_id
                 ),
                 insert_log AS (
@@ -490,18 +499,20 @@ impl Storage for PgStorage {
                     FROM (VALUES ($1, $2, $5)) as t(task_id, index, message)
                     JOIN current_task task ON task.id = task_id
                     WHERE message IS NOT NULL
+                      AND task.running_on = $6
                     RETURNING task_id
                 )
             SELECT running_on
              FROM current_task
             LEFT JOIN insert_event event ON event.task_id = id
-            LEFT JOIN insert_event log   ON log.task_id = id
+            LEFT JOIN insert_log   log   ON log.task_id = id
             "#,
             task_id,
             index,
             label,
             value as Json<&RawValue>,
-            message
+            message,
+            worker_id
         )
         .fetch_one(&mut *conn)
         .await?;
@@ -513,15 +524,18 @@ impl Storage for PgStorage {
         &self,
         conn: &mut PgConnection,
         task_id: i64,
+        worker_id: i64,
         wakeup_at: Option<DateTime<Utc>>,
     ) -> sqlx::Result<PgQueryResult> {
         sqlx::query!(
             "UPDATE durable.task
             SET state = 'suspended',
                 running_on = NULL,
-                wakeup_at = $2
-            WHERE id = $1",
+                wakeup_at = $3
+            WHERE id = $1
+              AND running_on = $2",
             task_id,
+            worker_id,
             wakeup_at
         )
         .execute(&mut *conn)
@@ -532,14 +546,17 @@ impl Storage for PgStorage {
         &self,
         conn: &mut PgConnection,
         task_id: i64,
+        worker_id: i64,
     ) -> sqlx::Result<PgQueryResult> {
         sqlx::query!(
             "UPDATE durable.task
               SET state = 'suspended',
                   running_on = NULL
             WHERE id = $1
+              AND running_on = $2
             ",
-            task_id
+            task_id,
+            worker_id
         )
         .execute(&mut *conn)
         .await
@@ -621,10 +638,12 @@ impl Storage for PgStorage {
         &self,
         conn: &mut PgConnection,
         task_id: i64,
-    ) -> sqlx::Result<Option<TaskState>> {
-        sqlx::query_scalar!(
+    ) -> sqlx::Result<Option<LockedTask>> {
+        let record = sqlx::query!(
             r#"
-            SELECT state as "state!: TaskState"
+            SELECT
+                state as "state!: TaskState",
+                running_on
              FROM durable.task
             WHERE task.id = $1
             FOR UPDATE
@@ -632,7 +651,12 @@ impl Storage for PgStorage {
             task_id
         )
         .fetch_optional(&mut *conn)
-        .await
+        .await?;
+
+        Ok(record.map(|r| LockedTask {
+            state: r.state,
+            running_on: r.running_on,
+        }))
     }
 
     async fn insert_notification(

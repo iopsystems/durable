@@ -597,8 +597,14 @@ impl TaskState {
         //
         // Doing this all at once has multiple advantages:
         // - We avoid multiple roundtrips to the database.
-        // - Since all the statements are conditional on running_on = worker_id,
-        //   we can run this outside of a transaction with no issues.
+        // - Since both inserts are conditional on running_on = worker_id, we
+        //   can run this outside of a transaction with no issues.
+        //
+        // The running_on check uses the statement's snapshot, so an execution
+        // on a worker whose row is concurrently being deleted can still insert
+        // an event that the task's new owner then also tries to insert. The
+        // owner gets a primary key violation, which `Worker::run_task` treats
+        // as a lost race and retries the task.
         let value = serde_json::value::to_raw_value(data)?;
         let running_on = self
             .shared
@@ -606,6 +612,7 @@ impl TaskState {
             .commit_event_with_log(
                 &mut *conn,
                 self.task_id(),
+                self.worker_id,
                 self.txn_index,
                 &txn.label,
                 Json(&*value),
@@ -637,17 +644,23 @@ impl TaskState {
     /// connection is part of a transaction you can ensure that other state has
     /// not been modified before committing the transaction.
     ///
-    /// On success, returns a [`TaskState`] object that should be returned as an
-    /// error.
+    /// On success, returns a [`TaskStatus`] object that should be returned as
+    /// an error. This is [`TaskStatus::NotScheduledOnWorker`] if the task is no
+    /// longer running on this worker, in which case nothing was changed.
     pub async fn suspend(
         &mut self,
         conn: &mut PgConnection,
         timeout: Option<DateTime<Utc>>,
     ) -> anyhow::Result<TaskStatus> {
-        self.shared
+        let result = self
+            .shared
             .storage
-            .suspend_task(&mut *conn, self.task_id(), timeout)
+            .suspend_task(&mut *conn, self.task_id(), self.worker_id, timeout)
             .await?;
+
+        if result.rows_affected() == 0 {
+            return Ok(TaskStatus::NotScheduledOnWorker);
+        }
 
         Ok(TaskStatus::Suspend)
     }

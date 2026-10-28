@@ -1110,6 +1110,26 @@ impl Worker {
                         _ => (),
                     }
 
+                    if is_event_conflict(&error) {
+                        // Another execution of this task recorded the same
+                        // event first. That happens when a worker misses its
+                        // heartbeats, its row is deleted, and we claim the
+                        // task while its execution is still running. Neither
+                        // execution did anything wrong, so start over from the
+                        // recorded events if we still own the task.
+                        let mut conn = shared.pool.acquire().await?;
+                        let result = shared
+                            .storage
+                            .reset_task_for_retry(&mut conn, task_id, worker_id)
+                            .await?;
+
+                        if result.rows_affected() == 0 {
+                            break TaskStatus::NotScheduledOnWorker;
+                        }
+
+                        break TaskStatus::Suspend;
+                    }
+
                     let message = format!("{error:?}\n");
 
                     let result = async {
@@ -1161,6 +1181,39 @@ impl Worker {
             };
         };
 
+        // The final writes below only apply if we still own the task. If
+        // another worker has claimed it in the meantime then we treat it as
+        // having been taken from us.
+        let status = match status {
+            TaskStatus::ExitSuccess => {
+                let mut conn = shared.pool.acquire().await?;
+                let result = shared
+                    .storage
+                    .mark_task_complete(&mut conn, task_id, worker_id)
+                    .await?;
+
+                if result.rows_affected() == 0 {
+                    TaskStatus::NotScheduledOnWorker
+                } else {
+                    TaskStatus::ExitSuccess
+                }
+            }
+            TaskStatus::ExitFailure => {
+                let mut conn = shared.pool.acquire().await?;
+                let result = shared
+                    .storage
+                    .mark_task_failed(&mut conn, task_id, worker_id)
+                    .await?;
+
+                if result.rows_affected() == 0 {
+                    TaskStatus::NotScheduledOnWorker
+                } else {
+                    TaskStatus::ExitFailure
+                }
+            }
+            status => status,
+        };
+
         match status {
             TaskStatus::NotScheduledOnWorker => {
                 tracing::debug!("task {task_id} was taken by another worker");
@@ -1178,12 +1231,6 @@ impl Worker {
                 });
             }
             TaskStatus::ExitSuccess => {
-                let mut conn = shared.pool.acquire().await?;
-                shared
-                    .storage
-                    .mark_task_complete(&mut conn, task_id)
-                    .await?;
-
                 shared.metrics.task_complete.increment(1);
                 shared.scheduler.notify(ScheduleEvent::TaskCompleted {
                     task_id,
@@ -1191,9 +1238,6 @@ impl Worker {
                 });
             }
             TaskStatus::ExitFailure => {
-                let mut conn = shared.pool.acquire().await?;
-                shared.storage.mark_task_failed(&mut conn, task_id).await?;
-
                 shared.metrics.task_failed.increment(1);
                 shared.scheduler.notify(ScheduleEvent::TaskCompleted {
                     task_id,
@@ -1495,7 +1539,31 @@ fn find_sqlx_error(error: &anyhow::Error) -> Option<&sqlx::Error> {
     error.chain().filter_map(|e| e.downcast_ref()).next()
 }
 
+/// Whether `error` is a primary key conflict on the `durable.event` or
+/// `durable.log` row for a workflow transaction.
+///
+/// `commit_event_with_log` only inserts these rows while the task is running on
+/// the current worker, but that check uses the statement's snapshot. An
+/// execution on a worker whose row is being deleted can still insert the
+/// event after another worker has claimed the task and started on the same
+/// transaction. The second insert then conflicts.
+fn is_event_conflict(error: &anyhow::Error) -> bool {
+    let Some(sqlx::Error::Database(error)) = find_sqlx_error(error) else {
+        return false;
+    };
+
+    error.is_unique_violation()
+        && matches!(
+            (error.table(), error.constraint()),
+            (Some("event"), Some("event_pkey")) | (Some("log"), Some("log_pkey"))
+        )
+}
+
 fn is_recoverable_error(error: &anyhow::Error) -> bool {
+    if is_event_conflict(error) {
+        return true;
+    }
+
     if let Some(error) = find_sqlx_error(error) {
         return matches!(
             error,
