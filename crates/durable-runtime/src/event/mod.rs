@@ -1,8 +1,10 @@
 use async_trait::async_trait;
 
 mod events;
+mod pg;
 
 pub use self::events::*;
+pub use self::pg::{PgEventSource, CHANNELS};
 
 #[derive(Clone, Debug)]
 pub enum Event {
