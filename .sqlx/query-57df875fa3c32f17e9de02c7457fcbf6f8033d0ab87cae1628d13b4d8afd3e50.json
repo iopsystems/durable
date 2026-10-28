@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n            INSERT INTO durable.worker(heartbeat_at)\n            VALUES (CURRENT_TIMESTAMP)\n            RETURNING id\n            ",
+  "query": "\n            INSERT INTO durable.worker(heartbeat_at)\n            VALUES ($1)\n            RETURNING id\n            ",
   "describe": {
     "columns": [
       {
@@ -16,11 +16,13 @@
       }
     ],
     "parameters": {
-      "Left": []
+      "Left": [
+        "Timestamptz"
+      ]
     },
     "nullable": [
       false
     ]
   },
-  "hash": "7f746180eb4a64c9d07789d04ea2e173479e1a82efe0f289bb4baa03642a32b1"
+  "hash": "57df875fa3c32f17e9de02c7457fcbf6f8033d0ab87cae1628d13b4d8afd3e50"
 }

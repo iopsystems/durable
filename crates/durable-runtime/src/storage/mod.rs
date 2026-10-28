@@ -63,7 +63,12 @@ pub(crate) trait Storage: Send + Sync + 'static {
     #[allow(dead_code)]
     fn pool(&self) -> &sqlx::PgPool;
 
-    async fn insert_worker(&self, conn: &mut PgConnection) -> sqlx::Result<i64>;
+    /// `now` is the runtime's [`Clock`](crate::clock::Clock) view of the
+    /// current time, used to seed the worker's initial heartbeat so that
+    /// liveness is tracked on the injected clock's timeline rather than the
+    /// database wall clock.
+    async fn insert_worker(&self, conn: &mut PgConnection, now: DateTime<Utc>)
+        -> sqlx::Result<i64>;
 
     async fn delete_worker(
         &self,
@@ -71,22 +76,34 @@ pub(crate) trait Storage: Send + Sync + 'static {
         worker_id: i64,
     ) -> sqlx::Result<PgQueryResult>;
 
+    /// Records a heartbeat at `now` (the injected clock's current time).
+    ///
     /// Returns `true` if the row still exists.
-    async fn heartbeat_worker(&self, conn: &mut PgConnection, worker_id: i64)
-        -> sqlx::Result<bool>;
+    async fn heartbeat_worker(
+        &self,
+        conn: &mut PgConnection,
+        worker_id: i64,
+        now: DateTime<Utc>,
+    ) -> sqlx::Result<bool>;
 
+    /// `now` is the injected clock's current time, against which heartbeat
+    /// expiry is measured (rather than the database wall clock).
     async fn delete_following_expired_worker(
         &self,
         conn: &mut PgConnection,
         following: i64,
         timeout: PgInterval,
+        now: DateTime<Utc>,
     ) -> sqlx::Result<PgQueryResult>;
 
+    /// `now` is the injected clock's current time, against which heartbeat
+    /// expiry is measured (rather than the database wall clock).
     async fn delete_other_expired_workers(
         &self,
         conn: &mut PgConnection,
         worker_id: i64,
         timeout: PgInterval,
+        now: DateTime<Utc>,
     ) -> sqlx::Result<PgQueryResult>;
 
     /// See `Worker::validate_workers` for the algorithm.
@@ -99,10 +116,15 @@ pub(crate) trait Storage: Send + Sync + 'static {
     /// The leader is the oldest worker.
     async fn load_leader_id(&self, conn: &mut PgConnection) -> sqlx::Result<Option<i64>>;
 
+    /// `now` is the injected clock's current time. Suspended tasks are woken
+    /// once `wakeup_at` (which is also written from the injected clock) is at
+    /// least `suspend_margin` in the past relative to `now`, so that
+    /// timer-based wakeup is driven entirely by the runtime's clock.
     async fn wake_suspended_tasks(
         &self,
         conn: &mut PgConnection,
         suspend_margin: PgInterval,
+        now: DateTime<Utc>,
     ) -> sqlx::Result<PgQueryResult>;
 
     async fn next_wakeup_at(&self, conn: &mut PgConnection) -> sqlx::Result<Option<DateTime<Utc>>>;

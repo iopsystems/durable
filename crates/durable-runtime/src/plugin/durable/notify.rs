@@ -34,6 +34,11 @@ async fn poll_notification(
 /// was pending, in which case nothing was changed and the caller should go
 /// back to polling.
 ///
+/// `wakeup_at` is the timer fallback written onto the suspended task. A plain
+/// notification wait passes `None` (it has no deadline and must not clobber an
+/// existing `wakeup_at`); a timed wait passes `Some(deadline)` so the task is
+/// revived by the wakeup timer even if its notification is never re-delivered.
+///
 /// The task row is locked `FOR UPDATE` before anything else. A notification
 /// inserted by another transaction holds `FOR KEY SHARE` on the task row from
 /// its `fk_task` check until that transaction commits, and `FOR UPDATE`
@@ -51,7 +56,7 @@ async fn poll_notification(
 /// whose trigger ran while the task was still active and which committed after
 /// this poll was invisible to both sides, and the task stayed suspended until
 /// `unwedge_stuck_notifications` swept it up.
-async fn try_suspend(task: &mut Task) -> anyhow::Result<bool> {
+async fn try_suspend(task: &mut Task, wakeup_at: Option<DateTime<Utc>>) -> anyhow::Result<bool> {
     let task_id = task.task_id();
     let mut tx = task.state.pool().begin().await?;
 
@@ -60,10 +65,22 @@ async fn try_suspend(task: &mut Task) -> anyhow::Result<bool> {
         .fetch_task_state_locked(&mut tx, task_id)
         .await?;
 
-    task.state
-        .storage()
-        .suspend_task_no_wakeup(&mut tx, task_id)
-        .await?;
+    match wakeup_at {
+        // A timed wait records its deadline so the wakeup timer can revive it.
+        Some(wakeup_at) => {
+            task.state
+                .storage()
+                .suspend_task(&mut tx, task_id, Some(wakeup_at))
+                .await?;
+        }
+        // A plain notification wait suspends without touching `wakeup_at`.
+        None => {
+            task.state
+                .storage()
+                .suspend_task_no_wakeup(&mut tx, task_id)
+                .await?;
+        }
+    }
 
     if poll_notification(&mut *task, &mut tx).await?.is_some() {
         // A notification arrived before we took the lock. Roll back so it
@@ -123,7 +140,7 @@ impl Host for Task {
                 }
 
                 // The timer expired, so we need to attempt to suspend.
-                if !try_suspend(self).await? {
+                if !try_suspend(self, None).await? {
                     break 'inner;
                 }
 
@@ -147,14 +164,35 @@ impl Host for Task {
             );
         }
 
+        let timeout = std::time::Duration::from_nanos(timeout_ns);
+
+        // Durably record the absolute deadline as a recorded event *before* the
+        // result. This is what gives the timed wait a timer fallback: it is
+        // - computed from the injected `Clock` (so a `DstClock` controls it),
+        //   and
+        // - persisted, so it survives a suspend/replay cycle. On replay we read
+        //   the recorded value back rather than recomputing a fresh deadline.
+        let deadline_options =
+            TransactionOptions::new("durable:core/notify.notification-blocking-timeout.deadline");
+        let deadline: DateTime<Utc> =
+            match self.state.enter::<DateTime<Utc>>(deadline_options).await? {
+                Some(deadline) => deadline,
+                None => {
+                    let deadline = chrono::Duration::from_std(timeout)
+                        .ok()
+                        .and_then(|d| self.state.clock().now().checked_add_signed(d))
+                        .unwrap_or(DateTime::<Utc>::MAX_UTC);
+                    self.state.exit(&deadline).await?;
+                    deadline
+                }
+            };
+
         let options = TransactionOptions::new("durable:core/notify.notification-blocking-timeout");
         if let Some(event) = self.state.enter::<Option<EventData>>(options).await? {
             return Ok(event.map(Into::into));
         }
 
-        let timeout = std::time::Duration::from_nanos(timeout_ns);
-        let user_deadline = Instant::now() + timeout;
-        let suspend_deadline = Instant::now() + self.state.config().suspend_timeout;
+        let suspend_timeout = self.state.config().suspend_timeout;
         let task_id = self.state.task_id();
         let mut rx = self.state.subscribe_notifications();
 
@@ -170,6 +208,16 @@ impl Host for Task {
             }
 
             tx.rollback().await?;
+
+            // Compute the time remaining until the user deadline using the
+            // injected clock. If it has already elapsed (e.g. we were revived
+            // by the wakeup timer at `deadline`), `user_deadline` is now and
+            // the select below resolves the timeout immediately.
+            let remaining = (deadline - self.state.clock().now())
+                .to_std()
+                .unwrap_or(std::time::Duration::ZERO);
+            let user_deadline = Instant::now() + remaining;
+            let suspend_deadline = Instant::now() + suspend_timeout;
 
             // Wait for either a notification, the user timeout, or the suspend
             // timeout — whichever comes first.
@@ -219,10 +267,12 @@ impl Host for Task {
                     break None;
                 }
 
-                // The suspend timeout expired. Attempt to suspend the task so
-                // we free up the worker slot, just like notification_blocking.
+                // The suspend timeout expired. Suspend the task to free up the
+                // worker slot, recording `deadline` as the wakeup time so the
+                // task is revived by the timer even if its notification is
+                // never re-delivered.
                 Some(Expired::Suspend) => {
-                    if !try_suspend(self).await? {
+                    if !try_suspend(self, Some(deadline)).await? {
                         continue;
                     }
 
