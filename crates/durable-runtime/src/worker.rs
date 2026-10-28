@@ -37,6 +37,10 @@ pub(crate) struct SharedState {
     pub(crate) storage: Arc<dyn crate::storage::Storage>,
     pub client: reqwest::Client,
     pub notifications: broadcast::Sender<Notification>,
+    /// Fired when the event source reports [`Event::Lagged`]. Notification
+    /// events may have been lost, so tasks blocked waiting on a notification
+    /// should re-poll the `notification` table.
+    pub(crate) notification_resync: broadcast::Sender<()>,
     pub config: Config,
     pub plugins: Vec<Box<dyn Plugin>>,
 
@@ -343,6 +347,7 @@ impl WorkerBuilder {
             shutdown: ShutdownFlag::new(),
             client: self.client.unwrap_or_default(),
             notifications: broadcast::channel(128).0,
+            notification_resync: broadcast::channel(1).0,
             scheduler: self
                 .scheduler
                 .unwrap_or_else(|| Arc::new(crate::scheduler::NoopScheduler)),
@@ -962,6 +967,7 @@ impl Worker {
 
                 // We don't know what we missed so do everything.
                 Event::Lagged => {
+                    let _ = self.shared.notification_resync.send(());
                     self.spawn_new_tasks(&tx).await?;
                     self.load_leader_id().await?;
                     self.shared.suspend.notify_waiters();

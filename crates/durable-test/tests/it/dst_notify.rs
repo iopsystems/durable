@@ -600,3 +600,80 @@ async fn dst_notify_timeout_recovers_from_lag_then_notified(
 
     Ok(())
 }
+
+/// Regression test for iopsystems/durable#121.
+///
+/// When the event source emits [`Event::Lagged`], a notification event may
+/// have been the one that was lost. Tasks blocked in memory waiting on a
+/// notification must re-poll the database instead of sleeping until
+/// `suspend_timeout` runs out.
+///
+/// The notification is inserted into the database but its event is never
+/// delivered; only an `Event::Lagged` is sent. With a 300s suspend timeout
+/// the task only completes promptly if the lag wakes it.
+///
+/// [`Event::Lagged`]: durable_runtime::event::Event::Lagged
+async fn dst_notify_lagged_wakes_waiter(pool: sqlx::PgPool, binary: &str) -> anyhow::Result<()> {
+    let scheduler = Arc::new(DstScheduler::new(42));
+    let clock = Arc::new(DstClock::new(Utc::now()));
+    let entropy = Arc::new(DstEntropy::new(42));
+    let (event_source, event_handle) = DstEventSource::new();
+
+    let config = Config::new()
+        .suspend_margin(Duration::from_secs(1))
+        .suspend_timeout(Duration::from_secs(300));
+
+    let _guard = durable_test::spawn_worker_with_dst_events(
+        pool.clone(),
+        config,
+        scheduler.clone(),
+        clock.clone(),
+        entropy.clone(),
+        Box::new(event_source),
+    )
+    .await?;
+
+    let client = DurableClient::new(pool.clone())?;
+    let program = crate::load_binary(&client, binary).await?;
+
+    let task = client
+        .launch(
+            "dst lagged wakes waiter",
+            &program,
+            &serde_json::json!(null),
+        )
+        .await?;
+
+    event_handle.send_task(task.id(), None);
+
+    // Let the task enter the wait loop.
+    tokio::time::sleep(Duration::from_secs(2)).await;
+
+    // Insert the notification but drop its event. Only report the lag.
+    task.notify("wakeup", &(), &client).await?;
+    event_handle.send_lagged();
+
+    let start = tokio::time::Instant::now();
+    let status = timeout(Duration::from_secs(15), task.wait(&client))
+        .await
+        .context("task did not complete within 15s — Event::Lagged did not wake the waiter")??;
+    let elapsed = start.elapsed();
+
+    assert!(status.success(), "task should have succeeded");
+    assert!(
+        elapsed < Duration::from_secs(10),
+        "task took {elapsed:?} after Event::Lagged, expected < 10s"
+    );
+
+    Ok(())
+}
+
+#[sqlx::test]
+async fn dst_notify_lagged_wakes_blocking_waiter(pool: sqlx::PgPool) -> anyhow::Result<()> {
+    dst_notify_lagged_wakes_waiter(pool, "notify-wait.wasm").await
+}
+
+#[sqlx::test]
+async fn dst_notify_lagged_wakes_timeout_waiter(pool: sqlx::PgPool) -> anyhow::Result<()> {
+    dst_notify_lagged_wakes_waiter(pool, "notify-wait-timeout-wakeup.wasm").await
+}
