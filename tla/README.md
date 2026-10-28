@@ -57,10 +57,19 @@ the `.cfg` files.
 
 ## Findings
 
-These traces come from walking the code by hand and building the model to
-match. Run `check.sh` to confirm them with TLC.
+TLC (v1.7.4) results on a 4-core machine:
+
+| Config              | Result                                         | Distinct states | Time   |
+|---------------------|------------------------------------------------|-----------------|--------|
+| `zombie.cfg`        | `NoSpuriousFailure` violated, 19-step trace    | 86,730 (partial)| 28s    |
+| `zombie-stuck.cfg`  | `AllTasksFinish` violated, 26-step trace       | 241,012         | 29s    |
+| `zombie-fenced.cfg` | no errors                                      | 2,339,527       | 17min  |
+| `crash.cfg`         | running at time of writing; no errors at 1.6M  |                 |        |
 
 ### A worker that misses its heartbeat can fail or wedge the task it was running
+
+Issues: [#125](https://github.com/iopsystems/durable/issues/125) (stuck),
+[#126](https://github.com/iopsystems/durable/issues/126) (wrongly failed).
 
 If a worker cannot heartbeat for `heartbeat_timeout` (120s by default) but is
 still running, another worker deletes its row. Possible causes are a long
@@ -102,7 +111,9 @@ either of these happens:
 
 - One execution records event *i* between the other's `enter` and `exit`. The
   second `INSERT` hits the `durable.event` primary key, the error is not
-  recoverable, and `mark_task_failed` fails the task.
+  recoverable, and `mark_task_failed` fails the task. This is the trace TLC
+  reports: the zombie inserts event 1 and then stops with
+  `NotScheduledOnWorker`, and the new owner hits the conflict and fails the task.
 - Worker 2 completes the task (`wasm = NULL`). Worker 1 then tries to suspend
   it, `check_wasm_while_active` rejects the update, and that error also ends
   in `mark_task_failed`. The task goes from `complete` to `failed`, which also
@@ -124,6 +135,8 @@ A zombie cannot re-claim its own tasks, because `fk_worker` rejects
 `running_on` values with no worker row. The model includes that.
 
 ### Not modelled: the leader loop spins while a timer is pending
+
+Issue: [#127](https://github.com/iopsystems/durable/issues/127).
 
 In `Worker::leader` (`worker.rs`), the next sleep is computed as
 
