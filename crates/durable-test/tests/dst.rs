@@ -697,3 +697,129 @@ async fn dst_event_source_controls_notifications(pool: sqlx::PgPool) -> anyhow::
     guard.handle().shutdown();
     Ok(())
 }
+
+/// Test that the leader sleeps until a suspended task is due instead of
+/// polling the database while it waits.
+///
+/// Scenario: insert a task suspended until 30s from now and start a worker.
+/// The leader should only run a bounded number of times while the clock is
+/// frozen. Once the `DstClock` passes `wakeup_at + suspend_margin` the leader
+/// runs again and wakes the task.
+///
+/// `wake_suspended_tasks` compares `wakeup_at` against Postgres' `NOW()`,
+/// which follows the wall clock rather than the `DstClock`. To let the task
+/// become due without waiting in real time, the test moves `wakeup_at` into
+/// the database's past after the leader has gone to sleep. The leader still
+/// decides when to look again based on the `DstClock`, which is what this
+/// test checks.
+#[sqlx::test]
+async fn leader_sleeps_until_suspended_task_is_due(pool: sqlx::PgPool) -> anyhow::Result<()> {
+    let suspend_margin = Duration::from_secs(10);
+    let start: chrono::DateTime<Utc> = sqlx::query_scalar("SELECT NOW()").fetch_one(&pool).await?;
+    let wakeup_at = start + chrono::Duration::seconds(30);
+
+    let scheduler = Arc::new(DstScheduler::new(42));
+    let clock = Arc::new(DstClock::new(start));
+    let entropy = Arc::new(DstEntropy::new(42));
+    // No events are injected, so the leader is only woken by the clock.
+    let (event_source, _event_handle) = DstEventSource::new();
+
+    let config = Config::new()
+        .suspend_margin(suspend_margin)
+        .suspend_timeout(Duration::from_secs(1));
+
+    // The task never runs, so it does not need a valid program.
+    let wasm_id: i64 = sqlx::query_scalar(
+        "INSERT INTO durable.wasm(hash, wasm) VALUES ('\\x00'::bytea, '\\x00'::bytea) RETURNING id",
+    )
+    .fetch_one(&pool)
+    .await?;
+    let task_id: i64 = sqlx::query_scalar(
+        "INSERT INTO durable.task(name, state, wakeup_at, wasm, data)
+         VALUES ('dst-leader-sleep', 'suspended', $1, $2, 'null')
+         RETURNING id",
+    )
+    .bind(wakeup_at)
+    .bind(wasm_id)
+    .fetch_one(&pool)
+    .await?;
+
+    let guard = durable_test::spawn_worker_with_dst_events(
+        pool.clone(),
+        config,
+        scheduler.clone(),
+        clock.clone(),
+        entropy.clone(),
+        Box::new(event_source),
+    )
+    .await?;
+
+    let leader_count = || {
+        scheduler
+            .acquires()
+            .iter()
+            .filter(|c| matches!(c, Component::Leader { .. }))
+            .count()
+    };
+    let tasks_woken = || {
+        scheduler
+            .events()
+            .iter()
+            .any(|e| matches!(e, ScheduleEvent::TasksWoken { .. }))
+    };
+
+    tokio::time::timeout(Duration::from_secs(5), async {
+        while leader_count() == 0 {
+            tokio::task::yield_now().await;
+        }
+    })
+    .await
+    .expect("leader should run within 5 seconds");
+
+    // With the clock frozen the leader should go to sleep after its first
+    // pass, plus perhaps one more as the leader id is loaded at startup. If
+    // it computed the wrong delay it would spin and acquire many times here.
+    tokio::time::sleep(Duration::from_millis(500)).await;
+    let before = leader_count();
+    assert!(
+        before <= 3,
+        "leader should not poll while the task is not yet due, but acquired {before} times"
+    );
+    assert!(!tasks_woken(), "task should not be woken before it is due");
+
+    // Make the task due as far as Postgres is concerned.
+    sqlx::query("UPDATE durable.task SET wakeup_at = wakeup_at - interval '1 hour' WHERE id = $1")
+        .bind(task_id)
+        .execute(&pool)
+        .await?;
+
+    // Just short of wakeup_at + suspend_margin the leader is still asleep.
+    clock.set(wakeup_at + suspend_margin - Duration::from_secs(1));
+    tokio::time::sleep(Duration::from_millis(200)).await;
+    assert_eq!(
+        leader_count(),
+        before,
+        "leader should not run before wakeup_at + suspend_margin"
+    );
+    assert!(!tasks_woken(), "task should not be woken before it is due");
+
+    // Once the clock passes wakeup_at + suspend_margin the leader wakes the
+    // task.
+    clock.set(wakeup_at + suspend_margin);
+    tokio::time::timeout(Duration::from_secs(5), async {
+        scheduler
+            .wait_for_event(|e| matches!(e, ScheduleEvent::TasksWoken { count: 1 }))
+            .await;
+    })
+    .await
+    .expect("leader should wake the task once it is due");
+
+    let state: String = sqlx::query_scalar("SELECT state::text FROM durable.task WHERE id = $1")
+        .bind(task_id)
+        .fetch_one(&pool)
+        .await?;
+    assert_ne!(state, "suspended", "task should no longer be suspended");
+
+    guard.handle().shutdown();
+    Ok(())
+}

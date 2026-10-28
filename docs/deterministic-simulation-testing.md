@@ -314,6 +314,20 @@ tokio::time::timeout(Duration::from_secs(5), async {
 }).await?;
 ```
 
+### Postgres Time vs. DstClock
+
+`DstClock` controls the time the runtime sees, but queries that use Postgres'
+`NOW()` still follow the wall clock. For example, the leader decides when to
+look for suspended tasks using the `DstClock`, while `wake_suspended_tasks`
+only wakes tasks with `wakeup_at <= NOW() - suspend_margin`.
+
+When a test needs a row to become due without waiting in real time, update
+the row so it is due according to Postgres and then advance the `DstClock` to
+drive the runtime. See `leader_sleeps_until_suspended_task_is_due` in
+`crates/durable-test/tests/dst.rs` for an example: it checks that the leader
+sleeps until `wakeup_at + suspend_margin` rather than polling the database,
+and that it wakes the task once the clock passes that point.
+
 ## File Layout
 
 ```
