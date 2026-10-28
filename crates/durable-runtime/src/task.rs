@@ -271,6 +271,12 @@ impl TaskState {
         self.shared.notifications.subscribe()
     }
 
+    /// Subscribe to signals that notification events may have been lost and
+    /// waiters should re-poll the database.
+    pub(crate) fn subscribe_notification_resync(&self) -> Receiver<()> {
+        self.shared.notification_resync.subscribe()
+    }
+
     /// Access the database connection pool for the worker.
     pub fn pool(&self) -> &sqlx::PgPool {
         &self.shared.pool
@@ -421,7 +427,14 @@ impl TaskState {
                 std::any::type_name::<T>()
             )
         }) {
-            Ok(value) => Ok(Some(value)),
+            Ok(value) => {
+                // Advance past the replayed event, mirroring the database hit
+                // path in `enter_impl` (the guest does not call `exit` on
+                // replay, so nothing else advances the index). Without this a
+                // second cached `enter` would re-read this same event.
+                self.txn_index += 1;
+                Ok(Some(value))
+            }
             Err(e) => {
                 self.events.clear();
                 Err(e)
