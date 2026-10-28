@@ -156,6 +156,26 @@ fn next_backoff(backoff: Duration, max: Duration) -> Duration {
     backoff.saturating_mul(2).min(max)
 }
 
+/// How long the leader should sleep before it can wake the task suspended
+/// until `wakeup_at`.
+///
+/// `wake_suspended_tasks` only wakes tasks once `wakeup_at + suspend_margin`
+/// has passed, so waking any earlier would not find anything to do.
+fn next_wakeup_delay(
+    now: DateTime<Utc>,
+    wakeup_at: DateTime<Utc>,
+    suspend_margin: Duration,
+) -> Duration {
+    let margin = chrono::Duration::from_std(suspend_margin).unwrap_or(chrono::Duration::MAX);
+
+    wakeup_at
+        .signed_duration_since(now)
+        .checked_add(&margin)
+        .unwrap_or(chrono::Duration::MAX)
+        .to_std()
+        .unwrap_or(Duration::ZERO)
+}
+
 pub(crate) struct SharedMetrics {
     task_spawn: Counter,
     task_suspend: Counter,
@@ -715,15 +735,10 @@ impl Worker {
             let wakeup_at = shared.storage.next_wakeup_at(&mut conn).await?;
 
             let now = shared.clock.now();
-            let delay = match wakeup_at {
-                Some(wakeup_at) => now
-                    .signed_duration_since(wakeup_at)
-                    .to_std()
-                    .unwrap_or(Duration::ZERO),
+            sleep_duration = match wakeup_at {
+                Some(wakeup_at) => next_wakeup_delay(now, wakeup_at, shared.config.suspend_margin),
                 None => Duration::from_secs(60),
             };
-
-            sleep_duration = delay;
         }
 
         Ok(())
@@ -1513,7 +1528,9 @@ fn is_recoverable_error(error: &anyhow::Error) -> bool {
 mod tests {
     use std::time::Duration;
 
-    use super::next_backoff;
+    use chrono::{TimeZone, Utc};
+
+    use super::{next_backoff, next_wakeup_delay};
 
     #[test]
     fn next_backoff_doubles_until_clamped() {
@@ -1546,5 +1563,37 @@ mod tests {
         // Doubling near the representable maximum must saturate rather than
         // panic, and the clamp still applies.
         assert_eq!(next_backoff(Duration::MAX, max), max);
+    }
+
+    #[test]
+    fn next_wakeup_delay_waits_for_wakeup_plus_margin() {
+        let now = Utc.with_ymd_and_hms(2026, 1, 1, 0, 0, 0).unwrap();
+        let margin = Duration::from_secs(10);
+
+        // A wakeup in the future waits until wakeup_at + suspend_margin.
+        assert_eq!(
+            next_wakeup_delay(now, now + chrono::Duration::seconds(30), margin),
+            Duration::from_secs(40)
+        );
+
+        // A wakeup that is due now still has to wait out the margin.
+        assert_eq!(next_wakeup_delay(now, now, margin), margin);
+
+        // A wakeup within the margin waits for the remainder of the margin.
+        assert_eq!(
+            next_wakeup_delay(now, now - chrono::Duration::seconds(4), margin),
+            Duration::from_secs(6)
+        );
+
+        // A wakeup that has already passed wakeup_at + suspend_margin does not
+        // wait at all.
+        assert_eq!(
+            next_wakeup_delay(now, now - chrono::Duration::seconds(10), margin),
+            Duration::ZERO
+        );
+        assert_eq!(
+            next_wakeup_delay(now, now - chrono::Duration::seconds(60), margin),
+            Duration::ZERO
+        );
     }
 }
