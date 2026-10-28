@@ -64,7 +64,7 @@ TLC (v1.7.4) results on a 4-core machine:
 | `zombie.cfg`        | `NoSpuriousFailure` violated, 19-step trace    | 86,730 (partial)| 28s    |
 | `zombie-stuck.cfg`  | `AllTasksFinish` violated, 26-step trace       | 241,012         | 29s    |
 | `zombie-fenced.cfg` | no errors                                      | 2,339,527       | 17min  |
-| `crash.cfg`         | running at time of writing; no errors at 1.6M  |                 |        |
+| `crash.cfg`         | no errors; stopped before finishing (4.0M states still queued) | 10,798,926 (partial) | 2h |
 
 ### A worker that misses its heartbeat can fail or wedge the task it was running
 
