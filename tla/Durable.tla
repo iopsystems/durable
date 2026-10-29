@@ -18,7 +18,9 @@
 (*  - Task executions: replaying recorded events, committing new ones      *)
 (*    (commit_event_with_log), sleeping (wasi poll -> suspend_task),       *)
 (*    waiting for notifications (notify.rs: notification_blocking,         *)
-(*    try_suspend) and finishing (mark_task_complete / mark_task_failed).  *)
+(*    notification_blocking_timeout, try_suspend) and finishing            *)
+(*    (mark_task_complete / mark_task_failed). Every write an execution    *)
+(*    makes to its own task is fenced on running_on = this worker (#130).  *)
 (*  - Faults: worker crashes, a worker that misses heartbeats while still  *)
 (*    running ("zombie"), transient database errors inside a task, and     *)
 (*    dropped LISTEN connections.                                          *)
@@ -34,6 +36,10 @@
 (*   "txn"   - any transaction that just records a result (e.g. http).    *)
 (*   "wait"  - notification_blocking: consumes one notification.           *)
 (*   "sleep" - a long sleep that suspends the task until a timer fires.    *)
+(*   "twait" - notification_blocking_timeout: returns a notification if    *)
+(*             one arrives before the deadline, and None otherwise. Its    *)
+(*             deadline is recorded by a separate event first; write a     *)
+(*             "txn" step before it to model that.                         *)
 (* Programs never fail on their own, never wait for a notification that is *)
 (* not eventually sent and never block forever. So any task that fails or  *)
 (* never completes is the runtime's fault, not the workflow's.             *)
@@ -50,30 +56,34 @@ CONSTANTS
     MaxLate,        \* Bound on missed heartbeats, across all workers.
     MaxTransient,   \* Bound on transient (Io/PoolTimedOut) errors in tasks.
     MaxReconnects,  \* Bound on dropped LISTEN connections.
-    Fenced,         \* TRUE models the proposed running_on fencing fix.
+    CommitLocksTask,\* TRUE models the proposed FOR SHARE in commit_event_with_log.
     Null            \* SQL NULL.
 
 ASSUME
     /\ IsFiniteSet(Workers) /\ Workers \subseteq Nat /\ Workers # {}
     /\ IsFiniteSet(Tasks) /\ Tasks \subseteq Nat /\ Tasks # {}
     /\ Null \notin Workers
-    /\ \A i \in 1..Len(Prog) : Prog[i] \in {"txn", "wait", "sleep"}
+    /\ \A i \in 1..Len(Prog) : Prog[i] \in {"txn", "wait", "sleep", "twait"}
     \* `deadline` below tracks a single timer per task.
-    /\ Cardinality({i \in 1..Len(Prog) : Prog[i] = "sleep"}) <= 1
+    /\ Cardinality({i \in 1..Len(Prog) : Prog[i] \in {"sleep", "twait"}}) <= 1
     /\ MaxTasks \in Nat \ {0}
     /\ CrashWorkers \subseteq Workers
     /\ FlakyWorkers \subseteq Workers
     /\ {MaxLate, MaxTransient, MaxReconnects} \subseteq Nat
-    /\ Fenced \in BOOLEAN
+    /\ CommitLocksTask \in BOOLEAN
 
+\* Every plain wait is eventually sent its notification. A timed wait may
+\* or may not be; that is what the timeout is for.
 NumWaits == Cardinality({i \in 1..Len(Prog) : Prog[i] = "wait"})
+NumSends == Cardinality({i \in 1..Len(Prog) : Prog[i] \in {"wait", "twait"}})
 
 Min(S) == CHOOSE x \in S : \A y \in S : x <= y
 Max(S) == CHOOSE x \in S : \A y \in S : y <= x
 
 TaskStates == {"none", "ready", "active", "suspended", "complete", "failed"}
 Final      == {"complete", "failed"}
-Phases     == {"run", "commit", "sleep", "poll", "waiting", "error"}
+Phases     == {"run", "commit", "sleep", "poll", "waiting", "tpoll",
+               "twaiting", "error"}
 
 VARIABLES
     \* ---- worker processes and the durable.worker table ----
@@ -96,7 +106,7 @@ VARIABLES
     nq,         \* Number of rows in durable.notification for each task.
     sent,       \* Number of notifications the outside world has sent.
     recorded,   \* Number of rows in durable.event for each task.
-    deadline,   \* Whether the task's sleep deadline has passed.
+    deadline,   \* Whether the task's sleep or timed wait deadline passed.
 
     \* ---- task executions running inside worker processes ----
     execs,      \* Set of [w, t, pc, ph]; pc = next transaction index.
@@ -127,8 +137,8 @@ TypeOK ==
     /\ task \in [Tasks -> [state : TaskStates,
                            ro : Workers \cup {Null},
                            timer : BOOLEAN]]
-    /\ nq \in [Tasks -> 0..NumWaits]
-    /\ sent \in [Tasks -> 0..NumWaits]
+    /\ nq \in [Tasks -> 0..NumSends]
+    /\ sent \in [Tasks -> 0..NumSends]
     /\ recorded \in [Tasks -> 0..Len(Prog)]
     /\ deadline \in [Tasks -> BOOLEAN]
     /\ execs \subseteq Exec
@@ -172,8 +182,9 @@ Shutdown(w) ==
    release_owned_ready_tasks if this worker is now full.
 
    `clear` says whether this call consumes the worker's pending evSpawn.
-   Sets task, execs, blocked, evSpawn and wstatus. *)
-Spawn(w, clear) ==
+   `base` is the worker's set of executions before the claimed ones are
+   added. Sets task, execs, blocked, evSpawn and wstatus. *)
+Spawn(w, clear, base) ==
     LET mine      == {e \in execs : e.w = w}
         len       == Cardinality(mine)
         claimable == {t \in Tasks :
@@ -209,7 +220,7 @@ Spawn(w, clear) ==
                              ELSE IF t \in released
                                   THEN [task[t] EXCEPT !.ro = Null]
                                   ELSE task[t]]
-               /\ execs' = execs \cup
+               /\ execs' = base \cup
                              {[w |-> w, t |-> t, pc |-> 0, ph |-> "run"] :
                                 t \in claimed}
                /\ blocked' = IF full THEN [blocked EXCEPT ![w] = TRUE]
@@ -372,7 +383,7 @@ ProcessJoin(w) ==
     /\ wstatus[w] = "running"
     /\ joinWake[w]
     /\ joinWake' = [joinWake EXCEPT ![w] = FALSE]
-    /\ IF blocked[w] THEN Spawn(w, FALSE)
+    /\ IF blocked[w] THEN Spawn(w, FALSE, execs)
                      ELSE UNCHANGED <<task, execs, blocked, evSpawn, wstatus>>
     /\ UNCHANGED <<leader, evNotif, evWorker, evLagged>>
     /\ PEUnchanged
@@ -381,18 +392,26 @@ ProcessJoin(w) ==
 ProcessSpawn(w) ==
     /\ wstatus[w] = "running"
     /\ evSpawn[w]
-    /\ Spawn(w, TRUE)
+    /\ Spawn(w, TRUE, execs)
     /\ UNCHANGED <<leader, evNotif, evWorker, evLagged, joinWake>>
     /\ PEUnchanged
 
+\* Executions on worker w, of a task in ts, that are waiting for a
+\* notification go back to polling.
+RepollSet(w, ts) ==
+    {IF e.w = w /\ e.t \in ts /\ e.ph \in {"waiting", "twaiting"}
+              THEN [e EXCEPT !.ph = IF e.ph = "waiting" THEN "poll" ELSE "tpoll"]
+              ELSE e : e \in execs}
+
+Repoll(w, ts) == execs' = RepollSet(w, ts)
+
 \* Event::Notification: rebroadcast to this worker's tasks. Executions of
-\* that task waiting in notification_blocking go back to polling.
+\* that task waiting for a notification go back to polling.
 ProcessNotif(w, t) ==
     /\ wstatus[w] = "running"
     /\ t \in evNotif[w]
     /\ evNotif' = [evNotif EXCEPT ![w] = @ \ {t}]
-    /\ execs' = {IF e.w = w /\ e.t = t /\ e.ph = "waiting"
-                 THEN [e EXCEPT !.ph = "poll"] ELSE e : e \in execs}
+    /\ Repoll(w, {t})
     /\ UNCHANGED <<wstatus, leader, blocked, evSpawn, evWorker, evLagged,
                    joinWake, task>>
     /\ PEUnchanged
@@ -410,12 +429,13 @@ ProcessWorker(w, v) ==
                    task, execs>>
     /\ PEUnchanged
 
-\* Event::Lagged: spawn_new_tasks and load_leader_id.
+\* Event::Lagged: wake every notification wait on this worker
+\* (notification_resync), then spawn_new_tasks and load_leader_id.
 ProcessLagged(w) ==
     /\ wstatus[w] = "running"
     /\ evLagged[w]
     /\ evLagged' = [evLagged EXCEPT ![w] = FALSE]
-    /\ Spawn(w, FALSE)
+    /\ Spawn(w, FALSE, RepollSet(w, Tasks))
     /\ leader' = [leader EXCEPT ![w] = LeaderOf(rows)]
     /\ UNCHANGED <<evNotif, evWorker, joinWake>>
     /\ PEUnchanged
@@ -447,11 +467,11 @@ Launch(t) ==
                    nq, sent, recorded, deadline, execs, faultVars>>
 
 \* durable-client notify: INSERT INTO durable.notification. The
-\* notify_notification trigger wakes the task if it is suspended. Every
-\* notification a workflow waits for is eventually sent exactly once.
-SendNotify(t) ==
+\* notify_notification trigger wakes the task if it is suspended. At most
+\* `max` notifications are sent to each task.
+SendNotify(t, max) ==
     /\ task[t].state # "none"
-    /\ sent[t] < NumWaits
+    /\ sent[t] < max
     /\ sent' = [sent EXCEPT ![t] = @ + 1]
     /\ nq' = [nq EXCEPT ![t] = @ + 1]
     /\ evNotif' = [x \in Workers |->
@@ -510,17 +530,19 @@ ExecEnter(e) ==
        THEN Advance(e, [e EXCEPT !.pc = e.pc + 1])
        ELSE LET k   == Prog[e.pc + 1]
                 nph == IF k = "wait" THEN "poll"
+                       ELSE IF k = "twait" THEN "tpoll"
                        ELSE IF k = "sleep" /\ ~deadline[e.t] THEN "sleep"
                        ELSE "commit"
             IN  Advance(e, [e EXCEPT !.ph = nph])
     /\ UNCHANGED <<task, nq, recorded, evSpawn>>
     /\ ExecUnchanged
 
-\* The workflow returned: TaskStatus::ExitSuccess -> mark_task_complete.
+\* The workflow returned: TaskStatus::ExitSuccess -> mark_task_complete,
+\* which only applies if we still own the task.
 ExecComplete(e) ==
     /\ e.ph = "run"
     /\ e.pc = Len(Prog)
-    /\ IF ~Fenced \/ Owns(e)
+    /\ IF Owns(e)
        THEN task' = [task EXCEPT ![e.t].state = "complete", ![e.t].ro = Null]
        ELSE UNCHANGED task
     /\ Finish(e)
@@ -537,38 +559,50 @@ Fail(e) ==
     /\ Advance(e, [e EXCEPT !.ph = "error"])
     /\ UNCHANGED <<task, evSpawn>>
 
-\* TaskState::exit -> commit_event_with_log, outside a database transaction.
-\* The event INSERT does not look at running_on, so a primary key conflict
-\* (someone else already recorded this index) is reported before the
-\* running_on check. That error is not recoverable, so the task fails.
-\* If the INSERT succeeds but running_on is not us, the event stays and we
-\* get NotScheduledOnWorker.
+\* commit_event_with_log for the event at index e.pc, plus whatever else
+\* the same database transaction does (`consume` notifications). The
+\* INSERT only happens if running_on = us, otherwise we get
+\* NotScheduledOnWorker.
 \*
-\* Fenced: the INSERT is conditional on running_on = us, and a conflict is
-\* treated as a lost race (reset for retry) instead of a workflow failure.
+\* The running_on check uses the statement's snapshot, so an execution whose
+\* worker row is being deleted concurrently can still insert the event after
+\* the new owner has claimed the task. The model allows that stale insert
+\* whenever the execution has lost the task, which is more often than in
+\* reality. Whoever inserts second gets a primary key conflict, which
+\* run_task treats as a lost race: reset for retry if we still own the task,
+\* NotScheduledOnWorker otherwise.
+\*
+\* CommitLocksTask: current_task takes FOR SHARE on the task row. That
+\* conflicts with the running_on = NULL update from deleting the worker row,
+\* so the check sees the latest running_on and there is no stale insert.
+CommitEvent(e, consume) ==
+    LET take == IF consume > 0 THEN nq' = [nq EXCEPT ![e.t] = @ - consume]
+                           ELSE UNCHANGED nq
+    IN
+    IF recorded[e.t] > e.pc
+    THEN Finish(e) /\ ResetForRetry(e) /\ UNCHANGED <<nq, recorded>>
+    ELSE IF Owns(e)
+    THEN /\ take
+         /\ RecordEvent(e.t)
+         /\ Advance(e, [e EXCEPT !.pc = e.pc + 1, !.ph = "run"])
+         /\ UNCHANGED <<task, evSpawn>>
+    ELSE \/ Quit(e) /\ UNCHANGED <<nq, recorded>>
+         \/ ~CommitLocksTask /\ take /\ RecordEvent(e.t) /\ Quit(e)
+
+\* TaskState::exit -> commit_event_with_log, outside a database transaction.
 ExecCommit(e) ==
     /\ e.ph = "commit"
-    /\ IF Fenced /\ ~Owns(e)
-       THEN Quit(e) /\ UNCHANGED recorded
-       ELSE IF recorded[e.t] > e.pc
-       THEN IF Fenced
-            THEN Finish(e) /\ ResetForRetry(e) /\ UNCHANGED recorded
-            ELSE Fail(e) /\ UNCHANGED recorded
-       ELSE IF Owns(e)
-       THEN /\ RecordEvent(e.t)
-            /\ Advance(e, [e EXCEPT !.pc = e.pc + 1, !.ph = "run"])
-            /\ UNCHANGED <<task, evSpawn>>
-       ELSE RecordEvent(e.t) /\ Quit(e)
-    /\ UNCHANGED nq
+    /\ CommitEvent(e, 0)
     /\ ExecUnchanged
 
 \* wasi poll/block with a deadline beyond suspend_timeout:
-\* TaskState::suspend -> suspend_task. The UPDATE only filters on id. If the
-\* task is already final its wasm is NULL and check_wasm_while_active rejects
-\* the UPDATE; that error is not recoverable, so the task fails.
+\* TaskState::suspend -> suspend_task, which only applies if we still own
+\* the task. If the task is already final its wasm is NULL and
+\* check_wasm_while_active rejects the UPDATE; that error is not
+\* recoverable, so the task fails.
 ExecSleep(e) ==
     /\ e.ph = "sleep"
-    /\ IF Fenced /\ ~Owns(e)
+    /\ IF ~Owns(e)
        THEN Quit(e)
        ELSE IF task[e.t].state \in Final
        THEN Fail(e)
@@ -579,54 +613,59 @@ ExecSleep(e) ==
     /\ UNCHANGED <<nq, recorded>>
     /\ ExecUnchanged
 
-\* notification_blocking: poll_notification and the exit commit share one
-\* database transaction, so a notification is consumed iff its event is
-\* recorded. A running_on mismatch rolls it back (NotScheduledOnWorker); a
-\* primary key conflict rolls it back and fails the task.
+\* The phase an execution waits in after an empty poll.
+WaitPhase(e) == IF e.ph = "tpoll" THEN "twaiting" ELSE "waiting"
+PollPhase(e) == IF e.ph = "twaiting" THEN "tpoll" ELSE "poll"
+
+\* notification_blocking and notification_blocking_timeout: poll_notification
+\* and the exit commit share one database transaction, so a notification is
+\* consumed iff its event is recorded.
 ExecPoll(e) ==
-    /\ e.ph = "poll"
+    /\ e.ph \in {"poll", "tpoll"}
     /\ IF nq[e.t] = 0
-       THEN /\ Advance(e, [e EXCEPT !.ph = "waiting"])
+       THEN /\ Advance(e, [e EXCEPT !.ph = WaitPhase(e)])
             /\ UNCHANGED <<task, evSpawn, nq, recorded>>
-       ELSE IF Fenced /\ ~Owns(e)
-       THEN Quit(e) /\ UNCHANGED <<nq, recorded>>
-       ELSE IF recorded[e.t] > e.pc
-       THEN IF Fenced
-            THEN Finish(e) /\ ResetForRetry(e) /\ UNCHANGED <<nq, recorded>>
-            ELSE Fail(e) /\ UNCHANGED <<nq, recorded>>
-       ELSE IF Owns(e)
-       THEN /\ nq' = [nq EXCEPT ![e.t] = @ - 1]
-            /\ RecordEvent(e.t)
-            /\ Advance(e, [e EXCEPT !.pc = e.pc + 1, !.ph = "run"])
-            /\ UNCHANGED <<task, evSpawn>>
-       ELSE Quit(e) /\ UNCHANGED <<nq, recorded>>
+       ELSE CommitEvent(e, 1)
     /\ ExecUnchanged
 
-\* notification_blocking hits suspend_timeout and calls try_suspend: lock
-\* the row, suspend_task_no_wakeup, poll once more and roll back if a
-\* notification is there. Nothing checks that this execution still owns
-\* the task.
+\* notification_blocking_timeout: the user's deadline has passed. Poll once
+\* more; record the notification if there is one, and None otherwise.
+ExecUserTimeout(e) ==
+    /\ e.ph = "twaiting"
+    /\ deadline[e.t]
+    /\ CommitEvent(e, IF nq[e.t] > 0 THEN 1 ELSE 0)
+    /\ ExecUnchanged
+
+\* The wait hits suspend_timeout and calls try_suspend: lock the row, check
+\* that the task is still active on this worker, suspend it, then poll once
+\* more and roll back if a notification is there.
 \*
-\* Fenced: try_suspend also checks running_on = us after taking the lock.
+\* A plain wait uses suspend_task_no_wakeup, which leaves wakeup_at alone.
+\* A timed wait uses suspend_task with its recorded deadline, so the timer
+\* revives it even if its notification never arrives. A timed wait only
+\* gets here while its deadline is in the future: otherwise the user timeout
+\* fires first (it is earlier in the biased select!).
 ExecTimeout(e) ==
-    /\ e.ph = "waiting"
-    /\ IF Fenced /\ ~Owns(e)
+    /\ \/ e.ph = "waiting"
+       \/ e.ph = "twaiting" /\ ~deadline[e.t]
+    /\ IF ~Owns(e) \/ task[e.t].state # "active"
        THEN Quit(e)
-       ELSE IF task[e.t].state \in Final
-       THEN Fail(e)
        ELSE IF nq[e.t] > 0
-       THEN Advance(e, [e EXCEPT !.ph = "poll"]) /\ UNCHANGED <<task, evSpawn>>
+       THEN Advance(e, [e EXCEPT !.ph = PollPhase(e)])
+            /\ UNCHANGED <<task, evSpawn>>
        ELSE /\ task' = [task EXCEPT ![e.t].state = "suspended",
-                                    ![e.t].ro = Null]
+                                    ![e.t].ro = Null,
+                                    ![e.t].timer = (e.ph = "twaiting" \/ @)]
             /\ Finish(e)
             /\ UNCHANGED evSpawn
     /\ UNCHANGED <<nq, recorded>>
     /\ ExecUnchanged
 
-\* TaskStatus::ExitFailure -> mark_task_failed, which only filters on id.
+\* TaskStatus::ExitFailure -> mark_task_failed, which only applies if we
+\* still own the task.
 ExecFail(e) ==
     /\ e.ph = "error"
-    /\ IF ~Fenced \/ Owns(e)
+    /\ IF Owns(e)
        THEN task' = [task EXCEPT ![e.t].state = "failed", ![e.t].ro = Null]
        ELSE UNCHANGED task
     /\ Finish(e)
@@ -649,6 +688,7 @@ ExecStep(e) ==
     \/ ExecCommit(e)
     \/ ExecSleep(e)
     \/ ExecPoll(e)
+    \/ ExecUserTimeout(e)
     \/ ExecTimeout(e)
     \/ ExecFail(e)
 
@@ -696,7 +736,7 @@ WorkerNext(w) ==
 
 Next ==
     \/ \E w \in Workers : WorkerNext(w)
-    \/ \E t \in Tasks : Launch(t) \/ SendNotify(t) \/ Tick(t)
+    \/ \E t \in Tasks : Launch(t) \/ SendNotify(t, NumSends) \/ Tick(t)
     \/ \E e \in execs : ExecStep(e) \/ ExecTransient(e)
 
 \* Everything the system does on its own is weakly fair. Faults (Crash,
@@ -718,7 +758,8 @@ Fairness ==
           /\ \A v \in Workers : WF_vars(ProcessWorker(w, v))
     /\ \A t \in Tasks :
           /\ WF_vars(Launch(t))
-          /\ WF_vars(SendNotify(t))
+          \* Only the notifications for plain waits have to be sent.
+          /\ WF_vars(SendNotify(t, NumWaits))
           /\ WF_vars(Tick(t))
     /\ \A w \in Workers, t \in Tasks :
           WF_vars(\E e \in execs : e.w = w /\ e.t = t /\ ExecStep(e))
