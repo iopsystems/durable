@@ -30,8 +30,10 @@ the `.cfg` files.
 | `crash.cfg`  | wait, then sleep            | crash, transient task errors, LISTEN drop    |
 | `zombie.cfg` | wait, then sleep            | a worker misses heartbeats but keeps running, transient task errors, LISTEN drop |
 | `timed.cfg`  | `notification_blocking_timeout` | same as `zombie.cfg`                     |
+| `zombie-locked.cfg` | wait, then sleep     | same as `zombie.cfg`, plus the proposed fix for #133 (`CommitLocksTask`) |
 
-All properties are expected to hold in every config.
+All properties are expected to hold except in `zombie.cfg`, which finds
+[#133](https://github.com/iopsystems/durable/issues/133).
 
 ## Properties
 
@@ -71,6 +73,32 @@ TLC (v1.7.4) results on a 4-core machine, for the code as of #130:
 |--------------|-----------|-----------------|--------|
 RESULTS
 
+### Open: a stale `running_on` snapshot can still strand a task
+
+Issue: [#133](https://github.com/iopsystems/durable/issues/133).
+
+`commit_event_with_log` checks `running_on` in a plain `SELECT`, so the
+check reads the statement's snapshot. #130 handles the event primary-key
+conflict this can cause, but `zombie.cfg` finds a trace with no conflict
+(worker 1 is the zombie, worker 2 the new owner, `Prog = <<"wait", "sleep">>`):
+
+1. Worker 1's execution is in `notification_blocking`. In one transaction it
+   deletes the notification and inserts event 0. The `running_on` check
+   still sees worker 1.
+2. Before that commits, worker 2 reaps worker 1 and claims the task. Its
+   execution polls, waits on the notification row worker 1 has locked, and
+   finds nothing once worker 1 commits.
+3. Worker 2 hits `suspend_timeout`, and `try_suspend` suspends the task with
+   no `wakeup_at`.
+
+The task is `suspended`, with no timer and no pending notification, so
+nothing wakes it again.
+
+**Proposed fix** (`CommitLocksTask = TRUE`, `zombie-locked.cfg`): add
+`FOR SHARE` to `current_task`. That conflicts with the reaper's
+`running_on = NULL` update, so either the check sees `NULL`, or the reaper
+waits until the event has committed and the new owner replays it.
+
 ### Fixed
 
 The first version of the model found three bugs, all since fixed:
@@ -86,7 +114,8 @@ The first version of the model found three bugs, all since fixed:
   conflict (or a suspend of an already-completed task) failed the task. Every
   write an execution makes to its own task is now conditional on
   `running_on = worker_id`, and an event conflict is retried instead of
-  failing the task. `zombie.cfg` used to fail and now passes.
+  failing the task. The two original traces no longer reproduce, but see
+  #133 above.
 - [#127](https://github.com/iopsystems/durable/issues/127), fixed in #129. The
   leader computed its sleep as `now - wakeup_at` and so spun until the next
   suspended task was due. The model has no clock, so it cannot see this; it

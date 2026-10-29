@@ -56,6 +56,7 @@ CONSTANTS
     MaxLate,        \* Bound on missed heartbeats, across all workers.
     MaxTransient,   \* Bound on transient (Io/PoolTimedOut) errors in tasks.
     MaxReconnects,  \* Bound on dropped LISTEN connections.
+    CommitLocksTask,\* TRUE models the proposed FOR SHARE in commit_event_with_log.
     Null            \* SQL NULL.
 
 ASSUME
@@ -69,6 +70,7 @@ ASSUME
     /\ CrashWorkers \subseteq Workers
     /\ FlakyWorkers \subseteq Workers
     /\ {MaxLate, MaxTransient, MaxReconnects} \subseteq Nat
+    /\ CommitLocksTask \in BOOLEAN
 
 \* Every plain wait is eventually sent its notification. A timed wait may
 \* or may not be; that is what the timeout is for.
@@ -569,6 +571,10 @@ Fail(e) ==
 \* reality. Whoever inserts second gets a primary key conflict, which
 \* run_task treats as a lost race: reset for retry if we still own the task,
 \* NotScheduledOnWorker otherwise.
+\*
+\* CommitLocksTask: current_task takes FOR SHARE on the task row. That
+\* conflicts with the running_on = NULL update from deleting the worker row,
+\* so the check sees the latest running_on and there is no stale insert.
 CommitEvent(e, consume) ==
     LET take == IF consume > 0 THEN nq' = [nq EXCEPT ![e.t] = @ - consume]
                            ELSE UNCHANGED nq
@@ -581,7 +587,7 @@ CommitEvent(e, consume) ==
          /\ Advance(e, [e EXCEPT !.pc = e.pc + 1, !.ph = "run"])
          /\ UNCHANGED <<task, evSpawn>>
     ELSE \/ Quit(e) /\ UNCHANGED <<nq, recorded>>
-         \/ take /\ RecordEvent(e.t) /\ Quit(e)
+         \/ ~CommitLocksTask /\ take /\ RecordEvent(e.t) /\ Quit(e)
 
 \* TaskState::exit -> commit_event_with_log, outside a database transaction.
 ExecCommit(e) ==
