@@ -71,7 +71,10 @@ TLC (v1.7.4) results on a 4-core machine, for the code as of #130:
 
 | Config       | Result    | Distinct states | Time   |
 |--------------|-----------|-----------------|--------|
-RESULTS
+| `zombie.cfg` | `AllTasksComplete` violated, 19-step trace (#133) | 1,553,189 (partial) | 17min |
+| `zombie-locked.cfg` | no errors                         | 2,339,527       | 34min  |
+| `timed.cfg`  | no errors                                | 3,004,070       | 42min  |
+| `crash.cfg`  | no errors; stopped before finishing (4.0M states still queued). Not re-run since #130 | 10,798,926 (partial) | 2h |
 
 ### Open: a stale `running_on` snapshot can still strand a task
 
