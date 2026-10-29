@@ -1495,10 +1495,10 @@ fn find_sqlx_error(error: &anyhow::Error) -> Option<&sqlx::Error> {
 /// `durable.log` row for a workflow transaction.
 ///
 /// `commit_event_with_log` only inserts these rows while the task is running on
-/// the current worker, but that check uses the statement's snapshot. An
-/// execution on a worker whose row is being deleted can still insert the
-/// event after another worker has claimed the task and started on the same
-/// transaction. The second insert then conflicts.
+/// the current worker, and it locks the task row so that check cannot use a
+/// stale `running_on`. This should therefore no longer happen, but if a stale
+/// execution does record an event that the task's owner also tries to record,
+/// the owner has lost a race and should retry the task rather than fail it.
 fn is_event_conflict(error: &anyhow::Error) -> bool {
     let Some(sqlx::Error::Database(error)) = find_sqlx_error(error) else {
         return false;

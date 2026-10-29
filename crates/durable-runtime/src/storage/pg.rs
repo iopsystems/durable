@@ -494,6 +494,7 @@ impl Storage for PgStorage {
                     FROM durable.task
                     WHERE id = $1
                     LIMIT 1
+                    FOR SHARE
                 ),
                 insert_event AS (
                     INSERT INTO durable.event(task_id, index, label, value)
@@ -612,6 +613,22 @@ impl Storage for PgStorage {
         )
         .execute(&mut *conn)
         .await
+    }
+
+    async fn lock_task_shared(&self, conn: &mut PgConnection, task_id: i64) -> sqlx::Result<()> {
+        sqlx::query!(
+            r#"
+            SELECT id
+             FROM durable.task
+            WHERE id = $1
+            FOR SHARE
+            "#,
+            task_id
+        )
+        .fetch_optional(&mut *conn)
+        .await?;
+
+        Ok(())
     }
 
     async fn poll_notification(

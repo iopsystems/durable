@@ -28,6 +28,28 @@ async fn poll_notification(
     Ok(data)
 }
 
+/// Poll for a notification in a transaction that will go on to commit it as
+/// an event.
+///
+/// The event commit locks the task row `FOR SHARE` (see #133). This takes that
+/// lock before the notification row is locked, so the locks are acquired in
+/// the same order as in [`try_suspend`], which locks the task row `FOR UPDATE`
+/// and then polls. Otherwise a stale execution holding the notification and
+/// the task's current owner suspending in `try_suspend` could deadlock, and
+/// the owner could be the one that is aborted.
+async fn poll_notification_for_commit(
+    task: &mut Task,
+    tx: &mut sqlx::PgConnection,
+) -> anyhow::Result<Option<EventData>> {
+    let task_id = task.state.task_id();
+    task.state
+        .storage()
+        .lock_task_shared(&mut *tx, task_id)
+        .await?;
+
+    poll_notification(task, tx).await
+}
+
 /// Try to suspend a task that is waiting on a notification.
 ///
 /// Returns `true` if the task was suspended and `false` if a notification
@@ -140,7 +162,7 @@ impl Host for Task {
 
         let data = loop {
             let mut tx = self.state.pool().begin().await?;
-            let data = poll_notification(&mut *self, &mut tx).await?;
+            let data = poll_notification_for_commit(&mut *self, &mut tx).await?;
 
             if let Some(data) = data {
                 let txn = self.state.transaction_mut().unwrap();
@@ -234,7 +256,7 @@ impl Host for Task {
 
         let data = loop {
             let mut tx = self.state.pool().begin().await?;
-            let data = poll_notification(&mut *self, &mut tx).await?;
+            let data = poll_notification_for_commit(&mut *self, &mut tx).await?;
 
             if let Some(data) = data {
                 let txn = self.state.transaction_mut().unwrap();
@@ -299,7 +321,7 @@ impl Host for Task {
                 // notification that may have arrived concurrently.
                 Some(Expired::User) => {
                     let mut tx = self.state.pool().begin().await?;
-                    let data = poll_notification(&mut *self, &mut tx).await?;
+                    let data = poll_notification_for_commit(&mut *self, &mut tx).await?;
 
                     if let Some(data) = data {
                         let txn = self.state.transaction_mut().unwrap();

@@ -613,11 +613,11 @@ impl TaskState {
         // - Since both inserts are conditional on running_on = worker_id, we
         //   can run this outside of a transaction with no issues.
         //
-        // The running_on check uses the statement's snapshot, so an execution
-        // on a worker whose row is concurrently being deleted can still insert
-        // an event that the task's new owner then also tries to insert. The
-        // owner gets a primary key violation, which `Worker::run_task` treats
-        // as a lost race and retries the task.
+        // The task row is locked FOR SHARE, so the running_on check sees the
+        // latest committed value. If our worker row is being deleted
+        // concurrently, either the delete commits first and nothing is
+        // inserted, or it waits for our transaction to commit and the task's
+        // next owner replays the event (#133).
         let value = serde_json::value::to_raw_value(data)?;
         let running_on = self
             .shared

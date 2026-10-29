@@ -212,7 +212,9 @@ pub(crate) trait Storage: Send + Sync + 'static {
     /// task's `running_on` value in a single round-trip.
     ///
     /// The event and log rows are only inserted if the task is owned by
-    /// `worker_id`.
+    /// `worker_id`. The task row is locked `FOR SHARE` so the ownership check
+    /// sees the latest committed `running_on` and a concurrent release of the
+    /// task waits for the surrounding transaction to commit.
     #[allow(clippy::too_many_arguments)]
     async fn commit_event_with_log(
         &self,
@@ -262,6 +264,14 @@ pub(crate) trait Storage: Send + Sync + 'static {
         index: i32,
         message: &str,
     ) -> sqlx::Result<PgQueryResult>;
+
+    /// Locks the task row `FOR SHARE` for the duration of the surrounding
+    /// transaction.
+    ///
+    /// Polling for a notification takes this lock before it locks the
+    /// notification row, so that it acquires locks in the same order as
+    /// `try_suspend` and the event commit that follows the poll.
+    async fn lock_task_shared(&self, conn: &mut PgConnection, task_id: i64) -> sqlx::Result<()>;
 
     async fn poll_notification(
         &self,
