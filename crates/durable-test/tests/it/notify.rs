@@ -396,3 +396,59 @@ async fn notify_uncommitted_during_suspend(pool: sqlx::PgPool) -> anyhow::Result
 
     Ok(())
 }
+
+/// A task whose journal was recorded by a runtime that predates the timed-wait
+/// deadline event must still replay.
+///
+/// Older runtimes recorded only the result of `wait_with_timeout`, with no
+/// `notification-blocking-timeout.deadline` event before it. When such a task
+/// replays on a newer runtime, the result event sits where the deadline event
+/// is now expected. That must not be treated as non-determinism, or every
+/// in-flight task that has finished a timed wait fails across an upgrade.
+#[sqlx::test]
+async fn notify_wait_timeout_legacy_journal(pool: sqlx::PgPool) -> anyhow::Result<()> {
+    let client = DurableClient::new(pool.clone())?;
+    let program = crate::load_binary(&client, "notify-wait-timeout-wakeup.wasm").await?;
+
+    let task = client
+        .launch(
+            "notify wait timeout legacy journal test",
+            &program,
+            &serde_json::json!(null),
+        )
+        .await?;
+
+    // Seed the journal the way an older runtime would have left it: the timed
+    // wait's result at index 0, and no deadline event.
+    sqlx::query!(
+        "INSERT INTO durable.event(task_id, index, label, value)
+         VALUES ($1, 0, 'durable:core/notify.notification-blocking-timeout', $2)",
+        task.id(),
+        serde_json::json!({
+            "created_at": "2026-01-01T00:00:00Z",
+            "event": "wakeup",
+            "data": null,
+        })
+    )
+    .execute(&pool)
+    .await?;
+
+    let _guard = durable_test::spawn_worker(pool.clone()).await?;
+
+    let status = match timeout(Duration::from_secs(30), task.wait(&client)).await {
+        Ok(result) => result?,
+        Err(_) => anyhow::bail!("task failed to complete in under 30s"),
+    };
+
+    if !status.success() {
+        let logs: Vec<String> = sqlx::query_scalar!(
+            "SELECT message FROM durable.log WHERE task_id = $1 ORDER BY index",
+            task.id()
+        )
+        .fetch_all(&pool)
+        .await?;
+        anyhow::bail!("task failed replaying a legacy journal:\n{}", logs.join(""));
+    }
+
+    Ok(())
+}
