@@ -396,6 +396,33 @@ impl TaskState {
         Ok(None)
     }
 
+    /// Return the label of the event recorded at the current transaction
+    /// index, without consuming it.
+    ///
+    /// Returns `None` if no event has been recorded at this index yet, i.e.
+    /// the workflow is executing past the end of its journal. This is used to
+    /// recognize journals written by older runtimes whose sequence of events
+    /// differs from the one the current runtime would record.
+    ///
+    /// # Errors
+    /// This function will return an error if the database query fails.
+    pub async fn recorded_label(&mut self) -> anyhow::Result<Option<String>> {
+        if let Some(record) = self.events.last() {
+            if record.index == self.txn_index {
+                return Ok(Some(record.label.clone()));
+            }
+        }
+
+        let mut conn = self.pool().acquire().await?;
+        let record = self
+            .shared
+            .storage
+            .fetch_event_at_index(&mut conn, self.task_id(), self.txn_index)
+            .await?;
+
+        Ok(record.map(|record| record.label))
+    }
+
     /// Attempt to load the transaction value from the cached event history.
     fn try_enter_cached<T>(&mut self, options: &TransactionOptions) -> anyhow::Result<Option<T>>
     where

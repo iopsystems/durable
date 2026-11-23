@@ -1,3 +1,4 @@
+use anyhow::Context;
 use chrono::{DateTime, Utc};
 use serde_json::value::RawValue;
 use sqlx::types::Json;
@@ -8,6 +9,10 @@ use crate::bindings::durable::core::notify::{Event, Host, NotifyError};
 use crate::storage::{LockedTask, TaskState};
 use crate::task::TransactionOptions;
 use crate::{Task, TaskStatus};
+
+/// The label of the event that records the result of a timed notification
+/// wait.
+const TIMED_WAIT_LABEL: &str = "durable:core/notify.notification-blocking-timeout";
 
 async fn poll_notification(
     task: &mut Task,
@@ -222,6 +227,22 @@ impl Host for Task {
         }
 
         let timeout = std::time::Duration::from_nanos(timeout_ns);
+        let options = TransactionOptions::new(TIMED_WAIT_LABEL);
+
+        // Runtimes before the deadline event was introduced recorded only the
+        // result of a timed wait. If the result is what sits at the current
+        // index, this wait already finished under such a runtime: replay its
+        // result and don't look for a deadline event that was never recorded.
+        // Treating this as non-determinism would fail every in-flight task
+        // that had finished a timed wait before the runtime was upgraded.
+        if self.state.recorded_label().await?.as_deref() == Some(TIMED_WAIT_LABEL) {
+            let event = self
+                .state
+                .enter::<Option<EventData>>(options)
+                .await?
+                .context("the recorded timed wait result vanished during replay")?;
+            return Ok(event.map(Into::into));
+        }
 
         // Durably record the absolute deadline as a recorded event *before* the
         // result. This is what gives the timed wait a timer fallback: it is
@@ -244,7 +265,6 @@ impl Host for Task {
                 }
             };
 
-        let options = TransactionOptions::new("durable:core/notify.notification-blocking-timeout");
         if let Some(event) = self.state.enter::<Option<EventData>>(options).await? {
             return Ok(event.map(Into::into));
         }
